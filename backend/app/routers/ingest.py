@@ -3,6 +3,7 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..auth import require_ingest
@@ -61,7 +62,13 @@ async def ingest_health_auto_export(
     )
     if existing is None:
         db.add(event)
-        db.commit()
+        try:
+            db.commit()
+        except IntegrityError:
+            # Concurrent request inserted the same payload first; let that
+            # request own processing and return an idempotent duplicate here.
+            db.rollback()
+            return IngestResult(status="ok", duplicate=True)
 
     payload = json.loads(raw_text)
     parsed = parse_payload(payload)

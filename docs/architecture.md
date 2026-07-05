@@ -36,7 +36,7 @@ persists to Azure SQL, and a React SPA reads it back.
 | `config.py` | Env-driven settings; builds the SQLAlchemy/pyodbc URL. |
 | `db.py` | Engine + session factory + `get_db` dependency. |
 | `models.py` | ORM tables in the `fit` schema (schema is configurable so tests use schemaless SQLite). |
-| `auth.py` | Bearer-token validation against SHA-256 hashes; `require_ingest` / `require_read`. |
+| `auth.py` | Bearer-token validation against SHA-256 hashes; `require_ingest` / `require_read`. Refreshes `last_used_utc` at most hourly (debounced) so read GETs don't commit on every request. |
 | `normalize.py` | Pure parsing of Health Auto Export JSON → dataclasses; idempotent persistence + split computation. |
 | `geo.py` | Haversine + split computation from GPS route or distance samples (pure, heavily tested). |
 | `routers/` | `ingest`, `workouts`, `dashboard` endpoints. |

@@ -45,11 +45,6 @@ class HrSample:
     bpm: float
 
 
-def _avg_hr_between(hr: list[HrSample], start: datetime, end: datetime) -> float | None:
-    vals = [h.bpm for h in hr if start <= h.ts_utc <= end]
-    return sum(vals) / len(vals) if vals else None
-
-
 @dataclass
 class DistanceSample:
     start_utc: datetime
@@ -92,6 +87,20 @@ def _splits_from_axes(
     if total_dist <= 0:
         return []
 
+    # Pre-sort HR once and build prefix sums so each split's average HR is an
+    # O(log n) range lookup instead of a full scan (was O(splits x samples)).
+    hr_sorted = sorted(hr, key=lambda h: h.ts_utc)
+    hr_times = [h.ts_utc for h in hr_sorted]
+    hr_prefix = [0.0]
+    for h in hr_sorted:
+        hr_prefix.append(hr_prefix[-1] + h.bpm)
+
+    def avg_hr(seg_start: datetime, seg_end: datetime) -> float | None:
+        lo = bisect.bisect_left(hr_times, seg_start)
+        hi = bisect.bisect_right(hr_times, seg_end)
+        n = hi - lo
+        return (hr_prefix[hi] - hr_prefix[lo]) / n if n else None
+
     splits: list[SplitRow] = []
     prev_elapsed = 0.0
     k = 1
@@ -107,7 +116,7 @@ def _splits_from_axes(
                 distance_m=unit_m,
                 duration_sec=dur,
                 pace_sec_per_unit=dur,
-                avg_hr=_avg_hr_between(hr, seg_start, seg_end),
+                avg_hr=avg_hr(seg_start, seg_end),
                 source=source,
             )
         )
@@ -127,7 +136,7 @@ def _splits_from_axes(
                 distance_m=remaining,
                 duration_sec=dur,
                 pace_sec_per_unit=pace,
-                avg_hr=_avg_hr_between(hr, seg_start, seg_end),
+                avg_hr=avg_hr(seg_start, seg_end),
                 source=source,
             )
         )

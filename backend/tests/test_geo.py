@@ -61,6 +61,19 @@ def test_route_avg_hr_per_split():
     assert splits[0].avg_hr == 120.0
 
 
+def test_avg_hr_correct_with_unsorted_and_varied_samples():
+    # HR climbs over time; feeding it out of order must still yield correct
+    # per-split averages (the prefix-sum path pre-sorts internally).
+    route = _straight_line_route(n=250, spacing_m=10.0, secs_per_point=5.0)
+    ordered = [HrSample(ts_utc=BASE + timedelta(seconds=i * 5.0), bpm=float(100 + i)) for i in range(250)]
+    shuffled = list(reversed(ordered))  # same samples, out of order
+    a = compute_splits_from_route(route, ordered, "km")
+    b = compute_splits_from_route(route, shuffled, "km")
+    # Ordering of the input HR must not change any computed split average.
+    assert [s.avg_hr for s in a] == [s.avg_hr for s in b]
+    assert a[0].avg_hr is not None and a[0].avg_hr > 100.0
+
+
 def test_route_too_few_points():
     assert compute_splits_from_route([], [], "mi") == []
     assert compute_splits_from_route([RoutePoint(BASE, 0, 0)], [], "mi") == []

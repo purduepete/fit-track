@@ -5,6 +5,7 @@ SHA-256 hash is stored in fit.api_tokens. Requests present the raw token as
 ``Authorization: Bearer <token>``.
 """
 import hashlib
+from datetime import timedelta
 
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import false, select
@@ -13,6 +14,10 @@ from sqlalchemy.orm import Session
 from .db import get_db
 from .models import ApiToken
 from .timeutil import utcnow
+
+# Only refresh a token's last_used_utc at most this often, so read-only GETs
+# don't turn into a DB write + commit on every request.
+USAGE_UPDATE_INTERVAL = timedelta(hours=1)
 
 
 def hash_token(token: str) -> str:
@@ -40,8 +45,10 @@ def _validate(token: str, db: Session, required_scope: str) -> ApiToken:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
     if row.scope != "all" and row.scope != required_scope:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Token scope insufficient")
-    row.last_used_utc = utcnow()
-    db.commit()
+    now = utcnow()
+    if row.last_used_utc is None or (now - row.last_used_utc) >= USAGE_UPDATE_INTERVAL:
+        row.last_used_utc = now
+        db.commit()
     return row
 
 

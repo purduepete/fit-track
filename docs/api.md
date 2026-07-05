@@ -12,7 +12,9 @@ Unauthenticated liveness probe. → `{"status": "ok"}`
 ## `POST /api/ingest/health-auto-export`  *(ingest scope)*
 Body: a raw Health Auto Export JSON payload (`{"data": {...}}`). The raw body is
 stored and deduplicated by SHA-256 hash; re-posting an identical payload
-short-circuits.
+short-circuits. Concurrent posts of the same payload are safe: if two requests
+race the duplicate check, the loser catches the unique-hash violation and returns
+`{ "status": "ok", "duplicate": true }` instead of erroring.
 
 Payloads larger than `MAX_INGEST_BYTES` (default 25 MiB, see `config.py`) are
 rejected with `413 Request Entity Too Large` before parsing.

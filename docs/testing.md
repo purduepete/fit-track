@@ -20,7 +20,7 @@ importing app modules, so models render schemaless on SQLite. API tests override
 | `test_geo.py` | haversine distance; GPS and sample split computation; interpolation across multiple boundaries; partial trailing split; monotonicity. |
 | `test_normalize.py` | parsing real Health Auto Export field shapes; unit conversion; timezone → UTC + `local_date`; payload hashing. |
 | `test_persist.py` | idempotent upsert (re-ingest replaces child rows, no duplicates); split persistence for both units; daily-metric uniqueness; **regression: duplicate null-source daily metrics dedupe to one row** (SQL Server allows only one NULL per UNIQUE index — SQLite does not). |
-| `test_api.py` | auth (401 without/with bad token, scope enforcement); ingest + dedup; workout list/detail; dashboard aggregates; `unit=mi\|km`. |
+| `test_api.py` | auth (401 without/with bad token, scope enforcement); `last_used_utc` debounce (no rewrite within window, refresh when stale); ingest + dedup; concurrent-duplicate ingest stays idempotent; workout list/detail; dashboard aggregates; `unit=mi\|km`. |
 
 ### Schema-portability notes for tests
 Models use `SCHEMA = get_settings().db_schema or None` and a `_fk()` helper so

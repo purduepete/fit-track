@@ -167,3 +167,75 @@ def test_dashboard_trends_are_windowed(client, auth_headers, db_session):
     dates = [p["local_date"] for p in dash["weekly_workouts"]]
     assert recent.strftime("%Y-%m-%d") in dates
     assert old.strftime("%Y-%m-%d") not in dates
+
+
+def test_token_last_used_not_rewritten_within_window(client, auth_headers, db_session):
+    from datetime import timedelta
+
+    from app.models import ApiToken
+    from app.timeutil import utcnow
+
+    tok = db_session.query(ApiToken).one()
+    recent = utcnow() - timedelta(minutes=5)
+    tok.last_used_utc = recent
+    db_session.commit()
+
+    assert client.get("/api/workouts", headers=auth_headers).status_code == 200
+    db_session.refresh(tok)
+    assert tok.last_used_utc == recent  # within debounce window -> no rewrite
+
+
+def test_token_last_used_refreshes_when_stale(client, auth_headers, db_session):
+    from datetime import timedelta
+
+    from app.models import ApiToken
+    from app.timeutil import utcnow
+
+    tok = db_session.query(ApiToken).one()
+    stale = utcnow() - timedelta(hours=2)
+    tok.last_used_utc = stale
+    db_session.commit()
+
+    assert client.get("/api/workouts", headers=auth_headers).status_code == 200
+    db_session.refresh(tok)
+    assert tok.last_used_utc > stale  # stale -> refreshed
+
+
+class _NoneResult:
+    """Stand-in Result whose scalar_one_or_none() reports 'no existing row'."""
+
+    def scalar_one_or_none(self):
+        return None
+
+
+def test_concurrent_duplicate_ingest_is_idempotent(client, auth_headers, db_session, monkeypatch):
+    from app.models import RawIngestEvent
+    from app.normalize import payload_hash
+    from app.timeutil import utcnow
+
+    raw = json.dumps(WORKOUT_PAYLOAD)
+    digest = payload_hash(raw)
+    # A concurrent request already committed this payload.
+    db_session.add(
+        RawIngestEvent(
+            source="health_auto_export", received_utc=utcnow(),
+            payload_hash=digest, payload_json=raw, status="received",
+        )
+    )
+    db_session.commit()
+
+    # Force only the ingest duplicate-check SELECT to miss (as it would in a race),
+    # so the handler attempts an INSERT that violates the unique payload_hash.
+    real_execute = db_session.execute
+
+    def fake_execute(stmt, *a, **k):
+        if "raw_ingest_events" in str(stmt):
+            return _NoneResult()
+        return real_execute(stmt, *a, **k)
+
+    monkeypatch.setattr(db_session, "execute", fake_execute)
+    r = _ingest(client, auth_headers)
+    monkeypatch.undo()
+
+    assert r.status_code == 200, r.text
+    assert r.json()["duplicate"] is True

@@ -1,11 +1,12 @@
 """Ingestion endpoint consumed by the Health Auto Export iOS app."""
 import json
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..auth import require_ingest
+from ..config import get_settings
 from ..db import get_db
 from ..models import RawIngestEvent
 from ..normalize import parse_payload, payload_hash, persist_payload
@@ -27,7 +28,21 @@ async def ingest_health_auto_export(
     be re-run later without asking the phone to resend data. Normalization then
     performs idempotent upserts keyed on the Apple workout UUID.
     """
+    max_bytes = get_settings().max_ingest_bytes
+    # Reject via the Content-Length header before buffering the whole body.
+    declared = request.headers.get("content-length")
+    if declared is not None and declared.isdigit() and int(declared) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Payload exceeds {max_bytes} bytes",
+        )
+
     raw_bytes = await request.body()
+    if len(raw_bytes) > max_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Payload exceeds {max_bytes} bytes",
+        )
     raw_text = raw_bytes.decode("utf-8")
     digest = payload_hash(raw_text)
 

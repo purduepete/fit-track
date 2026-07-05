@@ -17,6 +17,10 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 RESTING_HR_NAMES = ("resting_heart_rate", "restingHeartRate")
 VO2MAX_NAMES = ("vo2_max", "vo2Max", "vO2Max")
 
+# Trend windows keep dashboard queries/payloads bounded as history grows.
+WEEK_DAYS = 7
+RESTING_TREND_DAYS = 90
+
 
 def _latest_metric(db: Session, names: tuple[str, ...]) -> float | None:
     row = db.execute(
@@ -33,7 +37,9 @@ def dashboard(
     db: Session = Depends(get_db),
     _token=Depends(require_read),
 ) -> DashboardSummary:
-    since = utcnow() - timedelta(days=7)
+    since = utcnow() - timedelta(days=WEEK_DAYS)
+    # local_date is a "YYYY-MM-DD" string, so lexical >= is a valid date window.
+    resting_since = (utcnow() - timedelta(days=RESTING_TREND_DAYS)).strftime("%Y-%m-%d")
 
     week_rows = db.execute(
         select(
@@ -43,20 +49,24 @@ def dashboard(
         ).where(Workout.start_utc >= since)
     ).one()
 
-    # Trends grouped by local date.
+    # Trends grouped by local date (bounded to the last week).
     by_date = db.execute(
         select(
             Workout.local_date,
             func.count(Workout.uuid),
             func.coalesce(func.sum(Workout.duration_sec), 0.0),
         )
+        .where(Workout.start_utc >= since)
         .group_by(Workout.local_date)
         .order_by(Workout.local_date)
     ).all()
 
     resting_trend = db.execute(
         select(DailyMetric.local_date, DailyMetric.value)
-        .where(DailyMetric.metric_type.in_(RESTING_HR_NAMES))
+        .where(
+            DailyMetric.metric_type.in_(RESTING_HR_NAMES),
+            DailyMetric.local_date >= resting_since,
+        )
         .order_by(DailyMetric.local_date)
     ).all()
 

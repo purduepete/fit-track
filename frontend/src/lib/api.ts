@@ -41,6 +41,10 @@ export interface WorkoutDetail extends WorkoutSummary {
   splits: Split[];
   route: RoutePoint[];
   hr_series: HrPoint[];
+  route_total: number;
+  hr_total: number;
+  route_downsampled: boolean;
+  hr_downsampled: boolean;
 }
 
 export interface MetricPoint {
@@ -96,6 +100,8 @@ export const api = {
     apiGet<WorkoutSummary[]>(
       "/api/workouts" + (type ? `?workout_type=${encodeURIComponent(type)}` : "")
     ),
-  workout: (uuid: string, unit: "mi" | "km") =>
-    apiGet<WorkoutDetail>(`/api/workouts/${encodeURIComponent(uuid)}?unit=${unit}`),
+  workout: (uuid: string, unit: "mi" | "km", full = false) =>
+    apiGet<WorkoutDetail>(
+      `/api/workouts/${encodeURIComponent(uuid)}?unit=${unit}${full ? "&full=true" : ""}`
+    ),
 };

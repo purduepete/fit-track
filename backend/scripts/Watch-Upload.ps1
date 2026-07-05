@@ -4,10 +4,16 @@
     archives into the deployed fittrack API.
 
 .DESCRIPTION
-    Loads FITTRACK_API_URL and FITTRACK_TOKEN from backend/.env.local (a
-    gitignored file — never commit your token), then runs
-    scripts/upload_folder.py in watch mode. Drop a new HAE .zip/.json into
-    fittrack/upload and it is POSTed to the API and moved to upload/_archive.
+    Loads FITTRACK_API_URL, FITTRACK_TOKEN and (optionally) FITTRACK_WATCH_DIR /
+    FITTRACK_ARCHIVE_NAME from backend/.env.local (a gitignored file — never
+    commit your token), then runs scripts/upload_folder.py in watch mode. Drop a
+    new HAE .zip/.json into the watched folder and it is POSTed to the API and
+    moved into the archive subfolder.
+
+    The watched folder defaults to fittrack/upload; set FITTRACK_WATCH_DIR to a
+    synced cloud folder (e.g. "G:\My Drive\fittrack" for Google Drive) and
+    FITTRACK_ARCHIVE_NAME (e.g. "processed") to keep processed files tidied in
+    place.
 
     Leave this window open; it polls every -IntervalSeconds. To run it after a
     reboot, just launch this script again (or add it to your Startup folder /
@@ -45,12 +51,20 @@ if (-not $env:FITTRACK_API_URL -or -not $env:FITTRACK_TOKEN) {
 
 $venvPython = Join-Path $backend '.venv\Scripts\python.exe'
 $python = if (Test-Path $venvPython) { $venvPython } else { 'python' }
-$uploadDir = Join-Path $repo 'upload'
+
+# Watch folder + archive subfolder are configurable via .env.local
+# (FITTRACK_WATCH_DIR / FITTRACK_ARCHIVE_NAME); default to the local upload folder.
+$watchDir = if ($env:FITTRACK_WATCH_DIR) { $env:FITTRACK_WATCH_DIR } else { Join-Path $repo 'upload' }
+$archiveName = if ($env:FITTRACK_ARCHIVE_NAME) { $env:FITTRACK_ARCHIVE_NAME } else { '_archive' }
+
+if (-not (Test-Path $watchDir)) {
+    throw "Watch folder not found: $watchDir (check FITTRACK_WATCH_DIR in backend/.env.local)."
+}
 
 Push-Location $backend
 try {
-    Write-Host "Watching $uploadDir -> $($env:FITTRACK_API_URL) (every ${IntervalSeconds}s). Ctrl+C to stop."
-    & $python -m scripts.upload_folder --dir $uploadDir --interval $IntervalSeconds
+    Write-Host "Watching $watchDir -> $($env:FITTRACK_API_URL) (every ${IntervalSeconds}s, archive=$archiveName). Ctrl+C to stop."
+    & $python -m scripts.upload_folder --dir $watchDir --interval $IntervalSeconds --archive-name $archiveName
 }
 finally {
     Pop-Location

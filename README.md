@@ -78,11 +78,14 @@ npm run dev        # http://localhost:5173  (paste the read token)
 
 1. In **Health Auto Export**, configure an automation to export **JSON**
    including **Route**, **Heart Rate** and **Walking + Running Distance**, to a
-   folder that syncs to this PC (iCloud Drive / Dropbox / OneDrive), or to the
-   `fittrack/upload` folder directly.
+   folder that syncs to this PC. This project is wired for **Google Drive**: the
+   phone uploads to a `fittrack` folder in Drive, which Google Drive for Desktop
+   mirrors locally (e.g. `G:\My Drive\fittrack`). iCloud Drive / OneDrive /
+   Dropbox work the same way — just point `FITTRACK_WATCH_DIR` at the folder (or
+   drop files into `fittrack/upload` directly).
 2. Run the folder watcher. The easiest way is the launcher, which reads
-   `FITTRACK_API_URL` / `FITTRACK_TOKEN` from a gitignored `backend/.env.local`
-   and polls the folder continuously:
+   `FITTRACK_API_URL` / `FITTRACK_TOKEN` (and the optional watch-folder settings)
+   from a gitignored `backend/.env.local` and polls the folder continuously:
 
    ```powershell
    cd backend
@@ -94,6 +97,10 @@ npm run dev        # http://localhost:5173  (paste the read token)
    ```
    FITTRACK_API_URL=https://<your-container-app>
    FITTRACK_TOKEN=<ingest token>
+   # Optional: watch a synced cloud folder instead of fittrack/upload, and keep
+   # processed files tidied in a subfolder that stays in the cloud folder.
+   FITTRACK_WATCH_DIR=G:\My Drive\fittrack
+   FITTRACK_ARCHIVE_NAME=processed
    ```
 
    Or run the client directly (equivalent):

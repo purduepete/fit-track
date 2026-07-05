@@ -1,22 +1,27 @@
 // fittrack infrastructure — Azure Container Apps (Consumption, scale-to-zero).
-// Deployed into a NEW dedicated resource group; the Azure SQL server AND the
-// Log Analytics workspace are reused cross-RG from the existing webportfolio
-// deployment (tables live in the `fit` schema of the WebPortfolio database),
-// so neither a database nor a workspace resource is created here.
+// Provisions a dedicated ACR and a user-assigned managed identity; the Azure SQL
+// server AND the Log Analytics workspace are reused cross-RG from the existing
+// webportfolio deployment (tables live in the `fit` schema of the WebPortfolio
+// database), so neither a database nor a workspace resource is created here.
 //
-//   az group create -n fittrack-rg -l westus2
+//   az group create -n fittrack-rg -l eastus2
+//   az acr build -r <acrName> -t fittrack:v1 -t fittrack:latest .
 //   az deployment group create -g fittrack-rg -f infra/main.bicep \
-//        -p containerImage=ghcr.io/purduepete/fittrack:latest
+//        -p acrName=<acrName> containerImage=<acrName>.azurecr.io/fittrack:v1
 //
-// The app authenticates to Azure SQL with its SYSTEM-ASSIGNED managed identity
-// (DB_AUTH=aad) — no password is provisioned. After the first deploy, grant the
-// identity ([fittrack-api]) access to the fit schema (see docs/architecture.md).
+// The app authenticates to Azure SQL with its USER-ASSIGNED managed identity
+// (DB_AUTH=aad; AZURE_CLIENT_ID selects it) and pulls its image from the ACR with
+// the same identity. After the first deploy, grant the identity
+// ([fittrack-identity]) access to the fit schema (see docs/architecture.md).
 
 @description('Location for all resources.')
 param location string = resourceGroup().location
 
-@description('Container image (e.g. ghcr.io/<owner>/fittrack:latest).')
+@description('Container image, e.g. <acrName>.azurecr.io/fittrack:v1.')
 param containerImage string
+
+@description('Name of the Azure Container Registry the image is pulled from (created here).')
+param acrName string
 
 @description('Azure SQL server FQDN (existing webportfolio server).')
 param dbServer string = 'sqlgkhw25ijhyzzy.database.windows.net'
@@ -31,6 +36,34 @@ param logWorkspaceName string = 'loggkhw25ijhyzzy'
 param logWorkspaceResourceGroup string = 'investmentportfolio'
 
 var namePrefix = 'fittrack'
+
+// Dedicated registry for the app image; pulled via the user-assigned identity
+// below (no admin user / registry passwords).
+resource acr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = {
+  name: acrName
+  location: location
+  sku: { name: 'Basic' }
+  properties: { adminUserEnabled: false }
+}
+
+// One identity used for BOTH ACR pull and Azure SQL (DB_AUTH=aad). Using a
+// user-assigned identity (rather than system-assigned) lets the AcrPull role be
+// granted before the app exists, avoiding a first-pull race.
+resource uami 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
+  name: '${namePrefix}-identity'
+  location: location
+}
+
+resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
+  name: guid(acr.id, uami.id, 'AcrPull')
+  scope: acr
+  properties: {
+    // AcrPull built-in role.
+    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
+    principalId: uami.properties.principalId
+    principalType: 'ServicePrincipal'
+  }
+}
 
 // Reuse the existing (webportfolio) workspace cross-RG rather than creating a
 // dedicated one — for a personal tracker this just routes container logs and
@@ -58,9 +91,14 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-api'
   location: location
   identity: {
-    // System-assigned identity used to authenticate to Azure SQL (DB_AUTH=aad).
-    type: 'SystemAssigned'
+    type: 'UserAssigned'
+    userAssignedIdentities: {
+      '${uami.id}': {}
+    }
   }
+  dependsOn: [
+    acrPull
+  ]
   properties: {
     managedEnvironmentId: env.id
     configuration: {
@@ -69,6 +107,12 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 8000
         transport: 'auto'
       }
+      registries: [
+        {
+          server: acr.properties.loginServer
+          identity: uami.id
+        }
+      ]
     }
     template: {
       containers: [
@@ -81,6 +125,8 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           }
           env: [
             { name: 'DB_AUTH', value: 'aad' }
+            // Select the user-assigned identity for DefaultAzureCredential.
+            { name: 'AZURE_CLIENT_ID', value: uami.properties.clientId }
             { name: 'DB_SERVER', value: dbServer }
             { name: 'DB_NAME', value: dbName }
             { name: 'DB_SCHEMA', value: 'fit' }
@@ -104,5 +150,14 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
 
 output apiUrl string = 'https://${app.properties.configuration.ingress.fqdn}'
 
-@description('Principal (object) id of the app managed identity — grant it access to the fit schema.')
-output identityPrincipalId string = app.identity.principalId
+@description('Registry the image is pulled from.')
+output acrLoginServer string = acr.properties.loginServer
+
+@description('Name of the app user-assigned identity — used for the SQL CREATE USER ... FROM EXTERNAL PROVIDER grant.')
+output identityName string = uami.name
+
+@description('Client id of the app identity (matches the AZURE_CLIENT_ID env var).')
+output identityClientId string = uami.properties.clientId
+
+@description('Principal (object) id of the app identity.')
+output identityPrincipalId string = uami.properties.principalId

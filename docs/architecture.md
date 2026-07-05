@@ -54,21 +54,32 @@ Two modes, selected by `DB_AUTH` (see `backend/.env.example`):
 
 `aad` is preferred because the reused server's SQL admin password is managed
 elsewhere (webportfolio) and may rotate; token auth avoids depending on it.
-**The deployed Container App uses `DB_AUTH=aad` with a system-assigned managed
-identity** provisioned by `infra/main.bicep` — no password is passed at deploy
-time. The Bicep `identityPrincipalId` output is the identity's object id.
+**The deployed Container App uses `DB_AUTH=aad` with a **user-assigned** managed
+identity (`fittrack-identity`)** provisioned by `infra/main.bicep` — no password is
+passed at deploy time. `AZURE_CLIENT_ID` is set to that identity's client id so
+`DefaultAzureCredential` selects it. A user-assigned (rather than system-assigned)
+identity is used so its **AcrPull** role assignment can exist *before* the app does,
+avoiding a first-image-pull race; the same identity both pulls the image from the
+dedicated Azure Container Registry and authenticates to SQL. The Bicep
+`identityName` / `identityClientId` / `identityPrincipalId` outputs surface it.
 
 ### Granting the deployed app access (one-time)
 
 After the first deploy, connect **as the AAD admin** and create a contained
-database user for the Container App's identity, then grant it access to the
-`fit` schema. **Per policy this is a live-DB change — get a Gemini second opinion
-before running it.**
+database user for the Container App's identity (`fittrack-identity`), then grant it
+DML on the `fit` schema. **Per policy this is a live-DB change — get a Gemini
+second opinion before running it.** The statement below is idempotent (safe to
+re-run):
 
 ```sql
-CREATE USER [fittrack-api] FROM EXTERNAL PROVIDER;   -- the managed identity name
-GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::fit TO [fittrack-api];
+IF NOT EXISTS (SELECT 1 FROM sys.database_principals WHERE name = 'fittrack-identity')
+BEGIN
+    EXEC('CREATE USER [fittrack-identity] FROM EXTERNAL PROVIDER;');  -- the user-assigned MI name
+END
+GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::fit TO [fittrack-identity];
 ```
+
+Rollback: `DROP USER [fittrack-identity];` (removes the user and its grants).
 
 ## Design decisions
 
@@ -82,4 +93,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON SCHEMA::fit TO [fittrack-api];
   `tz_offset_minutes`, and derive `local_date` from the local calendar day so
   day-grouping matches what you saw on the watch.
 - **Cost**: Container Apps Consumption with `minReplicas: 0` idles at ~zero; the
-  Azure SQL server is reused (no new database resource).
+  Azure SQL server and Log Analytics workspace are reused (no new database or
+  workspace resource). The only always-on cost is the dedicated ACR (Basic SKU,
+  ~$5/mo) that stores the app image.

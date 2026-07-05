@@ -1,52 +1,49 @@
 name: Deploy
 
-# Manual deploy: builds the image, pushes to GHCR, and points the Container App
-# at the new tag. Deploys touch the SHARED WebPortfolio Azure SQL server (fit
-# schema), so this is intentionally manual (workflow_dispatch), never on push.
+# Manual deploy: builds the image in Azure Container Registry (az acr build) and
+# points the Container App at the new tag. Deploys touch the SHARED WebPortfolio
+# Azure SQL server (fit schema), so this is intentionally manual
+# (workflow_dispatch), never on push.
 #
-# The app authenticates to Azure SQL with its system-assigned managed identity
-# (DB_AUTH=aad) — no DB password is passed. Grant the identity access to the fit
+# The app authenticates to Azure SQL AND pulls its image with the same
+# USER-ASSIGNED managed identity (fittrack-identity, DB_AUTH=aad) — no DB password
+# and no registry credentials are passed. Grant the identity access to the fit
 # schema once after the first deploy (see docs/architecture.md).
 #
 # Required repo secrets:
 #   AZURE_CREDENTIALS   - output of `az ad sp create-for-rbac --sdk-auth`
 # Required repo variables:
 #   FITTRACK_RG         - resource group (e.g. fittrack-rg)
+#   FITTRACK_ACR        - Azure Container Registry name (e.g. fittrackacrcbc0af)
 
 on:
   workflow_dispatch:
-
-env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/fittrack
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
     steps:
       - uses: actions/checkout@v4
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push image
-        run: |
-          TAG="${IMAGE}:${GITHUB_SHA::7}"
-          docker build -t "$TAG" -t "${IMAGE}:latest" .
-          docker push "$TAG"
-          docker push "${IMAGE}:latest"
-          echo "TAG=$TAG" >> "$GITHUB_ENV"
 
       - name: Azure login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Build image in ACR
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            TAG="${GITHUB_SHA::7}"
+            az acr build \
+              -r "${{ vars.FITTRACK_ACR }}" \
+              -t "fittrack:${TAG}" \
+              -t "fittrack:latest" \
+              .
+            LOGIN_SERVER=$(az acr show -n "${{ vars.FITTRACK_ACR }}" --query loginServer -o tsv)
+            echo "IMAGE=${LOGIN_SERVER}/fittrack:${TAG}" >> "$GITHUB_ENV"
 
       - name: Deploy infra + image
         uses: azure/cli@v2
@@ -55,4 +52,4 @@ jobs:
             az deployment group create \
               -g "${{ vars.FITTRACK_RG }}" \
               -f infra/main.bicep \
-              -p containerImage="$TAG"
+              -p acrName="${{ vars.FITTRACK_ACR }}" containerImage="$IMAGE"

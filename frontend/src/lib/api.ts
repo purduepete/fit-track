@@ -58,7 +58,6 @@ export interface DashboardSummary {
   active_kcal_7d: number;
   latest_resting_hr: number | null;
   latest_vo2max: number | null;
-  weekly_workouts: MetricPoint[];
   weekly_minutes: MetricPoint[];
   resting_hr_trend: MetricPoint[];
 }

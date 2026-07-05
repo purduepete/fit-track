@@ -82,6 +82,15 @@ def test_full_ingest_and_read_flow(client, auth_headers):
     assert "workouts_7d" in dash
 
 
+def test_ingest_rejects_malformed_json(client, auth_headers):
+    r = client.post(
+        "/api/ingest/health-auto-export",
+        content="{not valid json",
+        headers={**auth_headers, "Content-Type": "application/json"},
+    )
+    assert r.status_code == 400, r.text
+
+
 def test_workout_404(client, auth_headers):
     assert client.get("/api/workouts/nope", headers=auth_headers).status_code == 404
 
@@ -164,7 +173,7 @@ def test_dashboard_trends_are_windowed(client, auth_headers, db_session):
 
     dash = client.get("/api/dashboard", headers=auth_headers).json()
     assert dash["workouts_7d"] == 1
-    dates = [p["local_date"] for p in dash["weekly_workouts"]]
+    dates = [p["local_date"] for p in dash["weekly_minutes"]]
     assert recent.strftime("%Y-%m-%d") in dates
     assert old.strftime("%Y-%m-%d") not in dates
 

@@ -70,7 +70,13 @@ async def ingest_health_auto_export(
             db.rollback()
             return IngestResult(status="ok", duplicate=True)
 
-    payload = json.loads(raw_text)
+    try:
+        payload = json.loads(raw_text)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Request body is not valid JSON.",
+        ) from exc
     parsed = parse_payload(payload)
     counts = persist_payload(parsed, db)
 

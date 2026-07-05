@@ -1,0 +1,55 @@
+name: Deploy
+
+# Manual deploy: builds the image, pushes to GHCR, and points the Container App
+# at the new tag. Deploys touch the SHARED WebPortfolio Azure SQL server (fit
+# schema), so this is intentionally manual (workflow_dispatch), never on push.
+#
+# Required repo secrets:
+#   AZURE_CREDENTIALS   - output of `az ad sp create-for-rbac --sdk-auth`
+#   FITTRACK_DB_PASSWORD- Azure SQL password (sqladmin)
+# Required repo variables:
+#   FITTRACK_RG         - resource group (e.g. fittrack-rg)
+
+on:
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/fittrack
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        run: |
+          TAG="${IMAGE}:${GITHUB_SHA::7}"
+          docker build -t "$TAG" -t "${IMAGE}:latest" .
+          docker push "$TAG"
+          docker push "${IMAGE}:latest"
+          echo "TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: Azure login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Deploy infra + image
+        uses: azure/cli@v2
+        with:
+          inlineScript: |
+            az deployment group create \
+              -g "${{ vars.FITTRACK_RG }}" \
+              -f infra/main.bicep \
+              -p containerImage="$TAG" dbPassword="${{ secrets.FITTRACK_DB_PASSWORD }}"

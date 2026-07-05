@@ -1,0 +1,72 @@
+"""Pydantic response/request schemas for the fittrack API."""
+from datetime import datetime
+
+from pydantic import BaseModel
+
+
+class IngestResult(BaseModel):
+    status: str
+    duplicate: bool = False
+    workouts: int = 0
+    daily_metrics: int = 0
+    splits: int = 0
+
+
+class WorkoutSummary(BaseModel):
+    uuid: str
+    workout_type: str
+    local_date: str
+    start_utc: datetime
+    duration_sec: float | None
+    distance_m: float | None
+    active_energy_kcal: float | None
+    avg_hr: float | None
+    max_hr: float | None
+    has_route: bool
+
+
+class SplitOut(BaseModel):
+    split_index: int
+    distance_m: float
+    duration_sec: float
+    pace_sec_per_unit: float
+    avg_hr: float | None
+    source: str
+
+
+class RoutePointOut(BaseModel):
+    seq: int
+    lat: float
+    lon: float
+    ts_utc: datetime
+
+
+class HrPointOut(BaseModel):
+    ts_utc: datetime
+    bpm: float
+
+
+class WorkoutDetail(WorkoutSummary):
+    source_name: str | None
+    device_name: str | None
+    end_utc: datetime
+    min_hr: float | None
+    splits: list[SplitOut]
+    route: list[RoutePointOut]
+    hr_series: list[HrPointOut]
+
+
+class MetricPoint(BaseModel):
+    local_date: str
+    value: float
+
+
+class DashboardSummary(BaseModel):
+    workouts_7d: int
+    minutes_7d: float
+    active_kcal_7d: float
+    latest_resting_hr: float | None
+    latest_vo2max: float | None
+    weekly_workouts: list[MetricPoint]
+    weekly_minutes: list[MetricPoint]
+    resting_hr_trend: list[MetricPoint]

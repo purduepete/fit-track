@@ -1,0 +1,72 @@
+"""Dashboard aggregate endpoint (last-7-day summary + trend series)."""
+from datetime import timedelta
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
+
+from ..auth import require_read
+from ..db import get_db
+from ..models import DailyMetric, Workout
+from ..schemas import DashboardSummary, MetricPoint
+from ..timeutil import utcnow
+
+router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
+
+# HAE metric names that represent resting HR / VO2 max vary; match loosely.
+RESTING_HR_NAMES = ("resting_heart_rate", "restingHeartRate")
+VO2MAX_NAMES = ("vo2_max", "vo2Max", "vO2Max")
+
+
+def _latest_metric(db: Session, names: tuple[str, ...]) -> float | None:
+    row = db.execute(
+        select(DailyMetric.value)
+        .where(DailyMetric.metric_type.in_(names))
+        .order_by(DailyMetric.local_date.desc())
+        .limit(1)
+    ).scalar_one_or_none()
+    return row
+
+
+@router.get("", response_model=DashboardSummary)
+def dashboard(
+    db: Session = Depends(get_db),
+    _token=Depends(require_read),
+) -> DashboardSummary:
+    since = utcnow() - timedelta(days=7)
+
+    week_rows = db.execute(
+        select(
+            func.count(Workout.uuid),
+            func.coalesce(func.sum(Workout.duration_sec), 0.0),
+            func.coalesce(func.sum(Workout.active_energy_kcal), 0.0),
+        ).where(Workout.start_utc >= since)
+    ).one()
+
+    # Trends grouped by local date.
+    by_date = db.execute(
+        select(
+            Workout.local_date,
+            func.count(Workout.uuid),
+            func.coalesce(func.sum(Workout.duration_sec), 0.0),
+        )
+        .group_by(Workout.local_date)
+        .order_by(Workout.local_date)
+    ).all()
+
+    resting_trend = db.execute(
+        select(DailyMetric.local_date, DailyMetric.value)
+        .where(DailyMetric.metric_type.in_(RESTING_HR_NAMES))
+        .order_by(DailyMetric.local_date)
+    ).all()
+
+    return DashboardSummary(
+        workouts_7d=week_rows[0],
+        minutes_7d=round(week_rows[1] / 60.0, 1),
+        active_kcal_7d=round(week_rows[2], 0),
+        latest_resting_hr=_latest_metric(db, RESTING_HR_NAMES),
+        latest_vo2max=_latest_metric(db, VO2MAX_NAMES),
+        weekly_workouts=[MetricPoint(local_date=d, value=c) for d, c, _ in by_date],
+        weekly_minutes=[MetricPoint(local_date=d, value=round(s / 60.0, 1)) for d, _, s in by_date],
+        resting_hr_trend=[MetricPoint(local_date=d, value=v) for d, v in resting_trend],
+    )

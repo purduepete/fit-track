@@ -6,8 +6,11 @@
 //
 //   az group create -n fittrack-rg -l westus2
 //   az deployment group create -g fittrack-rg -f infra/main.bicep \
-//        -p containerImage=ghcr.io/purduepete/fittrack:latest \
-//           dbPassword=<secret> ingestToken=<optional>
+//        -p containerImage=ghcr.io/purduepete/fittrack:latest
+//
+// The app authenticates to Azure SQL with its SYSTEM-ASSIGNED managed identity
+// (DB_AUTH=aad) — no password is provisioned. After the first deploy, grant the
+// identity ([fittrack-api]) access to the fit schema (see docs/architecture.md).
 
 @description('Location for all resources.')
 param location string = resourceGroup().location
@@ -20,13 +23,6 @@ param dbServer string = 'sqlgkhw25ijhyzzy.database.windows.net'
 
 @description('Database name.')
 param dbName string = 'WebPortfolio'
-
-@description('Database user.')
-param dbUser string = 'sqladmin'
-
-@secure()
-@description('Database password.')
-param dbPassword string
 
 @description('Existing Log Analytics workspace to reuse (avoids a dedicated workspace + its cost).')
 param logWorkspaceName string = 'loggkhw25ijhyzzy'
@@ -61,6 +57,10 @@ resource env 'Microsoft.App/managedEnvironments@2024-03-01' = {
 resource app 'Microsoft.App/containerApps@2024-03-01' = {
   name: '${namePrefix}-api'
   location: location
+  identity: {
+    // System-assigned identity used to authenticate to Azure SQL (DB_AUTH=aad).
+    type: 'SystemAssigned'
+  }
   properties: {
     managedEnvironmentId: env.id
     configuration: {
@@ -69,9 +69,6 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 8000
         transport: 'auto'
       }
-      secrets: [
-        { name: 'db-password', value: dbPassword }
-      ]
     }
     template: {
       containers: [
@@ -83,10 +80,9 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             memory: '0.5Gi'
           }
           env: [
+            { name: 'DB_AUTH', value: 'aad' }
             { name: 'DB_SERVER', value: dbServer }
             { name: 'DB_NAME', value: dbName }
-            { name: 'DB_USER', value: dbUser }
-            { name: 'DB_PASSWORD', secretRef: 'db-password' }
             { name: 'DB_SCHEMA', value: 'fit' }
           ]
         }
@@ -107,3 +103,6 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
 }
 
 output apiUrl string = 'https://${app.properties.configuration.ingress.fqdn}'
+
+@description('Principal (object) id of the app managed identity — grant it access to the fit schema.')
+output identityPrincipalId string = app.identity.principalId

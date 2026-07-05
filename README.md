@@ -36,7 +36,7 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
 | Path | Purpose |
 | --- | --- |
 | `backend/app/` | FastAPI app: config, db, models, auth, normalizer, geo/splits, routers |
-| `backend/scripts/` | `init_db`, `token_admin` / `New-IngestToken.ps1`, `upload_folder`, `backfill_export_xml` |
+| `backend/scripts/` | `init_db`, `token_admin` / `New-IngestToken.ps1`, `upload_folder` / `Watch-Upload.ps1`, `backfill_export_xml` |
 | `backend/tests/` | pytest suite (geo, normalizer, persistence, API) |
 | `frontend/` | React + Vite + TS dashboard (Recharts, react-leaflet) |
 | `infra/main.bicep` | Azure Container Apps (Consumption, scale-to-zero) |
@@ -80,7 +80,23 @@ npm run dev        # http://localhost:5173  (paste the read token)
    including **Route**, **Heart Rate** and **Walking + Running Distance**, to a
    folder that syncs to this PC (iCloud Drive / Dropbox / OneDrive), or to the
    `fittrack/upload` folder directly.
-2. Run the folder watcher:
+2. Run the folder watcher. The easiest way is the launcher, which reads
+   `FITTRACK_API_URL` / `FITTRACK_TOKEN` from a gitignored `backend/.env.local`
+   and polls the folder continuously:
+
+   ```powershell
+   cd backend
+   .\scripts\Watch-Upload.ps1                 # polls every 5 min; -IntervalSeconds to change
+   ```
+
+   `backend/.env.local` (never committed — matched by `*.local`):
+
+   ```
+   FITTRACK_API_URL=https://<your-container-app>
+   FITTRACK_TOKEN=<ingest token>
+   ```
+
+   Or run the client directly (equivalent):
 
    ```powershell
    $env:FITTRACK_API_URL = "https://<your-container-app>"   # or http://localhost:8000
@@ -89,8 +105,9 @@ npm run dev        # http://localhost:5173  (paste the read token)
    .\.venv\Scripts\python.exe -m scripts.upload_folder --dir ..\upload
    ```
 
-   Processed files move to `upload/_archive`. Use `--once` for a single pass or
-   register it as a Scheduled Task for a true daily job.
+   Processed files move to `upload/_archive`. Use `--once` for a single pass, or
+   add `Watch-Upload.ps1` to your Startup folder / a logon Scheduled Task so the
+   watcher survives reboots.
 
 See [`docs/data-pipeline.md`](docs/data-pipeline.md) for the Health Auto Export
 setup and the one-time historical backfill (`backfill_export_xml.py`).

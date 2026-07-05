@@ -73,6 +73,5 @@ class DashboardSummary(BaseModel):
     active_kcal_7d: float
     latest_resting_hr: float | None
     latest_vo2max: float | None
-    weekly_workouts: list[MetricPoint]
     weekly_minutes: list[MetricPoint]
     resting_hr_trend: list[MetricPoint]

@@ -41,25 +41,23 @@ def dashboard(
     # local_date is a "YYYY-MM-DD" string, so lexical >= is a valid date window.
     resting_since = (utcnow() - timedelta(days=RESTING_TREND_DAYS)).strftime("%Y-%m-%d")
 
-    week_rows = db.execute(
-        select(
-            func.count(Workout.uuid),
-            func.coalesce(func.sum(Workout.duration_sec), 0.0),
-            func.coalesce(func.sum(Workout.active_energy_kcal), 0.0),
-        ).where(Workout.start_utc >= since)
-    ).one()
-
-    # Trends grouped by local date (bounded to the last week).
+    # One grouped scan of the week: per-day counts/duration/energy. The 7-day
+    # KPI totals are derived from these rows, avoiding a second window scan.
     by_date = db.execute(
         select(
             Workout.local_date,
             func.count(Workout.uuid),
             func.coalesce(func.sum(Workout.duration_sec), 0.0),
+            func.coalesce(func.sum(Workout.active_energy_kcal), 0.0),
         )
         .where(Workout.start_utc >= since)
         .group_by(Workout.local_date)
         .order_by(Workout.local_date)
     ).all()
+
+    workouts_7d = sum(row[1] for row in by_date)
+    duration_7d = sum(row[2] for row in by_date)
+    energy_7d = sum(row[3] for row in by_date)
 
     resting_trend = db.execute(
         select(DailyMetric.local_date, DailyMetric.value)
@@ -71,12 +69,11 @@ def dashboard(
     ).all()
 
     return DashboardSummary(
-        workouts_7d=week_rows[0],
-        minutes_7d=round(week_rows[1] / 60.0, 1),
-        active_kcal_7d=round(week_rows[2], 0),
+        workouts_7d=workouts_7d,
+        minutes_7d=round(duration_7d / 60.0, 1),
+        active_kcal_7d=round(energy_7d, 0),
         latest_resting_hr=_latest_metric(db, RESTING_HR_NAMES),
         latest_vo2max=_latest_metric(db, VO2MAX_NAMES),
-        weekly_workouts=[MetricPoint(local_date=d, value=c) for d, c, _ in by_date],
-        weekly_minutes=[MetricPoint(local_date=d, value=round(s / 60.0, 1)) for d, _, s in by_date],
+        weekly_minutes=[MetricPoint(local_date=d, value=round(s / 60.0, 1)) for d, _, s, _ in by_date],
         resting_hr_trend=[MetricPoint(local_date=d, value=v) for d, v in resting_trend],
     )

@@ -23,6 +23,12 @@ def test_haversine_zero():
     assert haversine_m(47.0, -122.0, 47.0, -122.0) == 0.0
 
 
+def test_haversine_coincident_points_no_domain_error():
+    # Floating-point rounding must not push the asin/sqrt argument past 1.0.
+    assert haversine_m(47.123456, -122.123456, 47.123456, -122.123456) == 0.0
+    assert haversine_m(0.0, 0.0, 0.0, 0.0) == 0.0
+
+
 def _straight_line_route(n: int, spacing_m: float, secs_per_point: float) -> list[RoutePoint]:
     """Points marching north; ~spacing_m apart, one every secs_per_point seconds."""
     deg_per_m = 1.0 / 111_320.0

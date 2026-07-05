@@ -248,3 +248,27 @@ def test_concurrent_duplicate_ingest_is_idempotent(client, auth_headers, db_sess
 
     assert r.status_code == 200, r.text
     assert r.json()["duplicate"] is True
+
+
+def test_received_event_is_reprocessed(client, auth_headers, db_session):
+    """A prior request that crashed mid-persist leaves status='received'; a retry
+    of the same payload must reprocess it (not silently skip)."""
+    from app.models import RawIngestEvent, Workout
+    from app.normalize import payload_hash
+    from app.timeutil import utcnow
+
+    raw = json.dumps(WORKOUT_PAYLOAD)
+    db_session.add(
+        RawIngestEvent(
+            source="health_auto_export", received_utc=utcnow(),
+            payload_hash=payload_hash(raw), payload_json=raw, status="received",
+        )
+    )
+    db_session.commit()
+    assert db_session.query(Workout).count() == 0
+
+    r = _ingest(client, auth_headers)
+    assert r.status_code == 200, r.text
+    assert r.json()["duplicate"] is False
+    assert r.json()["workouts"] == 1
+    assert db_session.query(Workout).count() == 1

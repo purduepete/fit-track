@@ -6,7 +6,10 @@ on this PC — e.g. ``G:\\My Drive\\fittrack`` (Google Drive) or ``fittrack/uplo
 This script extracts the JSON payload (route, heart-rate and distance samples are
 embedded inside it), POSTs it to the fittrack ingest API with your bearer token,
 then moves processed archives into a subfolder (``--archive-name``, default
-``_archive``) so they are ingested once.
+``_archive``) so they are ingested once. Files that can never succeed (corrupt
+zip, a zip with no JSON, or a client 4xx from the API) are moved to a ``_failed``
+subfolder so they aren't rescanned every poll; transient failures (server 5xx /
+network) are left in place to retry.
 
 A ``--min-age-seconds`` guard skips files that were modified very recently so a
 file still downloading/syncing from the cloud isn't read mid-write.
@@ -31,6 +34,7 @@ import os
 import shutil
 import sys
 import time
+import urllib.error
 import urllib.request
 import zipfile
 from datetime import datetime
@@ -82,19 +86,41 @@ def process_file(path: str, api_url: str, token: str) -> bool:
     return True
 
 
+def _is_permanent_failure(exc: Exception) -> bool:
+    """True for failures that will never succeed on retry (so quarantine).
+
+    Corrupt/undecodable files and client (4xx) responses are permanent; server
+    (5xx) errors and network/transient issues are left in place to retry.
+    """
+    if isinstance(exc, urllib.error.HTTPError):
+        return 400 <= exc.code < 500
+    return isinstance(exc, (zipfile.BadZipFile, UnicodeDecodeError, json.JSONDecodeError))
+
+
 def scan_once(
     folder: str,
     api_url: str,
     token: str,
     archive_name: str = "_archive",
     min_age_seconds: int = 15,
+    failed_name: str = "_failed",
 ) -> int:
     archive = os.path.join(folder, archive_name)
+    failed = os.path.join(folder, failed_name)
     os.makedirs(archive, exist_ok=True)
     now = time.time()
     processed = 0
+
+    def quarantine(full: str, name: str, reason: str) -> None:
+        os.makedirs(failed, exist_ok=True)
+        try:
+            shutil.move(full, os.path.join(failed, name))
+            _log(f"QUARANTINE ({reason}) -> {failed_name}: {name}")
+        except OSError as move_exc:
+            _log(f"ERROR quarantining {name}: {move_exc}")
+
     for name in sorted(os.listdir(folder)):
-        if name == archive_name:
+        if name in (archive_name, failed_name):
             continue
         full = os.path.join(folder, name)
         if not os.path.isfile(full):
@@ -110,8 +136,16 @@ def scan_once(
             if process_file(full, api_url, token):
                 shutil.move(full, os.path.join(archive, name))
                 processed += 1
+            else:
+                # A .zip/.json with no usable JSON inside — a poison pill that
+                # would otherwise be rescanned every poll. Quarantine it.
+                quarantine(full, name, "no JSON inside")
         except Exception as exc:  # noqa: BLE001 - report and continue with next file
-            _log(f"ERROR {name}: {exc}")
+            if _is_permanent_failure(exc):
+                quarantine(full, name, f"permanent: {exc}")
+            else:
+                # Transient (server 5xx / network) — leave in place to retry.
+                _log(f"ERROR {name} (will retry): {exc}")
     return processed
 
 

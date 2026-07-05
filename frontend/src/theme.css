@@ -228,6 +228,17 @@ tbody tr:hover {
   color: #fff;
 }
 
+.linklike {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
 .gate {
   max-width: 420px;
   margin: 12vh auto 0;

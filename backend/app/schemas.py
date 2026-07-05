@@ -54,6 +54,12 @@ class WorkoutDetail(WorkoutSummary):
     splits: list[SplitOut]
     route: list[RoutePointOut]
     hr_series: list[HrPointOut]
+    # Full counts + whether the returned series were downsampled (fetch ?full=true
+    # for the complete series).
+    route_total: int = 0
+    hr_total: int = 0
+    route_downsampled: bool = False
+    hr_downsampled: bool = False
 
 
 class MetricPoint(BaseModel):

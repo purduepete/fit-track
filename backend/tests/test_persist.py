@@ -53,6 +53,39 @@ def test_persist_is_idempotent(db_session):
     assert db_session.query(WorkoutSplit).count() == splits_first
 
 
+def test_persist_batches_multiple_workouts_and_metrics(db_session):
+    """Multiple workouts + metrics persist correctly via the batched lookups."""
+    payload = {
+        "data": {
+            "workouts": [
+                {"id": "M1", "name": "Outdoor Walk",
+                 "start": "2026-07-05 08:00:00 -0700", "end": "2026-07-05 08:30:00 -0700",
+                 "duration": 1800.0, "distance": {"qty": 1.5, "units": "mi"}},
+                {"id": "M2", "name": "Outdoor Run",
+                 "start": "2026-07-05 18:00:00 -0700", "end": "2026-07-05 18:20:00 -0700",
+                 "duration": 1200.0, "distance": {"qty": 2.0, "units": "mi"}},
+            ],
+            "metrics": [
+                {"name": "resting_heart_rate", "units": "count/min",
+                 "data": [{"date": "2026-07-05 06:00:00 -0700", "qty": 55}]},
+                {"name": "vo2_max", "units": "ml/kg/min",
+                 "data": [{"date": "2026-07-05 06:00:00 -0700", "qty": 42}]},
+            ],
+        }
+    }
+    counts = persist_payload(parse_payload(payload), db_session)
+    assert counts["workouts"] == 2
+    assert counts["daily_metrics"] == 2
+    assert db_session.query(Workout).count() == 2
+    assert {w.uuid for w in db_session.query(Workout).all()} == {"M1", "M2"}
+    assert db_session.query(DailyMetric).count() == 2
+
+    # Re-ingest updates in place (no duplicates) through the batched path.
+    persist_payload(parse_payload(payload), db_session)
+    assert db_session.query(Workout).count() == 2
+    assert db_session.query(DailyMetric).count() == 2
+
+
 def test_persist_computes_splits(db_session):
     persist_payload(parse_payload(_payload()), db_session)
     splits = db_session.query(WorkoutSplit).filter_by(unit_system="mi").all()

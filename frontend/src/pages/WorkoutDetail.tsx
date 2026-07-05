@@ -21,12 +21,13 @@ import type { Unit } from "../lib/format";
 export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
   const { uuid = "" } = useParams();
   const [unit, setUnit] = useState<Unit>("mi");
+  const [full, setFull] = useState(false);
   const [data, setData] = useState<WorkoutDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api
-      .workout(uuid, unit)
+      .workout(uuid, unit, full)
       .then(setData)
       .catch((e) => {
         if (e instanceof ApiError && e.status === 401) {
@@ -34,10 +35,12 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
           onAuthError();
         } else setError(String(e));
       });
-  }, [uuid, unit, onAuthError]);
+  }, [uuid, unit, full, onAuthError]);
 
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="muted">Loading…</p>;
+
+  const downsampled = !full && (data.route_downsampled || data.hr_downsampled);
 
   const paceData = data.splits.map((s) => ({
     label: `${s.split_index}`,
@@ -77,6 +80,16 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
           </button>
         </div>
       </div>
+
+      {downsampled && (
+        <p className="muted" style={{ marginTop: -4, marginBottom: 12 }}>
+          Showing a simplified view of {data.route_total} route points and {data.hr_total} heart-rate
+          samples.{" "}
+          <button className="linklike" onClick={() => setFull(true)}>
+            Load full resolution
+          </button>
+        </p>
+      )}
 
       {data.route.length > 0 && (
         <div className="section">

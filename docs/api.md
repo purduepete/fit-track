@@ -14,6 +14,9 @@ Body: a raw Health Auto Export JSON payload (`{"data": {...}}`). The raw body is
 stored and deduplicated by SHA-256 hash; re-posting an identical payload
 short-circuits.
 
+Payloads larger than `MAX_INGEST_BYTES` (default 25 MiB, see `config.py`) are
+rejected with `413 Request Entity Too Large` before parsing.
+
 Response:
 ```json
 { "status": "ok", "duplicate": false, "workouts": 1, "daily_metrics": 0, "splits": 6 }
@@ -30,16 +33,23 @@ Returns an array of workout summaries (newest first):
 ```
 
 ## `GET /api/workouts/{uuid}`  *(read scope)*
-Query: `unit` = `mi` (default) or `km`.
+Query: `unit` = `mi` (default) or `km`; `full` = `true` for the full-resolution
+series (default `false`).
 Returns the summary plus:
 - `splits[]` — `{split_index, distance_m, duration_sec, pace_sec_per_unit, avg_hr, source}`
 - `route[]` — `{seq, lat, lon, ts_utc}`
 - `hr_series[]` — `{ts_utc, bpm}`
+- `route_total`, `hr_total` — full point counts before any downsampling
+- `route_downsampled`, `hr_downsampled` — `true` when the returned series was
+  reduced to the default caps (`MAX_ROUTE_POINTS` / `MAX_HR_POINTS`, 500 each)
 
-`404` if the workout does not exist.
+By default long GPS workouts are **downsampled** (deterministically, endpoints
+preserved) to keep responses and client rendering bounded; pass `full=true` to
+retrieve every point. `404` if the workout does not exist.
 
 ## `GET /api/dashboard`  *(read scope)*
-7-day rollup and trend series:
+7-day rollup and trend series. `weekly_workouts`/`weekly_minutes` cover the last
+7 days; `resting_hr_trend` covers the last 90 days.
 ```json
 { "workouts_7d": 3, "minutes_7d": 92.4, "active_kcal_7d": 810,
   "latest_resting_hr": 55, "latest_vo2max": 42.1,

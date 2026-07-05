@@ -292,8 +292,19 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
     now = utcnow()
     counts = {"workouts": 0, "daily_metrics": 0, "splits": 0}
 
+    # Batch-fetch existing workouts by UUID (avoids a SELECT per workout).
+    workout_uuids = [pw.uuid for pw in parsed.workouts]
+    existing_workouts: dict[str, models.Workout] = {}
+    if workout_uuids:
+        existing_workouts = {
+            w.uuid: w
+            for w in db.execute(
+                select(models.Workout).where(models.Workout.uuid.in_(workout_uuids))
+            ).scalars()
+        }
+
     for pw in parsed.workouts:
-        existing = db.get(models.Workout, pw.uuid)
+        existing = existing_workouts.get(pw.uuid)
         has_route = len(pw.route) >= 2
         if existing is None:
             existing = models.Workout(uuid=pw.uuid, created_utc=now)
@@ -354,31 +365,35 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
 
         counts["splits"] += _persist_splits(pw, db)
 
-    # Dedupe within this payload: SQL Server allows only one NULL per UNIQUE
-    # index and (with autoflush off) freshly-added rows are invisible to the
-    # SELECT below, so intra-payload duplicates would otherwise create colliding
-    # rows and fail on commit. Coalesce source_name to "" and reuse rows by key.
-    seen: dict[tuple[str, str, str], models.DailyMetric] = {}
+    # Batch-fetch existing daily metrics for the payload's dates/types in one
+    # query (avoids a SELECT per metric). The map doubles as the in-payload
+    # dedupe cache: SQL Server allows only one NULL per UNIQUE index and, with
+    # autoflush off, freshly-added rows are invisible to a SELECT — so we
+    # coalesce source_name to "" and reuse rows by (local_date, type, source).
+    metrics_by_key: dict[tuple[str, str, str], models.DailyMetric] = {}
+    metric_dates = {dm.local_date for dm in parsed.daily_metrics}
+    metric_types = {dm.metric_type for dm in parsed.daily_metrics}
+    if metric_dates:
+        for m in db.execute(
+            select(models.DailyMetric).where(
+                models.DailyMetric.local_date.in_(metric_dates),
+                models.DailyMetric.metric_type.in_(metric_types),
+            )
+        ).scalars():
+            metrics_by_key[(m.local_date, m.metric_type, m.source_name or "")] = m
+
     for dm in parsed.daily_metrics:
         source = dm.source_name or ""
         key = (dm.local_date, dm.metric_type, source)
-        row = seen.get(key)
+        row = metrics_by_key.get(key)
         if row is None:
-            row = db.execute(
-                select(models.DailyMetric).where(
-                    models.DailyMetric.local_date == dm.local_date,
-                    models.DailyMetric.metric_type == dm.metric_type,
-                    models.DailyMetric.source_name == source,
-                )
-            ).scalar_one_or_none()
-            if row is None:
-                row = models.DailyMetric(
-                    local_date=dm.local_date,
-                    metric_type=dm.metric_type,
-                    source_name=source,
-                )
-                db.add(row)
-            seen[key] = row
+            row = models.DailyMetric(
+                local_date=dm.local_date,
+                metric_type=dm.metric_type,
+                source_name=source,
+            )
+            db.add(row)
+            metrics_by_key[key] = row
         row.value = dm.value
         row.unit = dm.unit
         row.updated_utc = now

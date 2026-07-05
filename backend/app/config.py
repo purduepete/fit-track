@@ -23,6 +23,10 @@ class Settings(BaseSettings):
     # az login locally, managed identity in Azure — no password needed).
     db_auth: str = "sql"
 
+    # Reject ingest payloads larger than this (bytes) before parsing. The real
+    # Health Auto Export daily export is a few MB; 25 MiB is a generous ceiling.
+    max_ingest_bytes: int = 25 * 1024 * 1024
+
     # Where the built React app lives (served by FastAPI in production)
     static_dir: str = "static"
 

@@ -1,7 +1,7 @@
 """Tests for auth token hashing and persistence idempotency."""
 from app.auth import hash_token
+from app.models import DailyMetric, Workout, WorkoutSplit
 from app.normalize import parse_payload, persist_payload
-from app.models import Workout, WorkoutSplit
 
 
 def test_hash_token_deterministic():
@@ -58,3 +58,35 @@ def test_persist_computes_splits(db_session):
     splits = db_session.query(WorkoutSplit).filter_by(unit_system="mi").all()
     assert len(splits) >= 1
     assert all(s.workout_uuid == "W1" for s in splits)
+
+
+def test_persist_dedupes_null_source_daily_metrics(db_session):
+    """Duplicate metric points with no source must collapse to one row.
+
+    Regression for the SQLite-vs-SQL-Server UNIQUE-with-NULLs mismatch: source_name
+    is coalesced to "" and intra-payload duplicates are deduped, so a second row
+    with a NULL source can never be created (which SQL Server rejects on commit).
+    """
+    payload = {
+        "data": {
+            "metrics": [
+                {
+                    "name": "resting_heart_rate",
+                    "units": "count/min",
+                    "data": [
+                        {"date": "2026-07-05 06:00:00 -0700", "qty": 55},
+                        {"date": "2026-07-05 06:30:00 -0700", "qty": 60},
+                    ],
+                }
+            ]
+        }
+    }
+    counts = persist_payload(parse_payload(payload), db_session)
+    assert counts["daily_metrics"] == 2
+
+    rows = db_session.query(DailyMetric).all()
+    # Both points share (local_date, metric_type, source) -> a single row.
+    assert len(rows) == 1
+    assert rows[0].source_name == ""
+    # Last value wins.
+    assert rows[0].value == 60

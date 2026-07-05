@@ -10,11 +10,10 @@ import sys
 
 sys.path.insert(0, ".")
 
-from sqlalchemy import text  # noqa: E402
-
 from app.config import get_settings  # noqa: E402
 from app.db import engine  # noqa: E402
 from app.models import Base  # noqa: E402
+from sqlalchemy import text  # noqa: E402
 
 
 def main() -> None:

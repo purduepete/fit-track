@@ -11,14 +11,13 @@ from __future__ import annotations
 import hashlib
 import uuid as uuidlib
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from dateutil import parser as dtparser
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from . import models
-from .timeutil import utcnow
 from .geo import (
     DistanceSample,
     HrSample,
@@ -26,6 +25,7 @@ from .geo import (
     compute_splits_from_route,
     compute_splits_from_samples,
 )
+from .timeutil import utcnow
 
 # --- Apple workout activity type -> friendly name ----------------------------
 WORKOUT_TYPE_MAP = {
@@ -89,7 +89,7 @@ def parse_dt(value) -> tuple[datetime | None, int | None]:
     if dt.tzinfo is None:
         return dt.replace(tzinfo=None), None
     offset_min = int(dt.utcoffset().total_seconds() // 60)
-    utc = dt.astimezone(timezone.utc).replace(tzinfo=None)
+    utc = dt.astimezone(UTC).replace(tzinfo=None)
     return utc, offset_min
 
 
@@ -269,7 +269,7 @@ def parse_daily_metrics(metrics: list) -> list[ParsedDailyMetric]:
                     metric_type=str(name),
                     value=qty,
                     unit=units,
-                    source_name=first(point, "source", "sourceName"),
+                    source_name=first(point, "source", "sourceName") or "",
                 )
             )
     return out
@@ -354,21 +354,31 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
 
         counts["splits"] += _persist_splits(pw, db)
 
+    # Dedupe within this payload: SQL Server allows only one NULL per UNIQUE
+    # index and (with autoflush off) freshly-added rows are invisible to the
+    # SELECT below, so intra-payload duplicates would otherwise create colliding
+    # rows and fail on commit. Coalesce source_name to "" and reuse rows by key.
+    seen: dict[tuple[str, str, str], models.DailyMetric] = {}
     for dm in parsed.daily_metrics:
-        row = db.execute(
-            select(models.DailyMetric).where(
-                models.DailyMetric.local_date == dm.local_date,
-                models.DailyMetric.metric_type == dm.metric_type,
-                models.DailyMetric.source_name == dm.source_name,
-            )
-        ).scalar_one_or_none()
+        source = dm.source_name or ""
+        key = (dm.local_date, dm.metric_type, source)
+        row = seen.get(key)
         if row is None:
-            row = models.DailyMetric(
-                local_date=dm.local_date,
-                metric_type=dm.metric_type,
-                source_name=dm.source_name,
-            )
-            db.add(row)
+            row = db.execute(
+                select(models.DailyMetric).where(
+                    models.DailyMetric.local_date == dm.local_date,
+                    models.DailyMetric.metric_type == dm.metric_type,
+                    models.DailyMetric.source_name == source,
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                row = models.DailyMetric(
+                    local_date=dm.local_date,
+                    metric_type=dm.metric_type,
+                    source_name=source,
+                )
+                db.add(row)
+            seen[key] = row
         row.value = dm.value
         row.unit = dm.unit
         row.updated_utc = now

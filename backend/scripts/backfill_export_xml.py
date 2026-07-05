@@ -23,8 +23,6 @@ from datetime import datetime
 
 sys.path.insert(0, ".")
 
-from lxml import etree  # noqa: E402
-
 from app.db import SessionLocal  # noqa: E402
 from app.geo import RoutePoint  # noqa: E402
 from app.normalize import (  # noqa: E402
@@ -37,6 +35,7 @@ from app.normalize import (  # noqa: E402
     parse_dt,
     persist_payload,
 )
+from lxml import etree  # noqa: E402
 
 GPX_NS = {"g": "http://www.topografix.com/GPX/1/1"}
 

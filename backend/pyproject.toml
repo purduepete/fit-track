@@ -1,0 +1,24 @@
+# Backend tooling config for fittrack.
+# Lint (ruff) + static type-check (mypy) form the CI quality gate alongside pytest.
+
+[tool.ruff]
+target-version = "py312"
+line-length = 120
+src = ["app", "scripts", "tests"]
+exclude = [".venv", "static"]
+
+[tool.ruff.lint]
+# E/W = pycodestyle, F = pyflakes, I = isort, B = bugbear, UP = pyupgrade.
+select = ["E", "W", "F", "I", "B", "UP"]
+# B008: function calls in argument defaults are the intended FastAPI idiom
+# (Depends(), Header(), ...); not a bug here.
+ignore = ["B008"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["app"]
+# Third-party libs (pyodbc, azure.identity, etc.) ship no type stubs; don't fail on them.
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true

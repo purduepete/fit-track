@@ -56,4 +56,9 @@ async def ingest_health_auto_export(
     event.processed_utc = utcnow()
     db.commit()
 
-    return IngestResult(status="ok", **counts)
+    return IngestResult(
+        status="ok",
+        workouts=counts["workouts"],
+        daily_metrics=counts["daily_metrics"],
+        splits=counts["splits"],
+    )

@@ -17,6 +17,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Lint (ruff)
+        run: ruff check .
+      - name: Type-check (mypy)
+        run: mypy
       - name: Run backend tests (in-memory SQLite)
         env:
           DB_SCHEMA: ""

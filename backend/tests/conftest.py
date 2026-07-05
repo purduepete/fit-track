@@ -9,18 +9,16 @@ import os
 os.environ.setdefault("DB_SCHEMA", "")
 os.environ.setdefault("DB_PASSWORD", "test")
 
-from app.timeutil import utcnow  # noqa: E402
-
 import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import create_engine  # noqa: E402
-from sqlalchemy.orm import sessionmaker  # noqa: E402
-from sqlalchemy.pool import StaticPool  # noqa: E402
-
 from app import auth  # noqa: E402
 from app.db import get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import ApiToken, Base  # noqa: E402
+from app.timeutil import utcnow  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy.orm import sessionmaker  # noqa: E402
+from sqlalchemy.pool import StaticPool  # noqa: E402
 
 TEST_TOKEN = "test-token-abc123"
 

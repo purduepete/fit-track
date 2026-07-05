@@ -8,7 +8,7 @@ SQLite database so no live DB or network is required.
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe -m pytest        # 27 tests
+.\.venv\Scripts\python.exe -m pytest        # 28 tests
 ```
 
 `tests/conftest.py` sets `DB_SCHEMA=""` and `DB_PASSWORD="test"` **before**
@@ -19,7 +19,7 @@ importing app modules, so models render schemaless on SQLite. API tests override
 | --- | --- |
 | `test_geo.py` | haversine distance; GPS and sample split computation; interpolation across multiple boundaries; partial trailing split; monotonicity. |
 | `test_normalize.py` | parsing real Health Auto Export field shapes; unit conversion; timezone → UTC + `local_date`; payload hashing. |
-| `test_persist.py` | idempotent upsert (re-ingest replaces child rows, no duplicates); split persistence for both units; daily-metric uniqueness. |
+| `test_persist.py` | idempotent upsert (re-ingest replaces child rows, no duplicates); split persistence for both units; daily-metric uniqueness; **regression: duplicate null-source daily metrics dedupe to one row** (SQL Server allows only one NULL per UNIQUE index — SQLite does not). |
 | `test_api.py` | auth (401 without/with bad token, scope enforcement); ingest + dedup; workout list/detail; dashboard aggregates; `unit=mi\|km`. |
 
 ### Schema-portability notes for tests
@@ -39,8 +39,19 @@ npm test        # 13 tests
 distance in mi/km, duration, and null handling — the logic most likely to
 regress in the UI.
 
+## Lint & type-check
+
+```powershell
+cd backend
+.\.venv\Scripts\ruff.exe check .     # lint (pycodestyle, pyflakes, isort, bugbear, pyupgrade)
+.\.venv\Scripts\mypy.exe             # static type-check of app/
+```
+
+Config lives in `backend/pyproject.toml`. `ruff` also formats imports (`--fix`).
+The frontend is type-checked by `tsc --noEmit` as part of `npm run build`.
+
 ## CI
 
-`.github/workflows/ci.yml` runs on every push/PR: installs backend deps and runs
-pytest, then installs frontend deps and runs `npm test` + `npm run build`. It
-never touches Azure or the database.
+`.github/workflows/ci.yml` runs on every push/PR. The backend job installs deps
+then runs **ruff → mypy → pytest**; the frontend job runs `npm test` + `npm run
+build` (which type-checks via `tsc`). It never touches Azure or the database.

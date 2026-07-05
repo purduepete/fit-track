@@ -104,6 +104,27 @@ def test_parse_workout_synthesizes_uuid_when_missing():
     assert parse_workout(payload).uuid == w.uuid
 
 
+def test_synth_uuid_matches_across_json_and_xml_import_paths():
+    """A workout with no Apple id must resolve to the SAME synthetic uuid whether
+    it arrives via JSON ingest or the XML backfill (shared synth_workout_uuid)."""
+    from app.normalize import synth_workout_uuid
+    from lxml import etree
+    from scripts.backfill_export_xml import parse_workout_element
+
+    start = "2026-07-05 11:39:13 -0700"
+    raw_type = "HKWorkoutActivityTypeRunning"
+
+    json_w = parse_workout({"workoutActivityType": raw_type, "start": start, "end": start})
+    xml_el = etree.fromstring(
+        f'<Workout workoutActivityType="{raw_type}" startDate="{start}" '
+        f'endDate="{start}" duration="10" durationUnit="min"/>'
+    )
+    xml_w, _ = parse_workout_element(xml_el)
+
+    assert json_w.uuid == xml_w.uuid
+    assert json_w.uuid == synth_workout_uuid(raw_type, json_w.start_utc)
+
+
 def test_parse_payload_wraps_data():
     parsed = parse_payload({"data": {"workouts": [_sample_workout()], "metrics": []}})
     assert len(parsed.workouts) == 1

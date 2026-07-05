@@ -34,6 +34,7 @@ from app.normalize import (  # noqa: E402
     local_date_str,
     parse_dt,
     persist_payload,
+    synth_workout_uuid,
 )
 from lxml import etree  # noqa: E402
 
@@ -88,10 +89,7 @@ def parse_workout_element(w) -> tuple[ParsedWorkout | None, str | None]:
         if ref is not None:
             gpx_path = ref.get("path")
 
-    uuid_seed = w.get("startDate", "") + raw_type
-    import uuid as uuidlib
-
-    wid = str(uuidlib.uuid5(uuidlib.NAMESPACE_URL, uuid_seed))
+    wid = synth_workout_uuid(raw_type, start_utc)
 
     pw = ParsedWorkout(
         uuid=wid,

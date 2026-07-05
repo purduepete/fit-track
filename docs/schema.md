@@ -47,6 +47,15 @@ One row per workout. `uuid` is the Apple workout id (idempotency key).
 
 Indexes: `start_utc`; `(workout_type, local_date)`.
 
+> **Indexing decision (review P7):** a `(workout_type, start_utc)` composite index
+> was considered to serve the filtered-and-sorted list query
+> (`WHERE workout_type = ? ORDER BY start_utc DESC`) without a sort. It was
+> **deliberately not added**: the UI never sends a `workout_type` filter (the
+> Workouts page calls the list endpoint unfiltered), this is a single-user app
+> with a small `workouts` table, and adding it would require a live-DB migration
+> (plus the mandatory Gemini review for DB changes) for negligible gain. Revisit
+> only if a common filtered-list workload with a measured sort cost emerges.
+
 ## `fit.workout_route_points`
 GPS track. FK → `workouts.uuid` (cascade). Rebuilt on re-ingest.
 

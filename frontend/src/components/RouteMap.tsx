@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { MapContainer, Polyline, TileLayer, CircleMarker, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import type { RoutePoint } from "../lib/api";
@@ -15,7 +15,12 @@ function FitBounds({ points }: { points: [number, number][] }) {
 
 /** Renders a GPS route as a polyline with start/end markers (OpenStreetMap). */
 export function RouteMap({ route }: { route: RoutePoint[] }) {
-  const points: [number, number][] = route.map((p) => [p.lat, p.lon]);
+  // Memoize the derived [lat, lon] array so its identity only changes when the
+  // route does; otherwise parent re-renders would re-trigger FitBounds.
+  const points = useMemo<[number, number][]>(
+    () => route.map((p) => [p.lat, p.lon]),
+    [route],
+  );
   if (points.length === 0) return null;
 
   return (

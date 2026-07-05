@@ -18,7 +18,7 @@ importing app modules, so models render schemaless on SQLite. API tests override
 | File | Covers |
 | --- | --- |
 | `test_geo.py` | haversine distance; GPS and sample split computation; interpolation across multiple boundaries; partial trailing split; monotonicity. |
-| `test_normalize.py` | parsing real Health Auto Export field shapes; unit conversion; timezone → UTC + `local_date`; payload hashing. |
+| `test_normalize.py` | parsing real Health Auto Export field shapes; unit conversion; timezone → UTC + `local_date`; payload hashing; **synthetic uuid parity across the JSON and XML import paths** (shared `synth_workout_uuid`). |
 | `test_persist.py` | idempotent upsert (re-ingest replaces child rows, no duplicates); split persistence for both units; daily-metric uniqueness; **regression: duplicate null-source daily metrics dedupe to one row** (SQL Server allows only one NULL per UNIQUE index — SQLite does not). |
 | `test_api.py` | auth (401 without/with bad token, scope enforcement); `last_used_utc` debounce (no rewrite within window, refresh when stale); ingest + dedup; concurrent-duplicate ingest stays idempotent; workout list/detail; dashboard aggregates; `unit=mi\|km`. |
 
@@ -32,12 +32,14 @@ foreign keys render without the `fit.` prefix on SQLite. BigInteger PKs use
 
 ```powershell
 cd frontend
-npm test        # 13 tests
+npm test        # 16 tests
 ```
 
 `format.test.ts` covers the display helpers — pace formatting (`sec → m:ss`),
 distance in mi/km, duration, and null handling — the logic most likely to
-regress in the UI.
+regress in the UI. `useApiResource.test.ts` covers the shared data-loading hook:
+success populates data, a 401 clears the token and triggers logout, and other
+errors surface without logging out.
 
 ## Lint & type-check
 

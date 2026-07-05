@@ -43,7 +43,11 @@ In **Health Auto Export → Automations**, create a daily automation:
 
 `scripts/upload_folder.py` watches a folder, extracts the JSON from each `.zip`
 (or reads `.json` directly), POSTs it to `/api/ingest/health-auto-export` with
-your ingest token, and moves processed files to `_archive`.
+your ingest token, and moves processed files into a subfolder (`--archive-name`,
+default `_archive`). A `--min-age-seconds` guard (default 15) skips files that
+were modified very recently, so a file still downloading/syncing from the cloud
+is not read mid-write; a file is only moved once its POST succeeds (failures are
+retried on the next poll, and ingest is idempotent).
 
 ```powershell
 $env:FITTRACK_API_URL = "https://<container-app>"   # or http://localhost:8000
@@ -53,7 +57,24 @@ cd backend
 ```
 
 Run without `--once` to poll continuously, or register a **Scheduled Task** that
-runs the `--once` command daily.
+runs the watcher at logon (see below).
+
+### Google Drive (the wired default)
+
+The phone uploads each export to a `fittrack` folder in Google Drive; **Google
+Drive for Desktop** mirrors it locally (e.g. `G:\My Drive\fittrack`). Point the
+watcher there and keep processed files tidied in a `processed` subfolder that
+stays in Drive:
+
+```powershell
+.\.venv\Scripts\python.exe -m scripts.upload_folder --dir "G:\My Drive\fittrack" --archive-name processed
+```
+
+The `Watch-Upload.ps1` launcher reads `FITTRACK_WATCH_DIR` and
+`FITTRACK_ARCHIVE_NAME` from `backend/.env.local`, so the same setup runs
+unattended via the **`FitTrack Upload Watcher`** logon Scheduled Task. Any other
+provider (iCloud Drive / OneDrive / Dropbox) works identically — just point
+`FITTRACK_WATCH_DIR` at its local folder.
 
 ### Direct REST push (optional, Phase 3)
 

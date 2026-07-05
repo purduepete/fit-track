@@ -1,10 +1,15 @@
 """Daily pickup: ingest Health Auto Export zips/JSON dropped into a folder.
 
-Intended workflow: Health Auto Export (iOS) auto-exports a dated ``.zip`` into
-a synced folder (iCloud Drive / Dropbox / OneDrive) that lands here as
-``fittrack/upload``. This script extracts the JSON payload (route, heart-rate
-and distance samples are embedded inside it), POSTs it to the fittrack ingest
-API with your bearer token, then moves processed archives into ``_archive``.
+Intended workflow: Health Auto Export (iOS) auto-exports a dated ``.zip`` into a
+synced cloud folder (Google Drive / iCloud Drive / Dropbox / OneDrive) that lands
+on this PC — e.g. ``G:\\My Drive\\fittrack`` (Google Drive) or ``fittrack/upload``.
+This script extracts the JSON payload (route, heart-rate and distance samples are
+embedded inside it), POSTs it to the fittrack ingest API with your bearer token,
+then moves processed archives into a subfolder (``--archive-name``, default
+``_archive``) so they are ingested once.
+
+A ``--min-age-seconds`` guard skips files that were modified very recently so a
+file still downloading/syncing from the cloud isn't read mid-write.
 
 Route/splits/map all derive from the embedded JSON, so the separate ``*.gpx``
 files in the zip are ignored here.
@@ -16,6 +21,7 @@ Environment:
 Usage:
     python -m scripts.upload_folder --dir ..\\upload
     python -m scripts.upload_folder --dir ..\\upload --once
+    python -m scripts.upload_folder --dir "G:\\My Drive\\fittrack" --archive-name processed
 """
 from __future__ import annotations
 
@@ -76,15 +82,29 @@ def process_file(path: str, api_url: str, token: str) -> bool:
     return True
 
 
-def scan_once(folder: str, api_url: str, token: str) -> int:
-    archive = os.path.join(folder, "_archive")
+def scan_once(
+    folder: str,
+    api_url: str,
+    token: str,
+    archive_name: str = "_archive",
+    min_age_seconds: int = 15,
+) -> int:
+    archive = os.path.join(folder, archive_name)
     os.makedirs(archive, exist_ok=True)
+    now = time.time()
     processed = 0
     for name in sorted(os.listdir(folder)):
+        if name == archive_name:
+            continue
         full = os.path.join(folder, name)
         if not os.path.isfile(full):
             continue
         if not name.lower().endswith((".zip", ".json")):
+            continue
+        # Skip files still being written / synced from the cloud (Google Drive):
+        # only process once they've been stable for min_age_seconds.
+        if min_age_seconds > 0 and (now - os.path.getmtime(full)) < min_age_seconds:
+            _log(f"WAIT (too fresh, still syncing?): {name}")
             continue
         try:
             if process_file(full, api_url, token):
@@ -100,6 +120,18 @@ def main() -> None:
     p.add_argument("--dir", required=True, help="Folder to watch for .zip/.json exports")
     p.add_argument("--once", action="store_true", help="Process current files then exit")
     p.add_argument("--interval", type=int, default=300, help="Poll seconds (watch mode)")
+    p.add_argument(
+        "--archive-name",
+        default="_archive",
+        help="Subfolder (inside --dir) processed files are moved to. Default: _archive",
+    )
+    p.add_argument(
+        "--min-age-seconds",
+        type=int,
+        default=15,
+        help="Skip files modified more recently than this (avoids reading a file still "
+        "syncing from the cloud). Default: 15. Use 0 to disable.",
+    )
     args = p.parse_args()
 
     api_url = os.environ.get("FITTRACK_API_URL")
@@ -111,13 +143,13 @@ def main() -> None:
     if not os.path.isdir(folder):
         sys.exit(f"Folder not found: {folder}")
 
-    _log(f"Watching {folder} -> {api_url}{INGEST_PATH}")
+    _log(f"Watching {folder} -> {api_url}{INGEST_PATH} (archive={args.archive_name})")
     if args.once:
-        n = scan_once(folder, api_url, token)
+        n = scan_once(folder, api_url, token, args.archive_name, args.min_age_seconds)
         _log(f"Done. Processed {n} file(s).")
         return
     while True:
-        scan_once(folder, api_url, token)
+        scan_once(folder, api_url, token, args.archive_name, args.min_age_seconds)
         time.sleep(args.interval)
 
 

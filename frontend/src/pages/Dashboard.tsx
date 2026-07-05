@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -10,26 +9,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { api, ApiError, clearToken, type DashboardSummary } from "../lib/api";
+import { api } from "../lib/api";
+import { useApiResource } from "../lib/useApiResource";
 import { StatCard } from "../components/StatCard";
 import { ActivityIcon, ClockIcon, FlameIcon, GaugeIcon, HeartIcon } from "../components/Icons";
 import { round } from "../lib/format";
 
 export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
-  const [data, setData] = useState<DashboardSummary | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api
-      .dashboard()
-      .then(setData)
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 401) {
-          clearToken();
-          onAuthError();
-        } else setError(String(e));
-      });
-  }, [onAuthError]);
+  const { data, error } = useApiResource(() => api.dashboard(), [onAuthError], onAuthError);
 
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="muted">Loading…</p>;

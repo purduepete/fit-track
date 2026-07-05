@@ -1,24 +1,11 @@
-import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { api, ApiError, clearToken, type WorkoutSummary } from "../lib/api";
+import { api } from "../lib/api";
+import { useApiResource } from "../lib/useApiResource";
 import { formatDistance, formatDuration, formatLocalDateTime, round } from "../lib/format";
 
 export function Workouts({ onAuthError }: { onAuthError: () => void }) {
-  const [rows, setRows] = useState<WorkoutSummary[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const nav = useNavigate();
-
-  useEffect(() => {
-    api
-      .workouts()
-      .then(setRows)
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 401) {
-          clearToken();
-          onAuthError();
-        } else setError(String(e));
-      });
-  }, [onAuthError]);
+  const { data: rows, error } = useApiResource(() => api.workouts(), [onAuthError], onAuthError);
 
   if (error) return <p className="error">{error}</p>;
   if (!rows) return <p className="muted">Loading…</p>;

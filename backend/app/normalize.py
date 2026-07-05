@@ -212,7 +212,7 @@ def parse_workout(w: dict) -> ParsedWorkout | None:
 
     wid = first(w, "id", "uuid")
     if not wid:
-        wid = _synth_uuid(raw_type, start_utc)
+        wid = synth_workout_uuid(raw_type, start_utc)
 
     dist_field = first(w, "distance", "totalDistance", "distanceWalkingRunning")
     distance_m = distance_to_meters(dist_field, unit_of(dist_field, first(w, "distanceUnits")))
@@ -246,7 +246,12 @@ def parse_workout(w: dict) -> ParsedWorkout | None:
     )
 
 
-def _synth_uuid(raw_type: str, start_utc: datetime) -> str:
+def synth_workout_uuid(raw_type: str, start_utc: datetime) -> str:
+    """Deterministic UUID for workouts that arrive without an Apple id.
+
+    Shared by JSON ingest and the XML backfill so the same underlying workout
+    resolves to the same id regardless of the import path.
+    """
     seed = f"{raw_type}|{start_utc.isoformat()}"
     return str(uuidlib.uuid5(uuidlib.NAMESPACE_URL, seed))
 

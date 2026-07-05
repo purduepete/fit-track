@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   Bar,
@@ -11,7 +11,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { api, ApiError, clearToken, type WorkoutDetail } from "../lib/api";
+import { api } from "../lib/api";
+import { useApiResource } from "../lib/useApiResource";
 import { RouteMap } from "../components/RouteMap";
 import { StatCard } from "../components/StatCard";
 import { ActivityIcon, ClockIcon, FlameIcon, HeartIcon } from "../components/Icons";
@@ -22,20 +23,11 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
   const { uuid = "" } = useParams();
   const [unit, setUnit] = useState<Unit>("mi");
   const [full, setFull] = useState(false);
-  const [data, setData] = useState<WorkoutDetail | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    api
-      .workout(uuid, unit, full)
-      .then(setData)
-      .catch((e) => {
-        if (e instanceof ApiError && e.status === 401) {
-          clearToken();
-          onAuthError();
-        } else setError(String(e));
-      });
-  }, [uuid, unit, full, onAuthError]);
+  const { data, error } = useApiResource(
+    () => api.workout(uuid, unit, full),
+    [uuid, unit, full, onAuthError],
+    onAuthError,
+  );
 
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="muted">Loading…</p>;

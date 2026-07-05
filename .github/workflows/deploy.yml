@@ -4,9 +4,12 @@ name: Deploy
 # at the new tag. Deploys touch the SHARED WebPortfolio Azure SQL server (fit
 # schema), so this is intentionally manual (workflow_dispatch), never on push.
 #
+# The app authenticates to Azure SQL with its system-assigned managed identity
+# (DB_AUTH=aad) — no DB password is passed. Grant the identity access to the fit
+# schema once after the first deploy (see docs/architecture.md).
+#
 # Required repo secrets:
 #   AZURE_CREDENTIALS   - output of `az ad sp create-for-rbac --sdk-auth`
-#   FITTRACK_DB_PASSWORD- Azure SQL password (sqladmin)
 # Required repo variables:
 #   FITTRACK_RG         - resource group (e.g. fittrack-rg)
 
@@ -52,4 +55,4 @@ jobs:
             az deployment group create \
               -g "${{ vars.FITTRACK_RG }}" \
               -f infra/main.bicep \
-              -p containerImage="$TAG" dbPassword="${{ secrets.FITTRACK_DB_PASSWORD }}"
+              -p containerImage="$TAG"

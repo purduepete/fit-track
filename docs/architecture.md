@@ -54,12 +54,16 @@ Two modes, selected by `DB_AUTH` (see `backend/.env.example`):
 
 `aad` is preferred because the reused server's SQL admin password is managed
 elsewhere (webportfolio) and may rotate; token auth avoids depending on it.
+**The deployed Container App uses `DB_AUTH=aad` with a system-assigned managed
+identity** provisioned by `infra/main.bicep` — no password is passed at deploy
+time. The Bicep `identityPrincipalId` output is the identity's object id.
 
 ### Granting the deployed app access (one-time)
 
-When deploying with a managed identity, connect **as the AAD admin** and create a
-contained database user for the Container App's identity, then grant it access to
-the `fit` schema:
+After the first deploy, connect **as the AAD admin** and create a contained
+database user for the Container App's identity, then grant it access to the
+`fit` schema. **Per policy this is a live-DB change — get a Gemini second opinion
+before running it.**
 
 ```sql
 CREATE USER [fittrack-api] FROM EXTERNAL PROVIDER;   -- the managed identity name

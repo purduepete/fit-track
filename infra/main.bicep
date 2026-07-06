@@ -139,10 +139,38 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'ATHLETE_BIRTH_DATE', value: athleteBirthDate }
             { name: 'ATHLETE_SEX', value: athleteSex }
           ]
+          // Probes against the unauthenticated /api/health route. The startup
+          // probe gives boot (incl. DB pre-warm + AAD token) up to ~60s; the
+          // readiness probe holds traffic until the app is actually ready so
+          // the first request never lands on a half-started replica.
+          probes: [
+            {
+              type: 'Startup'
+              httpGet: { path: '/api/health', port: 8000 }
+              initialDelaySeconds: 1
+              periodSeconds: 2
+              failureThreshold: 30
+            }
+            {
+              type: 'Readiness'
+              httpGet: { path: '/api/health', port: 8000 }
+              initialDelaySeconds: 2
+              periodSeconds: 10
+              failureThreshold: 3
+            }
+            {
+              type: 'Liveness'
+              httpGet: { path: '/api/health', port: 8000 }
+              initialDelaySeconds: 5
+              periodSeconds: 30
+            }
+          ]
         }
       ]
       scale: {
-        // Scale to zero when idle to minimise cost for a personal tracker.
+        // Scale to zero when idle to minimise cost; a KEDA cron rule keeps one
+        // warm replica during active hours (06:00-23:00 local) to avoid
+        // cold-start latency, while still dropping to zero overnight.
         minReplicas: 0
         maxReplicas: 2
         rules: [
@@ -150,7 +178,22 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             name: 'http'
             // Bound concurrency: each request buffers the full body (up to
             // max_ingest_bytes) so keep this low on a small-memory replica.
+            // Also handles request-based wake-from-zero outside warm hours.
             http: { metadata: { concurrentRequests: '5' } }
+          }
+          {
+            name: 'warm-hours'
+            // Keep 1 replica warm 06:00-23:00 America/Los_Angeles; overnight
+            // the app is allowed to scale to zero (cold start acceptable then).
+            custom: {
+              type: 'cron'
+              metadata: {
+                timezone: 'America/Los_Angeles'
+                start: '0 6 * * *'
+                end: '0 23 * * *'
+                desiredReplicas: '1'
+              }
+            }
           }
         ]
       }

@@ -95,21 +95,22 @@ def test_workout_404(client, auth_headers):
     assert client.get("/api/workouts/nope", headers=auth_headers).status_code == 404
 
 
-def test_downsample_preserves_endpoints_and_cap():
+def test_sample_indices_preserves_endpoints_and_cap():
     from app.routers import workouts as wr
 
-    data = list(range(1000))
-    out = wr._downsample(data, 100)
-    assert len(out) <= 100
-    assert out[0] == 0 and out[-1] == 999
-    assert out == wr._downsample(data, 100)  # deterministic
+    idxs = wr._sample_indices(1000, 100)
+    assert len(idxs) <= 100
+    assert idxs[0] == 0 and idxs[-1] == 999
+    assert idxs == sorted(idxs)  # ascending, no dupes
+    assert idxs == wr._sample_indices(1000, 100)  # deterministic
 
 
-def test_downsample_noop_when_within_cap():
+def test_sample_indices_noop_when_within_cap():
     from app.routers import workouts as wr
 
-    assert wr._downsample([1, 2, 3], 500) == [1, 2, 3]
-    assert wr._downsample([], 500) == []
+    assert wr._sample_indices(3, 500) == [0, 1, 2]
+    assert wr._sample_indices(0, 500) == []
+    assert wr._sample_indices(2, 1) == [0]
 
 
 def _ingest(client, auth_headers, payload=WORKOUT_PAYLOAD):
@@ -131,9 +132,18 @@ def test_workout_detail_downsamples_and_full_opt_in(client, auth_headers, monkey
     assert d["route_downsampled"] is True
     assert len(d["route"]) == 1
 
-    full = client.get("/api/workouts/API-W1?unit=mi&full=true", headers=auth_headers).json()
+    full = client.get("/api/workouts/API-W1?full=true", headers=auth_headers).json()
     assert len(full["route"]) == 2
     assert full["route_downsampled"] is False
+
+
+def test_workout_detail_returns_both_unit_splits(client, auth_headers):
+    assert _ingest(client, auth_headers).status_code == 200
+
+    d = client.get("/api/workouts/API-W1", headers=auth_headers).json()
+    assert len(d["splits"]) >= 2
+    units = {s["unit_system"] for s in d["splits"]}
+    assert units == {"mi", "km"}  # both unit systems returned; client selects locally
 
 
 def test_ingest_rejects_oversized_payload(client, auth_headers):

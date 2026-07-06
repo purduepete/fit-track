@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { NavLink, Route, HashRouter as Router, Routes } from "react-router-dom";
 import { getToken } from "./lib/api";
 import { useTheme } from "./lib/useTheme";
@@ -6,8 +6,13 @@ import { ActivityIcon, LogOutIcon, MoonIcon, SunIcon } from "./components/Icons"
 import { TokenGate } from "./components/TokenGate";
 import { Dashboard } from "./pages/Dashboard";
 import { Workouts } from "./pages/Workouts";
-import { WorkoutDetail } from "./pages/WorkoutDetail";
 import { clearToken } from "./lib/api";
+
+// The detail page pulls in Leaflet (map) + extra charts; code-split it so the
+// initial bundle (dashboard + list) stays lean.
+const WorkoutDetail = lazy(() =>
+  import("./pages/WorkoutDetail").then((m) => ({ default: m.WorkoutDetail })),
+);
 
 export default function App() {
   const [theme, toggleTheme] = useTheme();
@@ -45,11 +50,13 @@ export default function App() {
         </button>
       </header>
       <main className="container">
-        <Routes>
-          <Route path="/" element={<Dashboard onAuthError={onAuthError} />} />
-          <Route path="/workouts" element={<Workouts onAuthError={onAuthError} />} />
-          <Route path="/workouts/:uuid" element={<WorkoutDetail onAuthError={onAuthError} />} />
-        </Routes>
+        <Suspense fallback={<p className="muted">Loading…</p>}>
+          <Routes>
+            <Route path="/" element={<Dashboard onAuthError={onAuthError} />} />
+            <Route path="/workouts" element={<Workouts onAuthError={onAuthError} />} />
+            <Route path="/workouts/:uuid" element={<WorkoutDetail onAuthError={onAuthError} />} />
+          </Routes>
+        </Suspense>
       </main>
     </Router>
   );

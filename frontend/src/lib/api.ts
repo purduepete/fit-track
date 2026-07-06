@@ -14,6 +14,7 @@ export interface WorkoutSummary {
 
 export interface Split {
   split_index: number;
+  unit_system: string;
   distance_m: number;
   duration_sec: number;
   pace_sec_per_unit: number;
@@ -99,8 +100,8 @@ export const api = {
     apiGet<WorkoutSummary[]>(
       "/api/workouts" + (type ? `?workout_type=${encodeURIComponent(type)}` : "")
     ),
-  workout: (uuid: string, unit: "mi" | "km", full = false) =>
+  workout: (uuid: string, full = false) =>
     apiGet<WorkoutDetail>(
-      `/api/workouts/${encodeURIComponent(uuid)}?unit=${unit}${full ? "&full=true" : ""}`
+      `/api/workouts/${encodeURIComponent(uuid)}${full ? "?full=true" : ""}`
     ),
 };

@@ -27,6 +27,7 @@ class WorkoutSummary(BaseModel):
 
 class SplitOut(BaseModel):
     split_index: int
+    unit_system: str
     distance_m: float
     duration_sec: float
     pace_sec_per_unit: float

@@ -241,8 +241,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
             </div>
             <div className="card">
               <p className="muted" style={{ margin: "0 0 8px", fontSize: "0.8rem" }}>
-                Pace per {unit === "mi" ? "mile" : "km"} — lower is faster; dashed
-                line is the {formatPace(paceAvg, unit)} average.
+                Pace per {unit === "mi" ? "mile" : "km"} — {formatPace(paceAvg, unit)} average.
               </p>
               <ResponsiveContainer width="100%" height={260}>
                 <LineChart data={paceData}>

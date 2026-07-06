@@ -294,3 +294,72 @@ tbody tr:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* Narrow-screen (phone) tweaks: reclaim horizontal space and turn wide data
+   tables into stacked cards so the Workouts list is readable on an iPhone. */
+@media (max-width: 640px) {
+  .container {
+    padding: 18px 14px 48px;
+  }
+
+  .page-title {
+    font-size: 1.35rem;
+    margin-bottom: 18px;
+  }
+
+  /* Only tables opted-in via .stack-table restructure; others (e.g. the splits
+     table) keep their normal layout. */
+  .stack-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .stack-table,
+  .stack-table tbody,
+  .stack-table tr,
+  .stack-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .stack-table tr {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+    padding: 6px 14px;
+    margin-bottom: 12px;
+  }
+
+  .stack-table td {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+  }
+
+  .stack-table tr td:last-child {
+    border-bottom: 0;
+  }
+
+  /* Render the column header inline as a label for each stacked cell. */
+  .stack-table td::before {
+    content: attr(data-label);
+    color: var(--text-dim);
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    text-align: left;
+  }
+}

@@ -33,12 +33,40 @@ export function formatPace(secPerUnit: number | null, unit: Unit): string {
   return `${roll.m}:${String(roll.s).padStart(2, "0")}/${unit}`;
 }
 
-/** ISO/naive-UTC string -> local date+time label. */
+/** Average pace (seconds per unit) from total distance + duration, or null. */
+export function avgPaceSecPerUnit(
+  meters: number | null,
+  seconds: number | null,
+  unit: Unit,
+): number | null {
+  if (meters == null || seconds == null || meters <= 0) return null;
+  return seconds / metersToUnit(meters, unit);
+}
+
+/** Parse a naive-UTC / ISO string into a Date (assumes UTC when no offset). */
+function toDate(iso: string): Date {
+  return new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z");
+}
+
+/** ISO/naive-UTC string -> local date+time label (24-hour clock). */
 export function formatLocalDateTime(iso: string): string {
-  const d = new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z");
-  return d.toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
+  return toDate(iso).toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+/** Local time-of-day label (24-hour clock). Accepts an ISO string or epoch ms. */
+export function formatLocalTime(value: string | number): string {
+  const d = typeof value === "number" ? new Date(value) : toDate(value);
+  return d.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
   });
 }
 

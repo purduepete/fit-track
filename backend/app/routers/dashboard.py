@@ -55,7 +55,9 @@ def dashboard(
         .order_by(Workout.local_date)
     ).all()
 
-    workouts_7d = sum(row[1] for row in by_date)
+    # Count active days, not raw workout rows: two workouts on the same day
+    # count as one toward the "Workouts (7d)" KPI.
+    workouts_7d = len(by_date)
     duration_7d = sum(row[2] for row in by_date)
     energy_7d = sum(row[3] for row in by_date)
 

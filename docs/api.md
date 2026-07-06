@@ -25,14 +25,20 @@ Response:
 ```
 
 ## `GET /api/workouts`  *(read scope)*
-Query: `limit` (≤500, default 100), `offset`, `workout_type`.
-Returns an array of workout summaries (newest first):
+Query: `limit` (≤500, default 50), `offset`, `workout_type`, `date_from`,
+`date_to` (inclusive local `YYYY-MM-DD` bounds). Returns a page of workout
+summaries (newest first) plus the total matching count for pagination:
 ```json
-[{ "uuid": "…", "workout_type": "Outdoor Walk", "local_date": "2026-07-05",
-   "start_utc": "2026-07-05T18:39:13", "duration_sec": 1853.6,
-   "distance_m": 3705.0, "active_energy_kcal": 286.6,
-   "avg_hr": 117.8, "max_hr": 143.0, "has_route": true }]
+{ "total": 137,
+  "items": [{ "uuid": "…", "workout_type": "Outdoor Walk", "local_date": "2026-07-05",
+     "start_utc": "2026-07-05T18:39:13", "duration_sec": 1853.6,
+     "distance_m": 3705.0, "active_energy_kcal": 286.6,
+     "avg_hr": 117.8, "max_hr": 143.0, "has_route": true }] }
 ```
+
+## `GET /api/workouts/types`  *(read scope)*
+Distinct `workout_type` values present in the data (sorted), for the filter
+dropdown. → `["Outdoor Run", "Outdoor Walk", …]`
 
 ## `GET /api/workouts/{uuid}`  *(read scope)*
 Query: `unit` = `mi` (default) or `km`; `full` = `true` for the full-resolution

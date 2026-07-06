@@ -359,6 +359,58 @@ tbody tr:hover {
   border-top: 5px solid var(--text);
 }
 
+/* Workouts toolbar (type + date-range filters + search). */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.toolbar select,
+.toolbar input {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.toolbar input[type="search"] {
+  flex: 1;
+  min-width: 160px;
+}
+
+/* Day-group header row inside the workouts table. */
+.group-row td {
+  background: var(--surface-2);
+  color: var(--text-dim);
+  font-weight: 700;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+  cursor: default;
+}
+
+.group-count {
+  color: var(--accent);
+  font-weight: 600;
+  margin-left: 10px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.workouts-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+}
+
 /* Narrow-screen (phone) tweaks: reclaim horizontal space and turn wide data
    tables into stacked cards so the Workouts list is readable on an iPhone. */
 @media (max-width: 640px) {
@@ -425,5 +477,26 @@ tbody tr:hover {
     text-transform: uppercase;
     letter-spacing: 0.04em;
     text-align: left;
+  }
+
+  /* Day-group headers are section labels on mobile, not cards. */
+  .stack-table tr.group-row {
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    margin: 14px 0 6px;
+  }
+
+  .stack-table tr.group-row td {
+    display: block;
+    text-align: left;
+    padding: 4px 0;
+    border-bottom: 0;
+    background: transparent;
+  }
+
+  .stack-table tr.group-row td::before {
+    content: "";
   }
 }

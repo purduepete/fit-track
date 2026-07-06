@@ -66,9 +66,10 @@ def test_full_ingest_and_read_flow(client, auth_headers):
 
     # List
     lst = client.get("/api/workouts", headers=auth_headers).json()
-    assert len(lst) == 1
-    assert lst[0]["uuid"] == "API-W1"
-    assert lst[0]["has_route"] is True
+    assert lst["total"] == 1
+    assert len(lst["items"]) == 1
+    assert lst["items"][0]["uuid"] == "API-W1"
+    assert lst["items"][0]["has_route"] is True
 
     # Detail with splits + route + hr
     detail = client.get("/api/workouts/API-W1?unit=mi", headers=auth_headers).json()
@@ -93,6 +94,49 @@ def test_ingest_rejects_malformed_json(client, auth_headers):
 
 def test_workout_404(client, auth_headers):
     assert client.get("/api/workouts/nope", headers=auth_headers).status_code == 404
+
+
+def test_workouts_filter_paginate_and_types(client, auth_headers, db_session):
+    from datetime import timedelta
+
+    from app.models import Workout
+    from app.timeutil import utcnow
+
+    now = utcnow()
+
+    def mk(uuid, wtype, day_offset):
+        d = now - timedelta(days=day_offset)
+        return Workout(
+            uuid=uuid, workout_type=wtype, start_utc=d, end_utc=d,
+            local_date=d.strftime("%Y-%m-%d"), duration_sec=600,
+            has_route=False, created_utc=now, updated_utc=now,
+        )
+
+    db_session.add_all(
+        [mk("w-run-0", "Run", 0), mk("w-run-1", "Run", 1), mk("w-walk-2", "Walk", 2), mk("w-walk-9", "Walk", 9)]
+    )
+    db_session.commit()
+
+    # Type filter.
+    r = client.get("/api/workouts?workout_type=Walk", headers=auth_headers).json()
+    assert r["total"] == 2
+    assert {i["uuid"] for i in r["items"]} == {"w-walk-2", "w-walk-9"}
+
+    # Pagination: total reflects the full match; items are the page; newest first.
+    r = client.get("/api/workouts?limit=2&offset=0", headers=auth_headers).json()
+    assert r["total"] == 4
+    assert [i["uuid"] for i in r["items"]] == ["w-run-0", "w-run-1"]
+    r2 = client.get("/api/workouts?limit=2&offset=2", headers=auth_headers).json()
+    assert [i["uuid"] for i in r2["items"]] == ["w-walk-2", "w-walk-9"]
+
+    # Date range: last 3 days excludes the 9-day-old walk.
+    since = (now - timedelta(days=3)).strftime("%Y-%m-%d")
+    r = client.get(f"/api/workouts?date_from={since}", headers=auth_headers).json()
+    assert r["total"] == 3
+    assert "w-walk-9" not in {i["uuid"] for i in r["items"]}
+
+    # Distinct types for the filter dropdown.
+    assert client.get("/api/workouts/types", headers=auth_headers).json() == ["Run", "Walk"]
 
 
 def test_sample_indices_preserves_endpoints_and_cap():

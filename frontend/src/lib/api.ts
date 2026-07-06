@@ -76,6 +76,18 @@ export interface DashboardSummary {
   vo2max_trend: MetricPoint[];
 }
 
+export interface WorkoutList {
+  items: WorkoutSummary[];
+  total: number;
+}
+
+export interface WorkoutQuery {
+  type?: string;
+  dateFrom?: string;
+  limit?: number;
+  offset?: number;
+}
+
 const TOKEN_KEY = "fittrack_token";
 
 export function getToken(): string | null {
@@ -109,10 +121,16 @@ async function apiGet<T>(path: string): Promise<T> {
 
 export const api = {
   dashboard: () => apiGet<DashboardSummary>("/api/dashboard"),
-  workouts: (type?: string) =>
-    apiGet<WorkoutSummary[]>(
-      "/api/workouts" + (type ? `?workout_type=${encodeURIComponent(type)}` : "")
-    ),
+  workouts: (q: WorkoutQuery = {}) => {
+    const p = new URLSearchParams();
+    if (q.type) p.set("workout_type", q.type);
+    if (q.dateFrom) p.set("date_from", q.dateFrom);
+    if (q.limit != null) p.set("limit", String(q.limit));
+    if (q.offset != null) p.set("offset", String(q.offset));
+    const qs = p.toString();
+    return apiGet<WorkoutList>("/api/workouts" + (qs ? `?${qs}` : ""));
+  },
+  workoutTypes: () => apiGet<string[]>("/api/workouts/types"),
   workout: (uuid: string, full = false) =>
     apiGet<WorkoutDetail>(
       `/api/workouts/${encodeURIComponent(uuid)}${full ? "?full=true" : ""}`

@@ -109,7 +109,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
 
   // Pace is seconds-per-unit (lower = faster). A line chart reads the trend well
   // even when splits are close, so zoom the axis to the actual spread (a line
-  // needs no zero baseline) and reverse it so faster splits sit higher. Draw the
+  // needs no zero baseline). Axis runs low->high (faster at the bottom). Draw the
   // average pace as a dashed reference line so fast/slow splits stand out.
   const paceValues = paceData.map((p) => p.pace);
   const paceMin = paceValues.length ? Math.min(...paceValues) : 0;
@@ -241,7 +241,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
             </div>
             <div className="card">
               <p className="muted" style={{ margin: "0 0 8px", fontSize: "0.8rem" }}>
-                Pace per {unit === "mi" ? "mile" : "km"} — higher is faster; dashed
+                Pace per {unit === "mi" ? "mile" : "km"} — lower is faster; dashed
                 line is the {formatPace(paceAvg, unit)} average.
               </p>
               <ResponsiveContainer width="100%" height={260}>
@@ -249,7 +249,6 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis
-                    reversed
                     domain={paceDomain}
                     allowDecimals={false}
                     width={44}

@@ -66,6 +66,9 @@ class WorkoutDetail(WorkoutSummary):
     hr_total: int = 0
     route_downsampled: bool = False
     hr_downsampled: bool = False
+    # Adjacent workouts by start time for prev/next navigation (null at the ends).
+    prev_uuid: str | None = None  # next-older workout
+    next_uuid: str | None = None  # next-newer workout
 
 
 class MetricPoint(BaseModel):

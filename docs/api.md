@@ -50,6 +50,8 @@ Returns the summary plus:
 - `route_total`, `hr_total` — full point counts before any downsampling
 - `route_downsampled`, `hr_downsampled` — `true` when the returned series was
   reduced to the default caps (`MAX_ROUTE_POINTS` / `MAX_HR_POINTS`, 500 each)
+- `prev_uuid`, `next_uuid` — adjacent workouts by start time for prev/next
+  navigation (`prev` = next-older, `next` = next-newer); `null` at the ends
 
 By default long GPS workouts are **downsampled** (deterministically, endpoints
 preserved) to keep responses and client rendering bounded; pass `full=true` to

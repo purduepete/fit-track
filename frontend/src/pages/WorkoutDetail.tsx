@@ -1,5 +1,5 @@
-import { Suspense, lazy, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Suspense, lazy, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   Bar,
   BarChart,
@@ -14,7 +14,7 @@ import {
 import { api } from "../lib/api";
 import { useApiResource } from "../lib/useApiResource";
 import { StatCard } from "../components/StatCard";
-import { ActivityIcon, ClockIcon, FlameIcon, HeartIcon } from "../components/Icons";
+import { ActivityIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, FlameIcon, HeartIcon } from "../components/Icons";
 import {
   formatDistance,
   formatDuration,
@@ -55,6 +55,7 @@ function writeFullPref(value: boolean): void {
 
 export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
   const { uuid = "" } = useParams();
+  const navigate = useNavigate();
   const [unit, setUnit] = useState<Unit>("mi");
   // Remember the user's resolution choice across workouts: once they opt into
   // full resolution it sticks (and vice-versa) instead of re-downsampling every
@@ -71,6 +72,23 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
     [uuid, full, onAuthError],
     onAuthError,
   );
+
+  // Left/right arrow keys move between workouts (ignoring when typing in a field).
+  const prevUuid = data?.prev_uuid ?? null;
+  const nextUuid = data?.next_uuid ?? null;
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const tag = el?.tagName;
+      if (tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA" || el?.isContentEditable) {
+        return;
+      }
+      if (e.key === "ArrowLeft" && prevUuid) navigate(`/workouts/${prevUuid}`);
+      else if (e.key === "ArrowRight" && nextUuid) navigate(`/workouts/${nextUuid}`);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [prevUuid, nextUuid, navigate]);
 
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="muted">Loading…</p>;
@@ -109,6 +127,27 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
 
   return (
     <>
+      <div className="detail-nav">
+        <button
+          className="nav-btn"
+          onClick={() => data.prev_uuid && navigate(`/workouts/${data.prev_uuid}`)}
+          disabled={!data.prev_uuid}
+          aria-label="Older workout"
+          title="Older workout (left arrow)"
+        >
+          <ChevronLeftIcon /> Older
+        </button>
+        <button
+          className="nav-btn"
+          onClick={() => data.next_uuid && navigate(`/workouts/${data.next_uuid}`)}
+          disabled={!data.next_uuid}
+          aria-label="Newer workout"
+          title="Newer workout (right arrow)"
+        >
+          Newer <ChevronRightIcon />
+        </button>
+      </div>
+
       <h1 className="page-title">
         {data.workout_type}{" "}
         <span className="muted" style={{ fontSize: "1rem" }}>

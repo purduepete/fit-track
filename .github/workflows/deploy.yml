@@ -15,9 +15,10 @@ name: Deploy
 # Required repo variables:
 #   FITTRACK_RG         - resource group (e.g. fittrack-rg)
 #   FITTRACK_ACR        - Azure Container Registry name (e.g. fittrackacrcbc0af)
-# Optional repo variables (VO2 max interpretation — blank disables it, and the
-# app tolerates blank without crashing). Set these so a deploy preserves the
-# athlete profile instead of clearing it:
+# Optional repo variables (VO2 max interpretation). Leave BOTH unset to fall back
+# to the athlete profile baked into infra/main.bicep defaults; set them only to
+# override that profile (they are passed to the deploy only when non-empty, so an
+# unset variable never clears the profile):
 #   ATHLETE_BIRTH_DATE  - YYYY-MM-DD
 #   ATHLETE_SEX         - male | female
 
@@ -54,9 +55,17 @@ jobs:
         uses: azure/cli@v2
         with:
           inlineScript: |
+            # Only pass the athlete params when the repo variables are set, so an
+            # unset variable does NOT override the bicep default with an empty
+            # string (which would clear the profile). See infra/main.bicep.
+            EXTRA=""
+            if [ -n "${{ vars.ATHLETE_BIRTH_DATE }}" ]; then
+              EXTRA="$EXTRA athleteBirthDate=${{ vars.ATHLETE_BIRTH_DATE }}"
+            fi
+            if [ -n "${{ vars.ATHLETE_SEX }}" ]; then
+              EXTRA="$EXTRA athleteSex=${{ vars.ATHLETE_SEX }}"
+            fi
             az deployment group create \
               -g "${{ vars.FITTRACK_RG }}" \
               -f infra/main.bicep \
-              -p acrName="${{ vars.FITTRACK_ACR }}" containerImage="$IMAGE" \
-                 athleteBirthDate="${{ vars.ATHLETE_BIRTH_DATE }}" \
-                 athleteSex="${{ vars.ATHLETE_SEX }}"
+              -p acrName="${{ vars.FITTRACK_ACR }}" containerImage="$IMAGE" $EXTRA

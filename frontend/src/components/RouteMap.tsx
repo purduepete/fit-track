@@ -1,7 +1,9 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MapContainer, Polyline, TileLayer, CircleMarker, useMap } from "react-leaflet";
+import type { Map as LeafletMap } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import type { RoutePoint } from "../lib/api";
+import { CrosshairIcon } from "./Icons";
 
 function FitBounds({ points }: { points: [number, number][] }) {
   const map = useMap();
@@ -21,11 +23,12 @@ export function RouteMap({ route }: { route: RoutePoint[] }) {
     () => route.map((p) => [p.lat, p.lon]),
     [route],
   );
+  const [map, setMap] = useState<LeafletMap | null>(null);
   if (points.length === 0) return null;
 
   return (
     <div className="map">
-      <MapContainer style={{ height: "100%", width: "100%" }} scrollWheelZoom>
+      <MapContainer ref={setMap} style={{ height: "100%", width: "100%" }} scrollWheelZoom>
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -39,6 +42,15 @@ export function RouteMap({ route }: { route: RoutePoint[] }) {
         />
         <FitBounds points={points} />
       </MapContainer>
+      <button
+        type="button"
+        className="map-recenter"
+        title="Re-center route"
+        aria-label="Re-center route"
+        onClick={() => map?.fitBounds(points as any, { padding: [24, 24] })}
+      >
+        <CrosshairIcon size={16} />
+      </button>
     </div>
   );
 }

@@ -1,11 +1,10 @@
 import { Suspense, lazy, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
-  Bar,
-  BarChart,
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -24,7 +23,7 @@ import {
   round,
 } from "../lib/format";
 import type { Unit } from "../lib/format";
-import { barCursor, tooltipProps } from "../lib/chart";
+import { tooltipProps } from "../lib/chart";
 
 // Leaflet is heavy and only needed when a workout has a GPS route, so keep it
 // out of the initial bundle and load it lazily on demand.
@@ -108,12 +107,22 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
     hr: s.avg_hr ? Math.round(s.avg_hr) : null,
   }));
 
-  // Pace is seconds-per-unit (lower = faster). Anchor the axis at 0 so bars grow
-  // up from a real baseline and their heights are proportional/comparable; add
-  // ~8% headroom above the slowest split.
+  // Pace is seconds-per-unit (lower = faster). A line chart reads the trend well
+  // even when splits are close, so zoom the axis to the actual spread (a line
+  // needs no zero baseline) and reverse it so faster splits sit higher. Draw the
+  // average pace as a dashed reference line so fast/slow splits stand out.
   const paceValues = paceData.map((p) => p.pace);
+  const paceMin = paceValues.length ? Math.min(...paceValues) : 0;
   const paceMax = paceValues.length ? Math.max(...paceValues) : 0;
-  const paceDomain: [number, number] = [0, Math.ceil(paceMax * 1.08)];
+  const paceAvg = paceValues.length
+    ? Math.round(paceValues.reduce((a, b) => a + b, 0) / paceValues.length)
+    : 0;
+  // Pad ~15% of the spread each side (min 8s) so the line isn't glued to the edges.
+  const pacePad = Math.max((paceMax - paceMin) * 0.15, 8);
+  const paceDomain: [number, number] = [
+    Math.max(0, Math.floor(paceMin - pacePad)),
+    Math.ceil(paceMax + pacePad),
+  ];
 
   const hrData = data.hr_series.map((h) => ({
     t: new Date(h.ts_utc + "Z").getTime(),
@@ -232,26 +241,40 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
             </div>
             <div className="card">
               <p className="muted" style={{ margin: "0 0 8px", fontSize: "0.8rem" }}>
-                Pace per {unit === "mi" ? "mile" : "km"} — taller bars are slower splits.
+                Pace per {unit === "mi" ? "mile" : "km"} — higher is faster; dashed
+                line is the {formatPace(paceAvg, unit)} average.
               </p>
               <ResponsiveContainer width="100%" height={260}>
-                <BarChart data={paceData}>
+                <LineChart data={paceData}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis
+                    reversed
                     domain={paceDomain}
                     allowDecimals={false}
+                    width={44}
                     tick={{ fontSize: 11 }}
                     tickFormatter={(v) => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}`}
                   />
                   <Tooltip
                     {...tooltipProps}
-                    cursor={barCursor}
                     formatter={(value) => [formatPace(Number(value), unit), "Pace"]}
                     labelFormatter={(l) => `${unit === "mi" ? "Mile" : "Km"} ${l}`}
                   />
-                  <Bar dataKey="pace" fill="#4f46e5" radius={[2, 2, 0, 0]} />
-                </BarChart>
+                  <ReferenceLine
+                    y={paceAvg}
+                    stroke="var(--text-dim)"
+                    strokeDasharray="4 4"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="pace"
+                    stroke="#4f46e5"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: "#4f46e5" }}
+                    activeDot={{ r: 5 }}
+                  />
+                </LineChart>
               </ResponsiveContainer>
             </div>
           </div>

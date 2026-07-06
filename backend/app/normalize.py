@@ -9,12 +9,13 @@ handles idempotent upserts and split computation.
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid as uuidlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 
 from dateutil import parser as dtparser
-from sqlalchemy import delete, select
+from sqlalchemy import delete, insert, select
 from sqlalchemy.orm import Session
 
 from . import models
@@ -22,8 +23,7 @@ from .geo import (
     DistanceSample,
     HrSample,
     RoutePoint,
-    compute_splits_from_route,
-    compute_splits_from_samples,
+    compute_splits,
 )
 from .timeutil import utcnow
 
@@ -73,6 +73,36 @@ def unit_of(value, default: str | None = None) -> str | None:
     return default
 
 
+_ISO_OFFSET_RE = re.compile(
+    r"^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s*([+-]\d{2}):?(\d{2})?$"
+)
+
+
+def _fast_parse_dt(text: str) -> datetime | None:
+    """Fast path for common HAE / ISO timestamp shapes via ``fromisoformat``.
+
+    HAE emits ``YYYY-MM-DD HH:MM:SS ±HHMM`` (space before a colon-less offset),
+    which ``fromisoformat`` won't accept directly, so normalize it first. Returns
+    ``None`` when the shape isn't recognized so the caller falls back to the
+    (much slower, but very tolerant) dateutil parser.
+    """
+    t = text.strip()
+    if not t:
+        return None
+    if t[-1] in ("Z", "z"):
+        t = t[:-1] + "+00:00"
+    m = _ISO_OFFSET_RE.match(t)
+    if m:
+        date_part, time_part, off_h, off_m = m.groups()
+        t = f"{date_part}T{time_part}{off_h}:{off_m or '00'}"
+    else:
+        t = t.replace(" ", "T", 1)
+    try:
+        return datetime.fromisoformat(t)
+    except ValueError:
+        return None
+
+
 def parse_dt(value) -> tuple[datetime | None, int | None]:
     """Parse an HAE date string into ``(naive_utc_datetime, tz_offset_minutes)``.
 
@@ -82,13 +112,16 @@ def parse_dt(value) -> tuple[datetime | None, int | None]:
     """
     if value is None or value == "":
         return None, None
-    try:
-        dt = dtparser.parse(str(value))
-    except (ValueError, OverflowError):
-        return None, None
+    dt = _fast_parse_dt(str(value))
+    if dt is None:
+        try:
+            dt = dtparser.parse(str(value))
+        except (ValueError, OverflowError):
+            return None, None
     if dt.tzinfo is None:
         return dt.replace(tzinfo=None), None
-    offset_min = int(dt.utcoffset().total_seconds() // 60)
+    offset = dt.utcoffset()
+    offset_min = int(offset.total_seconds() // 60) if offset is not None else 0
     utc = dt.astimezone(UTC).replace(tzinfo=None)
     return utc, offset_min
 
@@ -293,6 +326,12 @@ def payload_hash(raw_text: str) -> str:
 
 
 # --- persistence (idempotent upserts) ---------------------------------------
+def _bulk_insert(db: Session, model: type, rows: list[dict], chunk: int = 1000) -> None:
+    """Insert child rows via Core executemany, chunked to bound statement size."""
+    for i in range(0, len(rows), chunk):
+        db.execute(insert(model), rows[i : i + chunk])
+
+
 def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
     now = utcnow()
     counts = {"workouts": 0, "daily_metrics": 0, "splits": 0}
@@ -307,6 +346,11 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
                 select(models.Workout).where(models.Workout.uuid.in_(workout_uuids))
             ).scalars()
         }
+
+    # Accumulate child rows across ALL workouts, then bulk-insert once per table.
+    route_rows: list[dict] = []
+    sample_rows: list[dict] = []
+    split_rows: list[dict] = []
 
     for pw in parsed.workouts:
         existing = existing_workouts.get(pw.uuid)
@@ -331,44 +375,58 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
         existing.updated_utc = now
         counts["workouts"] += 1
 
-        # Replace child rows for this workout (idempotent re-ingest).
-        db.execute(
-            delete(models.WorkoutRoutePoint).where(
-                models.WorkoutRoutePoint.workout_uuid == pw.uuid
-            )
-        )
-        db.execute(
-            delete(models.WorkoutSample).where(models.WorkoutSample.workout_uuid == pw.uuid)
-        )
-        db.execute(
-            delete(models.WorkoutSplit).where(models.WorkoutSplit.workout_uuid == pw.uuid)
-        )
-
         for seq, rp in enumerate(sorted(pw.route, key=lambda p: p.ts_utc)):
-            db.add(
-                models.WorkoutRoutePoint(
-                    workout_uuid=pw.uuid,
-                    seq=seq,
-                    ts_utc=rp.ts_utc,
-                    lat=rp.lat,
-                    lon=rp.lon,
-                    elevation_m=rp.elevation_m,
-                    speed_mps=rp.speed_mps,
-                )
+            route_rows.append(
+                {
+                    "workout_uuid": pw.uuid,
+                    "seq": seq,
+                    "ts_utc": rp.ts_utc,
+                    "lat": rp.lat,
+                    "lon": rp.lon,
+                    "elevation_m": rp.elevation_m,
+                    "speed_mps": rp.speed_mps,
+                }
             )
         for hs in pw.hr_samples:
-            db.add(
-                models.WorkoutSample(
-                    workout_uuid=pw.uuid,
-                    metric_type="heart_rate",
-                    start_utc=hs.ts_utc,
-                    end_utc=hs.ts_utc,
-                    value=hs.bpm,
-                    unit="bpm",
-                )
+            sample_rows.append(
+                {
+                    "workout_uuid": pw.uuid,
+                    "metric_type": "heart_rate",
+                    "start_utc": hs.ts_utc,
+                    "end_utc": hs.ts_utc,
+                    "value": hs.bpm,
+                    "unit": "bpm",
+                }
             )
+        # Build the distance/time + HR axes once and derive both unit systems.
+        splits = compute_splits(pw.route, pw.distance_samples, pw.hr_samples, ("mi", "km"))
+        for r in splits:
+            split_rows.append(
+                {
+                    "workout_uuid": pw.uuid,
+                    "unit_system": r.unit_system,
+                    "split_index": r.split_index,
+                    "distance_m": r.distance_m,
+                    "duration_sec": r.duration_sec,
+                    "pace_sec_per_unit": r.pace_sec_per_unit,
+                    "avg_hr": r.avg_hr,
+                    "source": r.source,
+                }
+            )
+        counts["splits"] += len(splits)
 
-        counts["splits"] += _persist_splits(pw, db)
+    # Ensure parent workout rows exist before touching their children.
+    db.flush()
+
+    # Replace child rows set-wise for every workout in this payload (idempotent
+    # re-ingest): one DELETE per child table instead of three per workout.
+    if workout_uuids:
+        for child in (models.WorkoutRoutePoint, models.WorkoutSample, models.WorkoutSplit):
+            db.execute(delete(child).where(child.workout_uuid.in_(workout_uuids)))
+
+    _bulk_insert(db, models.WorkoutRoutePoint, route_rows)
+    _bulk_insert(db, models.WorkoutSample, sample_rows)
+    _bulk_insert(db, models.WorkoutSplit, split_rows)
 
     # Batch-fetch existing daily metrics for the payload's dates/types in one
     # query (avoids a SELECT per metric). The map doubles as the in-payload
@@ -406,29 +464,3 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
 
     db.commit()
     return counts
-
-
-def _persist_splits(pw: ParsedWorkout, db: Session) -> int:
-    total = 0
-    for unit_system in ("mi", "km"):
-        if len(pw.route) >= 2:
-            rows = compute_splits_from_route(pw.route, pw.hr_samples, unit_system)
-        elif pw.distance_samples:
-            rows = compute_splits_from_samples(pw.distance_samples, pw.hr_samples, unit_system)
-        else:
-            rows = []
-        for r in rows:
-            db.add(
-                models.WorkoutSplit(
-                    workout_uuid=pw.uuid,
-                    unit_system=r.unit_system,
-                    split_index=r.split_index,
-                    distance_m=r.distance_m,
-                    duration_sec=r.duration_sec,
-                    pace_sec_per_unit=r.pace_sec_per_unit,
-                    avg_hr=r.avg_hr,
-                    source=r.source,
-                )
-            )
-            total += 1
-    return total

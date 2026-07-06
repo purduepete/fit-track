@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import bisect
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -69,28 +70,11 @@ def _interp_time(dist_axis: list[float], time_axis: list[float], target: float) 
     return t0 + frac * (t1 - t0)
 
 
-def _splits_from_axes(
-    dist_axis: list[float],
-    time_axis: list[float],
-    start_dt: datetime,
-    hr: list[HrSample],
-    unit_system: str,
-    source: str,
-) -> list[SplitRow]:
-    """Build per-unit splits from monotonic cumulative distance/elapsed arrays.
-
-    Working in elapsed seconds (relative to ``start_dt``) and reconstructing
-    datetimes with ``timedelta`` avoids the naive-``datetime.timestamp()`` local
-    timezone trap.
+def _hr_avg_fn(hr: list[HrSample]) -> Callable[[datetime, datetime], float | None]:
+    """Pre-sort HR once and build prefix sums so each split's average HR is an
+    O(log n) range lookup instead of a full scan. Built once and reused across
+    unit systems (mi/km) so the samples are sorted a single time per workout.
     """
-    unit_m = MILE_M if unit_system == "mi" else KM_M
-    total_dist = dist_axis[-1]
-    total_time = time_axis[-1]
-    if total_dist <= 0:
-        return []
-
-    # Pre-sort HR once and build prefix sums so each split's average HR is an
-    # O(log n) range lookup instead of a full scan (was O(splits x samples)).
     hr_sorted = sorted(hr, key=lambda h: h.ts_utc)
     hr_times = [h.ts_utc for h in hr_sorted]
     hr_prefix = [0.0]
@@ -102,6 +86,29 @@ def _splits_from_axes(
         hi = bisect.bisect_right(hr_times, seg_end)
         n = hi - lo
         return (hr_prefix[hi] - hr_prefix[lo]) / n if n else None
+
+    return avg_hr
+
+
+def _splits_from_axes(
+    dist_axis: list[float],
+    time_axis: list[float],
+    start_dt: datetime,
+    avg_hr: Callable[[datetime, datetime], float | None],
+    unit_system: str,
+    source: str,
+) -> list[SplitRow]:
+    """Build per-unit splits from monotonic cumulative distance/elapsed arrays.
+
+    Working in elapsed seconds (relative to ``start_dt``) and reconstructing
+    datetimes with ``timedelta`` avoids the naive-``datetime.timestamp()`` local
+    timezone trap. ``avg_hr`` is a prebuilt range lookup (see :func:`_hr_avg_fn`).
+    """
+    unit_m = MILE_M if unit_system == "mi" else KM_M
+    total_dist = dist_axis[-1]
+    total_time = time_axis[-1]
+    if total_dist <= 0:
+        return []
 
     splits: list[SplitRow] = []
     prev_elapsed = 0.0
@@ -145,14 +152,8 @@ def _splits_from_axes(
     return splits
 
 
-def compute_splits_from_route(
-    points: list[RoutePoint],
-    hr: list[HrSample],
-    unit_system: str = "mi",
-) -> list[SplitRow]:
-    """Roll GPS points into per-unit splits using cumulative haversine distance."""
-    if len(points) < 2:
-        return []
+def _axes_from_route(points: list[RoutePoint]) -> tuple[list[float], list[float], datetime]:
+    """Cumulative haversine distance + elapsed-seconds axes from GPS points."""
     points = sorted(points, key=lambda p: p.ts_utc)
     start_dt = points[0].ts_utc
     dist_axis = [0.0]
@@ -163,7 +164,56 @@ def compute_splits_from_route(
         cum += haversine_m(a.lat, a.lon, b.lat, b.lon)
         dist_axis.append(cum)
         time_axis.append((b.ts_utc - start_dt).total_seconds())
-    return _splits_from_axes(dist_axis, time_axis, start_dt, hr, unit_system, "gps")
+    return dist_axis, time_axis, start_dt
+
+
+def _axes_from_samples(dist: list[DistanceSample]) -> tuple[list[float], list[float], datetime]:
+    """Cumulative distance + elapsed-seconds axes from distance-increment samples."""
+    dist = sorted(dist, key=lambda d: d.start_utc)
+    start_dt = dist[0].start_utc
+    dist_axis = [0.0]
+    time_axis = [0.0]
+    cum = 0.0
+    for s in dist:
+        cum += s.meters
+        dist_axis.append(cum)
+        time_axis.append((s.end_utc - start_dt).total_seconds())
+    return dist_axis, time_axis, start_dt
+
+
+def compute_splits(
+    points: list[RoutePoint],
+    dist_samples: list[DistanceSample],
+    hr: list[HrSample],
+    unit_systems: tuple[str, ...] = ("mi", "km"),
+) -> list[SplitRow]:
+    """Compute splits for several unit systems, building the distance/time and
+    HR axes ONCE (GPS route preferred, distance samples as fallback)."""
+    if len(points) >= 2:
+        dist_axis, time_axis, start_dt = _axes_from_route(points)
+        source = "gps"
+    elif dist_samples:
+        dist_axis, time_axis, start_dt = _axes_from_samples(dist_samples)
+        source = "sample"
+    else:
+        return []
+    avg_hr = _hr_avg_fn(hr)
+    out: list[SplitRow] = []
+    for unit_system in unit_systems:
+        out.extend(_splits_from_axes(dist_axis, time_axis, start_dt, avg_hr, unit_system, source))
+    return out
+
+
+def compute_splits_from_route(
+    points: list[RoutePoint],
+    hr: list[HrSample],
+    unit_system: str = "mi",
+) -> list[SplitRow]:
+    """Roll GPS points into per-unit splits using cumulative haversine distance."""
+    if len(points) < 2:
+        return []
+    dist_axis, time_axis, start_dt = _axes_from_route(points)
+    return _splits_from_axes(dist_axis, time_axis, start_dt, _hr_avg_fn(hr), unit_system, "gps")
 
 
 def compute_splits_from_samples(
@@ -174,13 +224,5 @@ def compute_splits_from_samples(
     """Fallback splits for indoor workouts with no GPS, using distance samples."""
     if not dist:
         return []
-    dist = sorted(dist, key=lambda d: d.start_utc)
-    start_dt = dist[0].start_utc
-    dist_axis = [0.0]
-    time_axis = [0.0]
-    cum = 0.0
-    for s in dist:
-        cum += s.meters
-        dist_axis.append(cum)
-        time_axis.append((s.end_utc - start_dt).total_seconds())
-    return _splits_from_axes(dist_axis, time_axis, start_dt, hr, unit_system, "sample")
+    dist_axis, time_axis, start_dt = _axes_from_samples(dist)
+    return _splits_from_axes(dist_axis, time_axis, start_dt, _hr_avg_fn(hr), unit_system, "sample")

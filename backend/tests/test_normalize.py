@@ -48,6 +48,28 @@ def test_parse_dt_bad():
     assert parse_dt(None) == (None, None)
 
 
+def test_fast_parse_dt_matches_dateutil():
+    from app.normalize import _fast_parse_dt
+    from dateutil import parser as dtparser
+
+    for s in [
+        "2026-07-05 11:39:13 -0700",
+        "2026-07-05T11:39:13-07:00",
+        "2026-07-05 11:39:13",
+        "2026-07-05T11:39:13Z",
+        "2026-07-05 11:39:13.500 -0700",
+    ]:
+        fast = _fast_parse_dt(s)
+        assert fast is not None, s
+        assert fast == dtparser.parse(s), s
+
+
+def test_parse_dt_handles_z_suffix():
+    utc, off = parse_dt("2026-07-05T11:39:13Z")
+    assert utc.hour == 11
+    assert off == 0
+
+
 def test_local_date_uses_offset():
     # 01:30 UTC at -0700 is still the previous local day.
     from datetime import datetime

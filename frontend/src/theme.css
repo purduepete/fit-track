@@ -16,6 +16,7 @@
   --text-dim: #5a5c74;
   --bar-bg: rgba(255, 255, 255, 0.72);
   --shadow: 0 1px 3px rgba(20, 20, 50, 0.08);
+  --chip-fg: #15803d;
 }
 
 :root[data-theme="dark"] {
@@ -27,6 +28,7 @@
   --text-dim: #9a9cb5;
   --bar-bg: rgba(23, 24, 38, 0.72);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --chip-fg: #22c55e;
 }
 
 * {
@@ -238,7 +240,7 @@ tbody tr:hover {
   padding: 3px 10px;
   border-radius: var(--radius);
   background: var(--surface-2);
-  color: var(--accent);
+  color: var(--chip-fg);
   font-size: 0.78rem;
   font-weight: 600;
 }

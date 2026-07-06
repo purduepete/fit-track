@@ -358,10 +358,12 @@ def _sleep_hours_for_point(point: dict) -> float | None:
     """Best-effort asleep hours for one HAE sleep data point.
 
     Prefers an explicit total, then the sum of sleep stages, then a generic
-    value; each source is normalized to hours. In-bed time is deliberately not
-    used as it overstates actual sleep.
+    value; each source is normalized to hours. Some HAE versions report
+    ``asleep: 0`` and carry the real total in ``totalSleep``, so ``totalSleep``
+    is tried first and any zero is treated as "not populated". In-bed time is
+    deliberately not used as it overstates actual sleep.
     """
-    total = _to_hours(first(point, "asleep", "totalSleep", "asleepUnspecified"))
+    total = _to_hours(first(point, "totalSleep", "asleep", "asleepUnspecified"))
     if total and total > 0:
         return total
     stage_sum = sum(h for k in ("core", "deep", "rem") if (h := _to_hours(point.get(k))))

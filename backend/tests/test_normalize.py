@@ -204,6 +204,20 @@ def test_parse_sleep_seconds_format_normalized_to_hours():
     assert metrics[0].value == 7.5
 
 
+def test_parse_sleep_prefers_total_when_asleep_is_zero():
+    # Real HAE shape: asleep=0, real total in totalSleep, stages also present.
+    metrics = _sleep_metric([
+        {"sleepStart": "2026-06-28 02:02:00 -0700",
+         "sleepEnd": "2026-06-28 08:31:38 -0700",
+         "asleep": 0, "totalSleep": 6.4937,
+         "core": 3.758, "deep": 0.898, "rem": 1.837, "awake": 0,
+         "date": "2026-06-28 00:00:00 -0700", "source": "Apple Watch"},
+    ])
+    assert len(metrics) == 1
+    assert metrics[0].local_date == "2026-06-28"
+    assert metrics[0].value == 6.494
+
+
 def test_parse_sleep_falls_back_to_stage_sum():
     metrics = _sleep_metric([
         {"sleepEnd": "2026-07-05 06:00:00 -0700",

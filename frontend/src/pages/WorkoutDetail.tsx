@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   Bar,
@@ -13,19 +13,26 @@ import {
 } from "recharts";
 import { api } from "../lib/api";
 import { useApiResource } from "../lib/useApiResource";
-import { RouteMap } from "../components/RouteMap";
 import { StatCard } from "../components/StatCard";
 import { ActivityIcon, ClockIcon, FlameIcon, HeartIcon } from "../components/Icons";
 import { formatDistance, formatDuration, formatLocalDateTime, formatPace, round } from "../lib/format";
 import type { Unit } from "../lib/format";
 
+// Leaflet is heavy and only needed when a workout has a GPS route, so keep it
+// out of the initial bundle and load it lazily on demand.
+const RouteMap = lazy(() =>
+  import("../components/RouteMap").then((m) => ({ default: m.RouteMap })),
+);
+
 export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
   const { uuid = "" } = useParams();
   const [unit, setUnit] = useState<Unit>("mi");
   const [full, setFull] = useState(false);
+  // Unit is a pure client-side view choice: the detail response carries splits
+  // for both unit systems, so switching mi/km must not refetch the workout.
   const { data, error } = useApiResource(
-    () => api.workout(uuid, unit, full),
-    [uuid, unit, full, onAuthError],
+    () => api.workout(uuid, full),
+    [uuid, full, onAuthError],
     onAuthError,
   );
 
@@ -34,7 +41,9 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
 
   const downsampled = !full && (data.route_downsampled || data.hr_downsampled);
 
-  const paceData = data.splits.map((s) => ({
+  const splits = data.splits.filter((s) => s.unit_system === unit);
+
+  const paceData = splits.map((s) => ({
     label: `${s.split_index}`,
     pace: Math.round(s.pace_sec_per_unit),
     paceLabel: formatPace(s.pace_sec_per_unit, unit),
@@ -86,13 +95,15 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
       {data.route.length > 0 && (
         <div className="section">
           <h2>Route</h2>
-          <RouteMap route={data.route} />
+          <Suspense fallback={<div className="map muted">Loading map…</div>}>
+            <RouteMap route={data.route} />
+          </Suspense>
         </div>
       )}
 
       <div className="section">
         <h2>Splits</h2>
-        {data.splits.length === 0 ? (
+        {splits.length === 0 ? (
           <p className="muted">No split data for this workout.</p>
         ) : (
           <div className="two-col">
@@ -107,7 +118,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {data.splits.map((s) => (
+                  {splits.map((s) => (
                     <tr key={s.split_index}>
                       <td>
                         {s.split_index}

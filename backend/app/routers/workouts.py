@@ -1,5 +1,6 @@
 """Read endpoints for the workout list and per-workout detail (splits/route/HR)."""
 from collections.abc import Sequence
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -25,19 +26,48 @@ MAX_ROUTE_POINTS = 500
 MAX_HR_POINTS = 500
 
 
-def _downsample[T](items: Sequence[T], max_points: int) -> list[T]:
-    """Uniformly subsample to at most ``max_points``, preserving first and last.
+def _sample_indices(n: int, cap: int) -> list[int]:
+    """Indices to keep when uniformly subsampling ``n`` items to at most ``cap``.
 
-    Deterministic (same input -> same output) so the client sees a stable curve.
+    Preserves the first and last index; deterministic (same input -> same output)
+    so the client sees a stable curve.
     """
-    n = len(items)
-    if max_points <= 0 or n <= max_points:
-        return list(items)
-    if max_points == 1:
-        return [items[0]]
-    step = (n - 1) / (max_points - 1)
-    idxs = sorted({round(i * step) for i in range(max_points)})
-    return [items[i] for i in idxs]
+    if cap <= 0 or n <= cap:
+        return list(range(n))
+    if cap == 1:
+        return [0]
+    step = (n - 1) / (cap - 1)
+    return sorted({round(i * step) for i in range(cap)})
+
+
+def _load_series(
+    db: Session,
+    model: type[Any],
+    id_col: Any,
+    order_col: Any,
+    where: Sequence[Any],
+    cap: int,
+    full: bool,
+) -> tuple[list[Any], int]:
+    """Load an ordered child series, downsampling in the DB to at most ``cap`` rows.
+
+    Fetches only the ordered ids first (a single lightweight column), picks the
+    sampled positions, then loads just those full rows -- so a long GPS/HR series
+    is never fully materialized in the app. ``full=True`` returns every row.
+    Returns ``(rows, total)`` where ``total`` is the untruncated count.
+    """
+    if full:
+        rows = list(db.scalars(select(model).where(*where).order_by(order_col)))
+        return rows, len(rows)
+    ids = list(db.scalars(select(id_col).where(*where).order_by(order_col)))
+    total = len(ids)
+    idxs = _sample_indices(total, cap)
+    if len(idxs) == total:
+        rows = list(db.scalars(select(model).where(*where).order_by(order_col)))
+        return rows, total
+    wanted = [ids[i] for i in idxs]
+    rows = list(db.scalars(select(model).where(id_col.in_(wanted)).order_by(order_col)))
+    return rows, total
 
 
 @router.get("", response_model=list[WorkoutSummary])
@@ -58,7 +88,6 @@ def list_workouts(
 @router.get("/{uuid}", response_model=WorkoutDetail)
 def get_workout(
     uuid: str,
-    unit: str = Query("mi", pattern="^(mi|km)$"),
     full: bool = Query(False, description="Return full-resolution route/HR instead of downsampled."),
     db: Session = Depends(get_db),
     _token=Depends(require_read),
@@ -67,26 +96,22 @@ def get_workout(
     if w is None:
         raise HTTPException(status_code=404, detail="Workout not found")
 
+    # Return every split (both unit systems); the client selects mi/km locally so
+    # toggling units never refetches the workout.
     splits = db.scalars(
         select(WorkoutSplit)
-        .where(WorkoutSplit.workout_uuid == uuid, WorkoutSplit.unit_system == unit)
-        .order_by(WorkoutSplit.split_index)
+        .where(WorkoutSplit.workout_uuid == uuid)
+        .order_by(WorkoutSplit.unit_system, WorkoutSplit.split_index)
     ).all()
-    route = db.scalars(
-        select(WorkoutRoutePoint)
-        .where(WorkoutRoutePoint.workout_uuid == uuid)
-        .order_by(WorkoutRoutePoint.seq)
-    ).all()
-    hr = db.scalars(
-        select(WorkoutSample)
-        .where(WorkoutSample.workout_uuid == uuid, WorkoutSample.metric_type == "heart_rate")
-        .order_by(WorkoutSample.start_utc)
-    ).all()
-
-    route_total = len(route)
-    hr_total = len(hr)
-    route_out = route if full else _downsample(route, MAX_ROUTE_POINTS)
-    hr_out = hr if full else _downsample(hr, MAX_HR_POINTS)
+    route_out, route_total = _load_series(
+        db, WorkoutRoutePoint, WorkoutRoutePoint.id, WorkoutRoutePoint.seq,
+        [WorkoutRoutePoint.workout_uuid == uuid], MAX_ROUTE_POINTS, full,
+    )
+    hr_out, hr_total = _load_series(
+        db, WorkoutSample, WorkoutSample.id, WorkoutSample.start_utc,
+        [WorkoutSample.workout_uuid == uuid, WorkoutSample.metric_type == "heart_rate"],
+        MAX_HR_POINTS, full,
+    )
 
     return WorkoutDetail(
         **WorkoutSummary.model_validate(w, from_attributes=True).model_dump(),

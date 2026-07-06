@@ -87,6 +87,13 @@ class Vo2MaxBand(BaseModel):
     sex: str
 
 
+class SleepBand(BaseModel):
+    category: str
+    category_index: int
+    target_low: float
+    target_high: float
+
+
 class DashboardSummary(BaseModel):
     workouts_7d: int
     minutes_7d: float
@@ -94,6 +101,9 @@ class DashboardSummary(BaseModel):
     latest_resting_hr: float | None
     latest_vo2max: float | None
     vo2max_band: Vo2MaxBand | None = None
+    latest_sleep_hours: float | None = None
+    sleep_band: SleepBand | None = None
     weekly_minutes: list[MetricPoint]
     resting_hr_trend: list[MetricPoint]
     vo2max_trend: list[MetricPoint]
+    sleep_trend: list[MetricPoint] = []

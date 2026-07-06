@@ -321,12 +321,95 @@ def synth_workout_uuid(raw_type: str, start_utc: datetime) -> str:
     return str(uuidlib.uuid5(uuidlib.NAMESPACE_URL, seed))
 
 
+# HAE names the sleep metric variously; matched case-insensitively.
+SLEEP_METRIC_NAMES = ("sleep_analysis", "sleepanalysis", "sleep")
+# Metric type persisted for nightly asleep hours (unit: hours).
+SLEEP_METRIC_TYPE = "sleep_asleep_hours"
+
+
+def _to_hours(value) -> float | None:
+    """Coerce an HAE sleep duration to hours.
+
+    HAE has shipped these durations as seconds in some app versions and as
+    decimal hours in others. Nobody sleeps more than 24 hours in a night, so any
+    value above 24 is treated as seconds and converted; otherwise it is already
+    in hours. Negative/None values yield ``None``.
+    """
+    n = as_number(value)
+    if n is None or n < 0:
+        return None
+    return n / 3600.0 if n > 24 else n
+
+
+def _sleep_local_date(point: dict) -> str | None:
+    """Attribute a sleep session to its wake-up local date.
+
+    Apple attributes sleep spanning midnight to the wake day, so prefer the end
+    of the session, falling back to any available date field.
+    """
+    for key in ("sleepEnd", "sleepEndDate", "endDate", "end", "date", "timestamp"):
+        ts, tz = parse_dt(point.get(key))
+        if ts is not None:
+            return local_date_str(ts, tz)
+    return None
+
+
+def _sleep_hours_for_point(point: dict) -> float | None:
+    """Best-effort asleep hours for one HAE sleep data point.
+
+    Prefers an explicit total, then the sum of sleep stages, then a generic
+    value; each source is normalized to hours. In-bed time is deliberately not
+    used as it overstates actual sleep.
+    """
+    total = _to_hours(first(point, "asleep", "totalSleep", "asleepUnspecified"))
+    if total and total > 0:
+        return total
+    stage_sum = sum(h for k in ("core", "deep", "rem") if (h := _to_hours(point.get(k))))
+    if stage_sum > 0:
+        return stage_sum
+    generic = _to_hours(first(point, "value", "qty"))
+    if generic and generic > 0:
+        return generic
+    return None
+
+
+def _parse_sleep_metric(points: list) -> list[ParsedDailyMetric]:
+    """Sum asleep hours per (wake date, source).
+
+    HAE may split one night into several data points, but daily metrics are
+    keyed one-per-(date, type, source), so intervals are summed here rather than
+    left to overwrite one another on upsert.
+    """
+    totals: dict[tuple[str, str], float] = {}
+    for point in points or []:
+        local_date = _sleep_local_date(point)
+        hours = _sleep_hours_for_point(point)
+        if local_date is None or hours is None or hours <= 0:
+            continue
+        source = first(point, "source", "sourceName") or ""
+        key = (local_date, source)
+        totals[key] = totals.get(key, 0.0) + hours
+    return [
+        ParsedDailyMetric(
+            local_date=local_date,
+            metric_type=SLEEP_METRIC_TYPE,
+            value=round(hours, 3),
+            unit="hr",
+            source_name=source,
+        )
+        for (local_date, source), hours in totals.items()
+    ]
+
+
 def parse_daily_metrics(metrics: list) -> list[ParsedDailyMetric]:
     out: list[ParsedDailyMetric] = []
     for m in metrics or []:
         name = first(m, "name", "metric")
         units = first(m, "units", "unit")
         if not name:
+            continue
+        if str(name).lower() in SLEEP_METRIC_NAMES:
+            out.extend(_parse_sleep_metric(first(m, "data", default=[])))
             continue
         for point in first(m, "data", default=[]):
             ts, tz = parse_dt(first(point, "date", "timestamp"))

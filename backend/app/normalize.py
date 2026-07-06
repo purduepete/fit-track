@@ -358,26 +358,44 @@ def payload_hash(raw_text: str) -> str:
 
 
 # --- persistence (idempotent upserts) ---------------------------------------
-def _bulk_insert(db: Session, model: type, rows: list[dict], chunk: int = 1000) -> None:
+# Azure SQL rejects a statement with more than 2,100 parameters. Every unbounded
+# IN (...) / executemany is chunked below this so a large payload or a multi-year
+# backfill cannot blow the limit mid-ingest.
+_IN_CHUNK = 1000
+
+
+def _chunked(seq: list, size: int | None = None):
+    """Yield successive ``size``-length slices of ``seq`` (defaults to _IN_CHUNK)."""
+    size = size or _IN_CHUNK
+    for i in range(0, len(seq), size):
+        yield seq[i : i + size]
+
+
+def _bulk_insert(db: Session, model: type, rows: list[dict], chunk: int | None = None) -> None:
     """Insert child rows via Core executemany, chunked to bound statement size."""
-    for i in range(0, len(rows), chunk):
-        db.execute(insert(model), rows[i : i + chunk])
+    for batch in _chunked(rows, chunk):
+        db.execute(insert(model), batch)
 
 
 def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
+    """Idempotently upsert a parsed payload. Transaction-neutral: this flushes
+    but does NOT commit, so the caller owns the transaction boundary (the ingest
+    route commits the normalized rows and the RawIngestEvent status atomically)."""
     now = utcnow()
     counts = {"workouts": 0, "daily_metrics": 0, "splits": 0}
 
     # Batch-fetch existing workouts by UUID (avoids a SELECT per workout).
     workout_uuids = [pw.uuid for pw in parsed.workouts]
     existing_workouts: dict[str, models.Workout] = {}
-    if workout_uuids:
-        existing_workouts = {
-            w.uuid: w
-            for w in db.execute(
-                select(models.Workout).where(models.Workout.uuid.in_(workout_uuids))
-            ).scalars()
-        }
+    for batch in _chunked(workout_uuids):
+        existing_workouts.update(
+            {
+                w.uuid: w
+                for w in db.execute(
+                    select(models.Workout).where(models.Workout.uuid.in_(batch))
+                ).scalars()
+            }
+        )
 
     # Accumulate child rows across ALL workouts, then bulk-insert once per table.
     route_rows: list[dict] = []
@@ -451,10 +469,10 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
     db.flush()
 
     # Replace child rows set-wise for every workout in this payload (idempotent
-    # re-ingest): one DELETE per child table instead of three per workout.
-    if workout_uuids:
-        for child in (models.WorkoutRoutePoint, models.WorkoutSample, models.WorkoutSplit):
-            db.execute(delete(child).where(child.workout_uuid.in_(workout_uuids)))
+    # re-ingest): one DELETE per child table (chunked) instead of three per workout.
+    for child in (models.WorkoutRoutePoint, models.WorkoutSample, models.WorkoutSplit):
+        for batch in _chunked(workout_uuids):
+            db.execute(delete(child).where(child.workout_uuid.in_(batch)))
 
     _bulk_insert(db, models.WorkoutRoutePoint, route_rows)
     _bulk_insert(db, models.WorkoutSample, sample_rows)
@@ -466,12 +484,12 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
     # autoflush off, freshly-added rows are invisible to a SELECT — so we
     # coalesce source_name to "" and reuse rows by (local_date, type, source).
     metrics_by_key: dict[tuple[str, str, str], models.DailyMetric] = {}
-    metric_dates = {dm.local_date for dm in parsed.daily_metrics}
-    metric_types = {dm.metric_type for dm in parsed.daily_metrics}
-    if metric_dates:
+    metric_dates = list({dm.local_date for dm in parsed.daily_metrics})
+    metric_types = list({dm.metric_type for dm in parsed.daily_metrics})
+    for date_batch in _chunked(metric_dates):
         for m in db.execute(
             select(models.DailyMetric).where(
-                models.DailyMetric.local_date.in_(metric_dates),
+                models.DailyMetric.local_date.in_(date_batch),
                 models.DailyMetric.metric_type.in_(metric_types),
             )
         ).scalars():
@@ -494,5 +512,5 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
         row.updated_utc = now
         counts["daily_metrics"] += 1
 
-    db.commit()
+    db.flush()
     return counts

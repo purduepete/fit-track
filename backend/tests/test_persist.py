@@ -86,6 +86,48 @@ def test_persist_batches_multiple_workouts_and_metrics(db_session):
     assert db_session.query(DailyMetric).count() == 2
 
 
+def test_persist_chunks_in_clauses_across_boundaries(db_session, monkeypatch):
+    """With a tiny chunk size, workouts and metrics that span multiple IN-clause
+    batches must all persist and stay idempotent (regression for the Azure SQL
+    2,100-parameter limit, which is enforced by chunking)."""
+    from app import normalize
+
+    monkeypatch.setattr(normalize, "_IN_CHUNK", 2)  # force several chunks
+
+    payload = {
+        "data": {
+            "workouts": [
+                {
+                    "id": f"C{i}", "name": "Outdoor Walk",
+                    "start": f"2026-07-{i + 1:02d} 08:00:00 -0700",
+                    "end": f"2026-07-{i + 1:02d} 08:30:00 -0700",
+                    "duration": 1800.0, "distance": {"qty": 1.0, "units": "mi"},
+                }
+                for i in range(5)
+            ],
+            "metrics": [
+                {
+                    "name": "resting_heart_rate", "units": "count/min",
+                    "data": [
+                        {"date": f"2026-07-{i + 1:02d} 06:00:00 -0700", "qty": 50 + i}
+                        for i in range(5)
+                    ],
+                }
+            ],
+        }
+    }
+    counts = persist_payload(parse_payload(payload), db_session)
+    assert counts["workouts"] == 5
+    assert counts["daily_metrics"] == 5
+    assert db_session.query(Workout).count() == 5
+    assert db_session.query(DailyMetric).count() == 5
+
+    # Re-ingest across the same chunk boundaries updates in place (no duplicates).
+    persist_payload(parse_payload(payload), db_session)
+    assert db_session.query(Workout).count() == 5
+    assert db_session.query(DailyMetric).count() == 5
+
+
 def test_persist_computes_splits(db_session):
     persist_payload(parse_payload(_payload()), db_session)
     splits = db_session.query(WorkoutSplit).filter_by(unit_system="mi").all()

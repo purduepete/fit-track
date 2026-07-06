@@ -139,6 +139,40 @@ def test_workouts_filter_paginate_and_types(client, auth_headers, db_session):
     assert client.get("/api/workouts/types", headers=auth_headers).json() == ["Run", "Walk"]
 
 
+def test_workout_detail_prev_next_navigation(client, auth_headers, db_session):
+    from datetime import timedelta
+
+    from app.models import Workout
+    from app.timeutil import utcnow
+
+    now = utcnow()
+
+    def mk(uuid, day_offset):
+        d = now - timedelta(days=day_offset)
+        return Workout(
+            uuid=uuid, workout_type="Run", start_utc=d, end_utc=d,
+            local_date=d.strftime("%Y-%m-%d"), duration_sec=600,
+            has_route=False, created_utc=now, updated_utc=now,
+        )
+
+    # newest -> oldest: n0, n1, n2
+    db_session.add_all([mk("n0", 0), mk("n1", 1), mk("n2", 2)])
+    db_session.commit()
+
+    # Middle workout links to the older one (prev) and the newer one (next).
+    mid = client.get("/api/workouts/n1", headers=auth_headers).json()
+    assert mid["prev_uuid"] == "n2"  # older
+    assert mid["next_uuid"] == "n0"  # newer
+
+    # Ends: newest has no newer, oldest has no older.
+    newest = client.get("/api/workouts/n0", headers=auth_headers).json()
+    assert newest["next_uuid"] is None
+    assert newest["prev_uuid"] == "n1"
+    oldest = client.get("/api/workouts/n2", headers=auth_headers).json()
+    assert oldest["prev_uuid"] is None
+    assert oldest["next_uuid"] == "n1"
+
+
 def test_sample_indices_preserves_endpoints_and_cap():
     from app.routers import workouts as wr
 

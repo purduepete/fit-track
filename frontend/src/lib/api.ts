@@ -46,6 +46,8 @@ export interface WorkoutDetail extends WorkoutSummary {
   hr_total: number;
   route_downsampled: boolean;
   hr_downsampled: boolean;
+  prev_uuid: string | null;
+  next_uuid: string | null;
 }
 
 export interface MetricPoint {

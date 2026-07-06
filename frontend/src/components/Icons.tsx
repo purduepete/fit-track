@@ -95,3 +95,19 @@ export function LogOutIcon({ size = 18, style }: IconProps) {
     </svg>
   );
 }
+
+export function ChevronLeftIcon({ size = 18, style }: IconProps) {
+  return (
+    <svg {...base(size, style)}>
+      <polyline points="15 18 9 12 15 6" />
+    </svg>
+  );
+}
+
+export function ChevronRightIcon({ size = 18, style }: IconProps) {
+  return (
+    <svg {...base(size, style)}>
+      <polyline points="9 18 15 12 9 6" />
+    </svg>
+  );
+}

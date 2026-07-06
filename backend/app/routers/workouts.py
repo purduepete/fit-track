@@ -124,6 +124,28 @@ def get_workout(
     if w is None:
         raise HTTPException(status_code=404, detail="Workout not found")
 
+    # Adjacent workouts by start time for prev/next navigation. prev = next-older
+    # (start_utc just below this one), next = next-newer (just above). Ties on
+    # start_utc are broken by uuid so navigation is stable and can't loop.
+    prev_uuid = db.scalar(
+        select(Workout.uuid)
+        .where(
+            (Workout.start_utc < w.start_utc)
+            | ((Workout.start_utc == w.start_utc) & (Workout.uuid < uuid))
+        )
+        .order_by(Workout.start_utc.desc(), Workout.uuid.desc())
+        .limit(1)
+    )
+    next_uuid = db.scalar(
+        select(Workout.uuid)
+        .where(
+            (Workout.start_utc > w.start_utc)
+            | ((Workout.start_utc == w.start_utc) & (Workout.uuid > uuid))
+        )
+        .order_by(Workout.start_utc.asc(), Workout.uuid.asc())
+        .limit(1)
+    )
+
     # Return every split (both unit systems); the client selects mi/km locally so
     # toggling units never refetches the workout.
     splits = db.scalars(
@@ -154,4 +176,6 @@ def get_workout(
         hr_total=hr_total,
         route_downsampled=len(route_out) < route_total,
         hr_downsampled=len(hr_out) < hr_total,
+        prev_uuid=prev_uuid,
+        next_uuid=next_uuid,
     )

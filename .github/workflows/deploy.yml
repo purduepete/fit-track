@@ -15,6 +15,11 @@ name: Deploy
 # Required repo variables:
 #   FITTRACK_RG         - resource group (e.g. fittrack-rg)
 #   FITTRACK_ACR        - Azure Container Registry name (e.g. fittrackacrcbc0af)
+# Optional repo variables (VO2 max interpretation — blank disables it, and the
+# app tolerates blank without crashing). Set these so a deploy preserves the
+# athlete profile instead of clearing it:
+#   ATHLETE_BIRTH_DATE  - YYYY-MM-DD
+#   ATHLETE_SEX         - male | female
 
 on:
   workflow_dispatch:
@@ -52,4 +57,6 @@ jobs:
             az deployment group create \
               -g "${{ vars.FITTRACK_RG }}" \
               -f infra/main.bicep \
-              -p acrName="${{ vars.FITTRACK_ACR }}" containerImage="$IMAGE"
+              -p acrName="${{ vars.FITTRACK_ACR }}" containerImage="$IMAGE" \
+                 athleteBirthDate="${{ vars.ATHLETE_BIRTH_DATE }}" \
+                 athleteSex="${{ vars.ATHLETE_SEX }}"

@@ -116,6 +116,19 @@ a {
   border-color: var(--accent);
 }
 
+/* Plain variant (e.g. the refresh button): keep the icon its normal color on
+   hover — no purple/accent tint — and dim it when disabled. */
+.icon-btn--plain,
+.icon-btn--plain:hover {
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.icon-btn--plain:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .container {
   max-width: 1100px;
   margin: 0 auto;
@@ -125,43 +138,6 @@ a {
 .page-title {
   margin: 4px 0 24px;
   font-size: 1.6rem;
-}
-
-/* Title row with a right-aligned action (e.g. Refresh). */
-.page-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.page-head .page-title {
-  margin: 4px 0 24px;
-}
-
-.refresh-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 14px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.refresh-btn:hover:not(:disabled) {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.refresh-btn:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 @keyframes spin {
@@ -247,6 +223,7 @@ a {
   margin-top: 10px;
   font-size: 1.9rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .stat .unit {
@@ -591,6 +568,16 @@ tbody tr:hover {
   .stat .label svg {
     width: 15px;
     height: 15px;
+  }
+
+  /* Keep the metric value + its category badge (e.g. "6h 30m  FAIR",
+     "42.3  GOOD") on one line by shrinking the value at phone widths. */
+  .stat .value {
+    font-size: 1.35rem;
+  }
+
+  .vo2-badge {
+    margin-left: 6px;
   }
 
   /* Only tables opted-in via .stack-table restructure; others (e.g. the splits

@@ -6,6 +6,7 @@ the ``fit`` schema of the WebPortfolio database.
 from datetime import date
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +37,16 @@ class Settings(BaseSettings):
     # omits the interpretation and shows the bare value.
     athlete_birth_date: date | None = None
     athlete_sex: str = ""
+
+    @field_validator("athlete_birth_date", mode="before")
+    @classmethod
+    def _blank_birth_date_is_none(cls, v: object) -> object:
+        # An unset ATHLETE_BIRTH_DATE arrives as an empty string from the
+        # environment; treat blank as "not configured" (disables VO2 max
+        # interpretation) rather than failing date parsing at startup.
+        if isinstance(v, str) and v.strip() == "":
+            return None
+        return v
 
     @property
     def sqlalchemy_url(self) -> str:

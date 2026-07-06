@@ -47,8 +47,14 @@ async def ingest_health_auto_export(
     raw_text = raw_bytes.decode("utf-8")
     digest = payload_hash(raw_text)
 
+    # Lock the dedupe row so concurrent retries of the same payload serialize:
+    # if a prior request left the event in "received" (e.g. crashed mid-persist),
+    # only one retry reprocesses it; the other blocks here, then sees "processed"
+    # and returns a duplicate. No-op on SQLite (FOR UPDATE is omitted).
     existing = db.execute(
-        select(RawIngestEvent).where(RawIngestEvent.payload_hash == digest)
+        select(RawIngestEvent)
+        .where(RawIngestEvent.payload_hash == digest)
+        .with_for_update()
     ).scalar_one_or_none()
     if existing is not None and existing.status == "processed":
         return IngestResult(status="ok", duplicate=True)

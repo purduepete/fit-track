@@ -140,7 +140,9 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         rules: [
           {
             name: 'http'
-            http: { metadata: { concurrentRequests: '20' } }
+            // Bound concurrency: each request buffers the full body (up to
+            // max_ingest_bytes) so keep this low on a small-memory replica.
+            http: { metadata: { concurrentRequests: '5' } }
           }
         ]
       }

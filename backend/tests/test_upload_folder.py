@@ -100,3 +100,62 @@ def test_failed_post_leaves_file_in_place(tmp_path, monkeypatch):
     assert n == 0
     assert z.exists()  # not moved on failure
     assert not (watch / "processed" / "export.zip").exists()
+
+
+def test_poison_pill_without_json_is_quarantined(tmp_path, monkeypatch):
+    watch = tmp_path / "gdrive"
+    watch.mkdir()
+    z = watch / "nojson.zip"
+    with zipfile.ZipFile(str(z), "w") as zf:
+        zf.writestr("route.gpx", "<gpx/>")  # no JSON inside -> unprocessable
+    old = time.time() - 3600
+    os.utime(str(z), (old, old))
+
+    monkeypatch.setattr(
+        upload_folder, "post_payload", lambda *a, **k: pytest.fail("should not POST")
+    )
+
+    n = upload_folder.scan_once(str(watch), "http://x", "t")
+
+    assert n == 0
+    assert not z.exists()  # moved out of the watch dir
+    assert (watch / "_failed" / "nojson.zip").exists()
+
+
+def test_client_4xx_is_quarantined_but_5xx_retries(tmp_path, monkeypatch):
+    import urllib.error
+
+    watch = tmp_path / "gdrive"
+    watch.mkdir()
+    bad = watch / "bad.zip"
+    _make_zip(str(bad), {"data": {}})
+    old = time.time() - 3600
+    os.utime(str(bad), (old, old))
+
+    def client_error(*a, **k):
+        raise urllib.error.HTTPError("http://x", 400, "Bad Request", {}, None)
+
+    monkeypatch.setattr(upload_folder, "post_payload", client_error)
+    assert upload_folder.scan_once(str(watch), "http://x", "t") == 0
+    assert not bad.exists()
+    assert (watch / "_failed" / "bad.zip").exists()
+
+    # A 5xx is transient and must be left in place to retry.
+    srv = watch / "srv.zip"
+    _make_zip(str(srv), {"data": {}})
+    os.utime(str(srv), (old, old))
+
+    def server_error(*a, **k):
+        raise urllib.error.HTTPError("http://x", 503, "Unavailable", {}, None)
+
+    monkeypatch.setattr(upload_folder, "post_payload", server_error)
+    assert upload_folder.scan_once(str(watch), "http://x", "t") == 0
+    assert srv.exists()  # left for a later poll
+    assert not (watch / "_failed" / "srv.zip").exists()
+
+
+def test_scan_ignores_the_failed_subfolder(tmp_path, monkeypatch):
+    watch = tmp_path / "gdrive"
+    (watch / "_failed").mkdir(parents=True)
+    monkeypatch.setattr(upload_folder, "post_payload", lambda *a, **k: {"status": "ok"})
+    assert upload_folder.scan_once(str(watch), "http://x", "t") == 0

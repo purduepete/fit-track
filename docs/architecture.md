@@ -63,6 +63,17 @@ avoiding a first-image-pull race; the same identity both pulls the image from th
 dedicated Azure Container Registry and authenticates to SQL. The Bicep
 `identityName` / `identityClientId` / `identityPrincipalId` outputs surface it.
 
+### Athlete profile env (deploy-time params)
+
+VO₂ max interpretation needs the athlete's age + sex. `infra/main.bicep` exposes
+`athleteBirthDate` / `athleteSex` params (→ `ATHLETE_BIRTH_DATE` / `ATHLETE_SEX`
+env), **both defaulting to empty**. So a deploy that doesn't supply them
+**clears** the profile on the running app and disables the VO₂ category/badge.
+A blank birth date is tolerated (normalized to `None` in `backend/app/config.py`)
+and no longer crash-loops the container. Always pass these on a manual deploy, or
+set the `ATHLETE_BIRTH_DATE` / `ATHLETE_SEX` repo variables for the Actions
+workflow — see the [README deploy section](../README.md#deploy-azure).
+
 ### Granting the deployed app access (one-time)
 
 After the first deploy, connect **as the AAD admin** and create a contained

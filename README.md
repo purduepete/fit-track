@@ -132,14 +132,58 @@ CI (`.github/workflows/ci.yml`) runs both on every push/PR. See
 ## Deploy (Azure)
 
 Cheapest path is **Azure Container Apps** on the Consumption plan
-(`minReplicas: 0` → scales to zero when idle). The container is deployed into a
-**dedicated new resource group**; the Azure SQL server is reused cross-RG.
+(`minReplicas: 0` → scales to zero when idle). The app runs in a **dedicated
+resource group** (`fittrack-rg`, **eastus2**) with its own ACR
+(`fittrackacrcbc0af`) and a **user-assigned managed identity**
+(`fittrack-identity`) used for both AcrPull and Azure SQL (`DB_AUTH=aad`, no DB
+password). The Azure SQL server is reused cross-RG (see
+[architecture](docs/architecture.md)).
+
+### Option A — GitHub Actions (manual trigger)
+
+`.github/workflows/deploy.yml` is **`workflow_dispatch` only** (never on push,
+because a deploy hits the shared WebPortfolio DB). Run it from the Actions tab
+or `gh workflow run deploy.yml`. It requires:
+
+| Kind | Name | Example |
+| --- | --- | --- |
+| secret | `AZURE_CREDENTIALS` | output of `az ad sp create-for-rbac --sdk-auth` |
+| variable | `FITTRACK_RG` | `fittrack-rg` |
+| variable | `FITTRACK_ACR` | `fittrackacrcbc0af` |
+| variable | `ATHLETE_BIRTH_DATE` | `1970-09-20` (blank = disables VO₂ interpretation) |
+| variable | `ATHLETE_SEX` | `male` \| `female` |
+
+> ⚠️ If `AZURE_CREDENTIALS` is not set the workflow fails at the Azure login
+> step — use Option B.
+
+### Option B — local az CLI (what to run today)
 
 ```powershell
-az group create -n fittrack-rg -l westus2
-# push image + deploy via the manual GitHub Actions "Deploy" workflow, or:
+$tag = git rev-parse --short=7 HEAD
+az acr build -r fittrackacrcbc0af -t "fittrack:$tag" -t fittrack:latest .
 az deployment group create -g fittrack-rg -f infra/main.bicep `
-   -p containerImage=ghcr.io/<owner>/fittrack:latest dbPassword=<secret>
+  -p acrName=fittrackacrcbc0af `
+     containerImage=fittrackacrcbc0af.azurecr.io/fittrack:$tag `
+     athleteBirthDate=<YYYY-MM-DD> athleteSex=<male|female>
+```
+
+> ⚠️ **Always pass `athleteBirthDate` / `athleteSex`.** `infra/main.bicep`
+> defaults them to empty, so omitting them **clears** the athlete profile on the
+> running app (only VO₂ max interpretation is affected — the app no longer
+> crashes on a blank birth date, see `backend/app/config.py`).
+
+> 🪟 On Windows, `az acr build` often crashes client-side with a
+> `UnicodeEncodeError` (cp1252 vs the `✓` glyph) **while streaming logs** — the
+> **remote build still succeeds**. Verify with
+> `az acr task list-runs -r fittrackacrcbc0af --top 1 --query "[0].status"` and
+> check the pushed tag; don't assume the build failed.
+
+Confirm the new revision came up healthy (a bad env/config would crash-loop and
+traffic would stay on the previous revision):
+
+```powershell
+az containerapp revision list -n fittrack-api -g fittrack-rg `
+  --query "[?properties.active].{rev:name,running:properties.runningState,health:properties.healthState,image:properties.template.containers[0].image}" -o table
 ```
 
 ## ⚠️ Database-change policy

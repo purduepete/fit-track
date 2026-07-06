@@ -48,26 +48,32 @@ function toDate(iso: string): Date {
   return new Date(iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z");
 }
 
-/** ISO/naive-UTC string -> local date+time label (24-hour clock). */
+function pad2(n: number): string {
+  return String(n).padStart(2, "0");
+}
+
+/** A "YYYY-MM-DD" (or ISO) date string -> "MM/DD/YYYY".
+ *
+ * ``local_date`` is already a calendar date (no time zone), so the date part is
+ * reformatted directly to avoid any UTC shift. */
+export function formatLocalDate(value: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(value);
+  if (m) return `${m[2]}/${m[3]}/${m[1]}`;
+  const d = toDate(value);
+  return `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${d.getFullYear()}`;
+}
+
+/** ISO/naive-UTC string -> local date+time label ("MM/DD/YYYY HH:MM", 24-hour). */
 export function formatLocalDateTime(iso: string): string {
-  return toDate(iso).toLocaleString(undefined, {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  const d = toDate(iso);
+  const date = `${pad2(d.getMonth() + 1)}/${pad2(d.getDate())}/${d.getFullYear()}`;
+  return `${date} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
 /** Local time-of-day label (24-hour clock). Accepts an ISO string or epoch ms. */
 export function formatLocalTime(value: string | number): string {
   const d = typeof value === "number" ? new Date(value) : toDate(value);
-  return d.toLocaleTimeString(undefined, {
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  });
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 }
 
 export function round(n: number | null, digits = 0): string {

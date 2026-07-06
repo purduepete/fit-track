@@ -153,9 +153,11 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
         <StatCard icon={<MoonIcon />} label="Sleep (last night)" value={sleepValue} />
       </div>
 
-      <div className="two-col">
+      <section className="dash-section">
+        <h2 className="section-title">This week</h2>
         <div className="card">
           <h2>Workout minutes by day</h2>
+          <p className="muted chart-caption">Active minutes per day over the last 7 days.</p>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={data.weekly_minutes}>
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -166,65 +168,77 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-        <div className="card">
-          <h2>Resting heart rate trend</h2>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={data.resting_hr_trend}>
-              <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-              <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
-              <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} />
-              <Tooltip {...tooltipProps} labelFormatter={formatLocalDate} />
-              <Line type="monotone" dataKey="value" stroke="#7c3aed" strokeWidth={2} dot={false} />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </div>
+      </section>
 
-      {data.vo2max_trend.length > 0 && (
+      <section className="dash-section">
+        <h2 className="section-title">Heart &amp; fitness</h2>
         <div className="two-col">
           <div className="card">
-            <h2>VO₂ max trend</h2>
+            <h2>Resting heart rate trend</h2>
+            <p className="muted chart-caption">Lower is generally better — watch for a stable or downward trend.</p>
             <ResponsiveContainer width="100%" height={240}>
-              <LineChart data={data.vo2max_trend}>
+              <LineChart data={data.resting_hr_trend}>
                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                 <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
                 <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} />
                 <Tooltip {...tooltipProps} labelFormatter={formatLocalDate} />
-                <Line type="monotone" dataKey="value" stroke="#4f46e5" strokeWidth={2} dot={false} />
+                <Line type="monotone" dataKey="value" stroke="#7c3aed" strokeWidth={2} dot={false} />
               </LineChart>
             </ResponsiveContainer>
           </div>
-          {data.vo2max_band && typeof data.latest_vo2max === "number" ? (
-            <CardioFitness band={data.vo2max_band} value={data.latest_vo2max} />
-          ) : (
-            <div className="card">
-              <h2>Cardio fitness</h2>
-              <p className="muted">
-                Set your birth date and sex in the app config to interpret VO₂ max against
-                age/sex norms.
-              </p>
-            </div>
-          )}
+          <div className="card">
+            <h2>VO₂ max trend</h2>
+            <p className="muted chart-caption">Higher is better — see your cardio-fitness rating below.</p>
+            {data.vo2max_trend.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <LineChart data={data.vo2max_trend}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
+                  <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} />
+                  <Tooltip {...tooltipProps} labelFormatter={formatLocalDate} />
+                  <Line type="monotone" dataKey="value" stroke="#4f46e5" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="muted">No VO₂ max readings yet.</p>
+            )}
+          </div>
         </div>
-      )}
+        {data.vo2max_band && typeof data.latest_vo2max === "number" ? (
+          <CardioFitness band={data.vo2max_band} value={data.latest_vo2max} />
+        ) : (
+          <div className="card">
+            <h2>Cardio fitness</h2>
+            <p className="muted">
+              Set your birth date and sex in the app config to interpret VO₂ max against
+              age/sex norms.
+            </p>
+          </div>
+        )}
+      </section>
 
-      {data.sleep_trend.length > 0 && (
+      <section className="dash-section">
+        <h2 className="section-title">Sleep</h2>
         <div className="two-col">
           <div className="card">
             <h2>Sleep hours</h2>
-            <p className="muted" style={{ margin: "0 0 8px", fontSize: "0.8rem" }}>
-              Asleep hours per night; shaded band is the 7–9 h target.
-            </p>
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={data.sleep_trend}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
-                <YAxis domain={[0, "auto"]} tick={{ fontSize: 11 }} unit="h" />
-                <Tooltip {...tooltipProps} cursor={barCursor} labelFormatter={formatLocalDate} />
-                <ReferenceArea y1={7} y2={9} fill="#22c55e" fillOpacity={0.12} ifOverflow="extendDomain" />
-                <Bar dataKey="value" fill="#7c3aed" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <p className="muted chart-caption">Asleep hours per night; shaded band is the 7–9 h target.</p>
+            {data.sleep_trend.length > 0 ? (
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={data.sleep_trend}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
+                  <YAxis domain={[0, "auto"]} tick={{ fontSize: 11 }} unit="h" />
+                  <Tooltip {...tooltipProps} cursor={barCursor} labelFormatter={formatLocalDate} />
+                  <ReferenceArea y1={7} y2={9} fill="#22c55e" fillOpacity={0.12} ifOverflow="extendDomain" />
+                  <Bar dataKey="value" fill="#7c3aed" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <p className="muted">
+                Enable “Sleep Analysis” in Health Auto Export to track nightly sleep hours here.
+              </p>
+            )}
           </div>
           {data.sleep_band && typeof data.latest_sleep_hours === "number" ? (
             <SleepQuality band={data.sleep_band} hours={data.latest_sleep_hours} />
@@ -232,13 +246,12 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
             <div className="card">
               <h2>Sleep quality</h2>
               <p className="muted">
-                Enable “Sleep Analysis” in Health Auto Export to track nightly sleep hours and
-                a rating here.
+                Once sleep data arrives, its rating against the 7–9 h target appears here.
               </p>
             </div>
           )}
         </div>
-      )}
+      </section>
     </>
   );
 }

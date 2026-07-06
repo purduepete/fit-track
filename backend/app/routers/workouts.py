@@ -3,7 +3,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..auth import require_read
@@ -14,6 +14,7 @@ from ..schemas import (
     RoutePointOut,
     SplitOut,
     WorkoutDetail,
+    WorkoutList,
     WorkoutSummary,
 )
 
@@ -70,19 +71,46 @@ def _load_series(
     return rows, total
 
 
-@router.get("", response_model=list[WorkoutSummary])
+@router.get("", response_model=WorkoutList)
 def list_workouts(
     db: Session = Depends(get_db),
     _token=Depends(require_read),
-    limit: int = Query(100, le=500),
-    offset: int = 0,
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
     workout_type: str | None = None,
-) -> list[WorkoutSummary]:
-    stmt = select(Workout).order_by(Workout.start_utc.desc())
+    date_from: str | None = Query(None, description="Inclusive local start date (YYYY-MM-DD)."),
+    date_to: str | None = Query(None, description="Inclusive local end date (YYYY-MM-DD)."),
+) -> WorkoutList:
+    # local_date is a "YYYY-MM-DD" string, so lexical comparisons are valid dates.
+    filters = []
     if workout_type:
-        stmt = stmt.where(Workout.workout_type == workout_type)
-    stmt = stmt.offset(offset).limit(limit)
-    return [WorkoutSummary.model_validate(w, from_attributes=True) for w in db.scalars(stmt)]
+        filters.append(Workout.workout_type == workout_type)
+    if date_from:
+        filters.append(Workout.local_date >= date_from)
+    if date_to:
+        filters.append(Workout.local_date <= date_to)
+
+    total = db.scalar(select(func.count()).select_from(Workout).where(*filters)) or 0
+    stmt = (
+        select(Workout)
+        .where(*filters)
+        .order_by(Workout.start_utc.desc())
+        .offset(offset)
+        .limit(limit)
+    )
+    items = [WorkoutSummary.model_validate(w, from_attributes=True) for w in db.scalars(stmt)]
+    return WorkoutList(items=items, total=total)
+
+
+@router.get("/types", response_model=list[str])
+def list_workout_types(
+    db: Session = Depends(get_db),
+    _token=Depends(require_read),
+) -> list[str]:
+    """Distinct workout types present in the data, for the filter dropdown."""
+    return list(
+        db.scalars(select(Workout.workout_type).distinct().order_by(Workout.workout_type))
+    )
 
 
 @router.get("/{uuid}", response_model=WorkoutDetail)

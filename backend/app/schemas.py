@@ -25,6 +25,11 @@ class WorkoutSummary(BaseModel):
     has_route: bool
 
 
+class WorkoutList(BaseModel):
+    items: list["WorkoutSummary"]
+    total: int
+
+
 class SplitOut(BaseModel):
     split_index: int
     unit_system: str

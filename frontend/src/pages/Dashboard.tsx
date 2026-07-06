@@ -14,6 +14,7 @@ import { useApiResource } from "../lib/useApiResource";
 import { StatCard } from "../components/StatCard";
 import { ActivityIcon, ClockIcon, FlameIcon, GaugeIcon, HeartIcon } from "../components/Icons";
 import { round } from "../lib/format";
+import { barCursor, tooltipProps } from "../lib/chart";
 
 export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
   const { data, error } = useApiResource(() => api.dashboard(), [onAuthError], onAuthError);
@@ -40,7 +41,7 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
               <XAxis dataKey="local_date" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip />
+              <Tooltip {...tooltipProps} cursor={barCursor} />
               <Bar dataKey="value" fill="#4f46e5" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -52,7 +53,7 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
               <XAxis dataKey="local_date" tick={{ fontSize: 11 }} />
               <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} />
-              <Tooltip />
+              <Tooltip {...tooltipProps} />
               <Line type="monotone" dataKey="value" stroke="#7c3aed" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  avgPaceSecPerUnit,
   formatDistance,
   formatDuration,
   formatLocalDateTime,
+  formatLocalTime,
   formatPace,
   metersToUnit,
   round,
@@ -49,6 +51,33 @@ describe("formatPace", () => {
     expect(formatPace(0, "mi")).toBe("—");
     expect(formatPace(null, "mi")).toBe("—");
     expect(formatPace(Infinity, "mi")).toBe("—");
+  });
+});
+
+describe("avgPaceSecPerUnit", () => {
+  it("computes seconds per mile from distance + duration", () => {
+    // 2 miles (3218.688 m) in 1200 s -> 600 s/mi
+    expect(avgPaceSecPerUnit(3218.688, 1200, "mi")).toBeCloseTo(600, 5);
+  });
+  it("computes seconds per km", () => {
+    // 2 km in 600 s -> 300 s/km
+    expect(avgPaceSecPerUnit(2000, 600, "km")).toBeCloseTo(300, 5);
+  });
+  it("returns null for missing or zero distance", () => {
+    expect(avgPaceSecPerUnit(null, 600, "mi")).toBeNull();
+    expect(avgPaceSecPerUnit(1000, null, "mi")).toBeNull();
+    expect(avgPaceSecPerUnit(0, 600, "mi")).toBeNull();
+  });
+});
+
+describe("formatLocalTime", () => {
+  it("produces a non-empty 24-hour string with no AM/PM", () => {
+    const s = formatLocalTime("2026-07-05T18:39:13Z");
+    expect(s.length).toBeGreaterThan(0);
+    expect(s).not.toMatch(/[ap]m/i);
+  });
+  it("accepts an epoch-ms number", () => {
+    expect(formatLocalTime(Date.now()).length).toBeGreaterThan(0);
   });
 });
 

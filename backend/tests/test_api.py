@@ -165,11 +165,18 @@ def test_dashboard_trends_are_windowed(client, auth_headers, db_session):
 
     now = utcnow()
     recent, old = now - timedelta(days=1), now - timedelta(days=30)
+    # Two workouts on the same recent day must count as one active day.
+    recent2 = recent - timedelta(hours=3)
     db_session.add_all(
         [
             Workout(
                 uuid="recent", workout_type="Walk", start_utc=recent, end_utc=recent,
                 local_date=recent.strftime("%Y-%m-%d"), duration_sec=600,
+                has_route=False, created_utc=now, updated_utc=now,
+            ),
+            Workout(
+                uuid="recent2", workout_type="Run", start_utc=recent2, end_utc=recent2,
+                local_date=recent.strftime("%Y-%m-%d"), duration_sec=900,
                 has_route=False, created_utc=now, updated_utc=now,
             ),
             Workout(
@@ -182,7 +189,7 @@ def test_dashboard_trends_are_windowed(client, auth_headers, db_session):
     db_session.commit()
 
     dash = client.get("/api/dashboard", headers=auth_headers).json()
-    assert dash["workouts_7d"] == 1
+    assert dash["workouts_7d"] == 1  # two same-day workouts count as one active day
     dates = [p["local_date"] for p in dash["weekly_minutes"]]
     assert recent.strftime("%Y-%m-%d") in dates
     assert old.strftime("%Y-%m-%d") not in dates

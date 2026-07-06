@@ -15,8 +15,16 @@ import { api } from "../lib/api";
 import { useApiResource } from "../lib/useApiResource";
 import { StatCard } from "../components/StatCard";
 import { ActivityIcon, ClockIcon, FlameIcon, HeartIcon } from "../components/Icons";
-import { formatDistance, formatDuration, formatLocalDateTime, formatPace, round } from "../lib/format";
+import {
+  formatDistance,
+  formatDuration,
+  formatLocalDateTime,
+  formatLocalTime,
+  formatPace,
+  round,
+} from "../lib/format";
 import type { Unit } from "../lib/format";
+import { barCursor, tooltipProps } from "../lib/chart";
 
 // Leaflet is heavy and only needed when a workout has a GPS route, so keep it
 // out of the initial bundle and load it lazily on demand.
@@ -49,6 +57,18 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
     paceLabel: formatPace(s.pace_sec_per_unit, unit),
     hr: s.avg_hr ? Math.round(s.avg_hr) : null,
   }));
+
+  // Anchor the pace axis to the actual spread (not zero) so a handful of splits
+  // with similar paces still show visible bar-height differences. Pad ~8% each
+  // side, and guarantee a floor range when every split is nearly identical.
+  const paceValues = paceData.map((p) => p.pace);
+  const paceMin = paceValues.length ? Math.min(...paceValues) : 0;
+  const paceMax = paceValues.length ? Math.max(...paceValues) : 0;
+  const pacePad = Math.max((paceMax - paceMin) * 0.08, 15);
+  const paceDomain: [number, number] = [
+    Math.max(0, Math.floor(paceMin - pacePad)),
+    Math.ceil(paceMax + pacePad),
+  ];
 
   const hrData = data.hr_series.map((h) => ({
     t: new Date(h.ts_utc + "Z").getTime(),
@@ -141,10 +161,14 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis
                     reversed
+                    domain={paceDomain}
+                    allowDecimals={false}
                     tick={{ fontSize: 11 }}
                     tickFormatter={(v) => `${Math.floor(v / 60)}:${String(v % 60).padStart(2, "0")}`}
                   />
                   <Tooltip
+                    {...tooltipProps}
+                    cursor={barCursor}
                     formatter={(value) => [formatPace(Number(value), unit), "Pace"]}
                     labelFormatter={(l) => `${unit === "mi" ? "Mile" : "Km"} ${l}`}
                   />
@@ -168,11 +192,12 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                   type="number"
                   domain={["dataMin", "dataMax"]}
                   tick={{ fontSize: 11 }}
-                  tickFormatter={(t) => new Date(t).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                  tickFormatter={(t) => formatLocalTime(Number(t))}
                 />
                 <YAxis domain={["auto", "auto"]} tick={{ fontSize: 11 }} />
                 <Tooltip
-                  labelFormatter={(t) => new Date(Number(t)).toLocaleTimeString()}
+                  {...tooltipProps}
+                  labelFormatter={(t) => formatLocalTime(Number(t))}
                   formatter={(v) => [`${v} bpm`, "HR"]}
                 />
                 <Line type="monotone" dataKey="bpm" stroke="#e5484d" strokeWidth={2} dot={false} />

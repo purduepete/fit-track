@@ -127,9 +127,45 @@ a {
 
 .grid-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   margin-bottom: 28px;
+}
+
+/* Balanced columns that always divide the card count so no card is orphaned:
+   dashboard (6 cards) -> 2-up phone / 3-up (3x2) tablet+; workout detail
+   (4 cards, .cards-4) -> 2-up phone / 4-up wider. */
+@media (min-width: 640px) {
+  .grid-cards:not(.cards-4) {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 720px) {
+  .grid-cards.cards-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Dashboard section grouping: a small caps subheading over each analytics group. */
+.dash-section {
+  margin-bottom: 28px;
+}
+
+.section-title {
+  margin: 0 0 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chart-caption {
+  margin: 0 0 10px;
+  font-size: 0.8rem;
 }
 
 .card {

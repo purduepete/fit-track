@@ -159,7 +159,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
         </span>
       </h1>
 
-      <div className="grid-cards">
+      <div className="grid-cards cards-4">
         <StatCard icon={<ClockIcon />} label="Duration" value={formatDuration(data.duration_sec)} />
         <StatCard icon={<ActivityIcon />} label="Distance" value={formatDistance(data.distance_m, unit)} />
         <StatCard icon={<FlameIcon />} label="Active energy" value={round(data.active_energy_kcal)} unit="kcal" />

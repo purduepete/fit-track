@@ -445,6 +445,15 @@ tbody tr:hover {
 /* Narrow-screen (phone) tweaks: reclaim horizontal space and turn wide data
    tables into stacked cards so the Workouts list is readable on an iPhone. */
 @media (max-width: 640px) {
+  .app-bar {
+    gap: 12px;
+    padding: 10px 14px;
+  }
+
+  .nav a {
+    padding: 6px 10px;
+  }
+
   .container {
     padding: 18px 14px 48px;
   }
@@ -531,3 +540,30 @@ tbody tr:hover {
     content: "";
   }
 }
+
+/* Very narrow phones: drop the brand wordmark (keep the logo) and tighten the
+   bar further so the nav + theme/logout buttons never run off-screen. */
+@media (max-width: 430px) {
+  .app-bar {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .brand-name {
+    display: none;
+  }
+
+  .icon-btn {
+    width: 34px;
+    height: 34px;
+  }
+
+  .nav {
+    gap: 2px;
+  }
+
+  .nav a {
+    padding: 6px 9px;
+  }
+}
+

@@ -3,6 +3,7 @@ import {
   avgPaceSecPerUnit,
   formatDistance,
   formatDuration,
+  formatHoursMinutes,
   formatLocalDate,
   formatLocalDateTime,
   formatLocalTime,
@@ -105,5 +106,20 @@ describe("formatLocalDate", () => {
   it("reformats a YYYY-MM-DD date string to MM/DD/YYYY without a TZ shift", () => {
     expect(formatLocalDate("2026-07-05")).toBe("07/05/2026");
     expect(formatLocalDate("2026-12-31")).toBe("12/31/2026");
+  });
+});
+
+describe("formatHoursMinutes", () => {
+  it("splits decimal hours into Hh Mm", () => {
+    expect(formatHoursMinutes(6.311)).toBe("6h 19m");
+    expect(formatHoursMinutes(7.6)).toBe("7h 36m");
+  });
+  it("omits minutes when whole, and hours when under one", () => {
+    expect(formatHoursMinutes(7)).toBe("7h");
+    expect(formatHoursMinutes(0.5)).toBe("30m");
+  });
+  it("handles null/invalid", () => {
+    expect(formatHoursMinutes(null)).toBe("—");
+    expect(formatHoursMinutes(Infinity)).toBe("—");
   });
 });

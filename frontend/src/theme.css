@@ -463,7 +463,7 @@ tbody tr:hover {
 }
 
 .group-count {
-  color: var(--accent);
+  color: var(--text-dim);
   font-weight: 600;
   margin-left: 10px;
   text-transform: none;

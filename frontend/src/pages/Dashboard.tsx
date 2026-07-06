@@ -15,7 +15,7 @@ import type { SleepBand, Vo2MaxBand } from "../lib/api";
 import { useApiResource } from "../lib/useApiResource";
 import { StatCard } from "../components/StatCard";
 import { ActivityIcon, ClockIcon, FlameIcon, GaugeIcon, HeartIcon, MoonIcon } from "../components/Icons";
-import { round, formatLocalDate } from "../lib/format";
+import { round, formatLocalDate, formatHoursMinutes } from "../lib/format";
 import { barCursor, tooltipProps } from "../lib/chart";
 
 // Red -> green scale, indexed by VO2 max category (0=Very Poor .. 5=Superior).
@@ -36,7 +36,7 @@ function SleepQuality({ band, hours }: { band: SleepBand; hours: number }) {
           {band.category}
         </span>
         <p className="muted vo2-context">
-          {round(hours, 1)} h asleep last night — rated <strong>{band.category}</strong> against a{" "}
+          {formatHoursMinutes(hours)} asleep last night — rated <strong>{band.category}</strong> against a{" "}
           {band.target_low}–{band.target_high} h target.
         </p>
         <div
@@ -127,7 +127,7 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
   const sleepValue =
     typeof data.latest_sleep_hours === "number" ? (
       <>
-        {round(data.latest_sleep_hours, 1)}h
+        {formatHoursMinutes(data.latest_sleep_hours)}
         {data.sleep_band && (
           <span
             className="vo2-badge"
@@ -229,7 +229,12 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
                   <YAxis domain={[0, "auto"]} tick={{ fontSize: 11 }} unit="h" />
-                  <Tooltip {...tooltipProps} cursor={barCursor} labelFormatter={formatLocalDate} />
+                  <Tooltip
+                    {...tooltipProps}
+                    cursor={barCursor}
+                    labelFormatter={formatLocalDate}
+                    formatter={(v) => [formatHoursMinutes(v as number), "Asleep"]}
+                  />
                   <ReferenceArea y1={7} y2={9} fill="#22c55e" fillOpacity={0.12} ifOverflow="extendDomain" />
                   <Bar dataKey="value" fill="#7c3aed" radius={[2, 2, 0, 0]} />
                 </BarChart>

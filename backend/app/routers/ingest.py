@@ -25,12 +25,13 @@ async def ingest_health_auto_export(
 ) -> IngestResult:
     """Accept a Health Auto Export JSON payload.
 
-    The raw body is stored first (deduplicated by SHA-256 hash) so parsing can
-    be re-run later without asking the phone to resend data. Normalization then
-    performs idempotent upserts keyed on the Apple workout UUID.
+    The raw body, the normalized rows and the event status are written in a
+    single transaction (committed at the end), so a crash mid-persist leaves no
+    partial state. Duplicates are detected by the SHA-256 payload hash, and
+    normalization performs idempotent upserts keyed on the Apple workout UUID.
     """
     max_bytes = get_settings().max_ingest_bytes
-    # Reject via the Content-Length header before buffering the whole body.
+    # Fast path: reject via the Content-Length header before reading any body.
     declared = request.headers.get("content-length")
     if declared is not None and declared.isdigit() and int(declared) > max_bytes:
         raise HTTPException(
@@ -38,13 +39,18 @@ async def ingest_health_auto_export(
             detail=f"Payload exceeds {max_bytes} bytes",
         )
 
-    raw_bytes = await request.body()
-    if len(raw_bytes) > max_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail=f"Payload exceeds {max_bytes} bytes",
-        )
-    raw_text = raw_bytes.decode("utf-8")
+    # Stream the body and abort as soon as the running total exceeds the cap, so a
+    # missing/inaccurate Content-Length cannot buffer an unbounded upload into
+    # memory and OOM the container.
+    raw = bytearray()
+    async for chunk in request.stream():
+        raw.extend(chunk)
+        if len(raw) > max_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                detail=f"Payload exceeds {max_bytes} bytes",
+            )
+    raw_text = bytes(raw).decode("utf-8")
     digest = payload_hash(raw_text)
 
     # Lock the dedupe row so concurrent retries of the same payload serialize:
@@ -69,10 +75,12 @@ async def ingest_health_auto_export(
     if existing is None:
         db.add(event)
         try:
-            db.commit()
+            # Flush (not commit) so the whole ingest is one transaction: the event
+            # row, the normalized rows and status='processed' commit together at
+            # the end. A concurrent insert of the same payload still trips the
+            # payload_hash unique constraint here and is returned as a duplicate.
+            db.flush()
         except IntegrityError:
-            # Concurrent request inserted the same payload first; let that
-            # request own processing and return an idempotent duplicate here.
             db.rollback()
             return IngestResult(status="ok", duplicate=True)
 

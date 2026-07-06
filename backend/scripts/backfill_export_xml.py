@@ -145,6 +145,7 @@ def backfill(export_dir: str, xml_path: str, include_routes: bool, batch_size: i
             return
         with SessionLocal() as db:
             counts = persist_payload(ParsedPayload(workouts=batch), db)
+            db.commit()
         totals["workouts"] += counts["workouts"]
         totals["splits"] += counts["splits"]
         batch = []
@@ -185,6 +186,7 @@ def backfill(export_dir: str, xml_path: str, include_routes: bool, batch_size: i
     if daily:
         with SessionLocal() as db:
             counts = persist_payload(ParsedPayload(daily_metrics=daily), db)
+            db.commit()
         totals["daily_metrics"] += counts["daily_metrics"]
 
     print(

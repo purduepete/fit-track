@@ -157,6 +157,29 @@ def test_ingest_rejects_oversized_payload(client, auth_headers):
         get_settings().max_ingest_bytes = 25 * 1024 * 1024
 
 
+def test_ingest_streams_and_caps_body_without_content_length(client, auth_headers):
+    """A chunked upload (no Content-Length) must still be capped by the streaming
+    guard, not buffered unbounded into memory."""
+    from app.config import get_settings
+
+    def _body():
+        # Yielding chunks makes httpx use chunked transfer encoding (no
+        # Content-Length header), so only the stream-side cap can reject it.
+        for _ in range(50):
+            yield b"x" * 1000
+
+    get_settings().max_ingest_bytes = 100
+    try:
+        r = client.post(
+            "/api/ingest/health-auto-export",
+            content=_body(),
+            headers={**auth_headers, "Content-Type": "application/json"},
+        )
+        assert r.status_code == 413, r.text
+    finally:
+        get_settings().max_ingest_bytes = 25 * 1024 * 1024
+
+
 def test_dashboard_trends_are_windowed(client, auth_headers, db_session):
     from datetime import timedelta
 

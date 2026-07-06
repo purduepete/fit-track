@@ -5,6 +5,7 @@ from app.geo import (
     DistanceSample,
     HrSample,
     RoutePoint,
+    compute_splits,
     compute_splits_from_route,
     compute_splits_from_samples,
     haversine_m,
@@ -65,6 +66,38 @@ def test_route_avg_hr_per_split():
     hr = [HrSample(ts_utc=BASE + timedelta(seconds=i * 5.0), bpm=120.0) for i in range(250)]
     splits = compute_splits_from_route(route, hr, "km")
     assert splits[0].avg_hr == 120.0
+
+
+def test_compute_splits_returns_both_units_from_shared_axes():
+    route = _straight_line_route(n=250, spacing_m=10.0, secs_per_point=5.0)
+    hr = [HrSample(ts_utc=BASE + timedelta(seconds=i * 5.0), bpm=120.0) for i in range(250)]
+
+    both = compute_splits(route, [], hr, ("mi", "km"))
+    assert {s.unit_system for s in both} == {"mi", "km"}
+
+    # Deriving both units from one axis build must equal computing each alone.
+    mi_only = compute_splits_from_route(route, hr, "mi")
+    km_only = compute_splits_from_route(route, hr, "km")
+    assert len(both) == len(mi_only) + len(km_only)
+    assert len([s for s in both if s.unit_system == "mi"]) == len(mi_only)
+
+
+def test_compute_splits_falls_back_to_samples_without_route():
+    samples = [
+        DistanceSample(
+            start_utc=BASE + timedelta(seconds=i * 60),
+            end_utc=BASE + timedelta(seconds=(i + 1) * 60),
+            meters=500.0,
+        )
+        for i in range(6)  # 3000 m total
+    ]
+    both = compute_splits([], samples, [], ("mi", "km"))
+    assert {s.unit_system for s in both} == {"mi", "km"}
+    assert all(s.source == "sample" for s in both)
+
+
+def test_compute_splits_empty_without_data():
+    assert compute_splits([], [], [], ("mi", "km")) == []
 
 
 def test_avg_hr_correct_with_unsorted_and_varied_samples():

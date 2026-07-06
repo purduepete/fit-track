@@ -3,6 +3,7 @@ import {
   avgPaceSecPerUnit,
   formatDistance,
   formatDuration,
+  formatLocalDate,
   formatLocalDateTime,
   formatLocalTime,
   formatPace,
@@ -93,5 +94,16 @@ describe("round", () => {
 describe("formatLocalDateTime", () => {
   it("produces a non-empty string", () => {
     expect(formatLocalDateTime("2026-07-05 18:39:13").length).toBeGreaterThan(0);
+  });
+  it("uses MM/DD/YYYY HH:MM (24-hour)", () => {
+    // A UTC datetime; the date+time render in the local zone but always MM/DD/YYYY.
+    expect(formatLocalDateTime("2026-07-05T18:39:13Z")).toMatch(/^\d{2}\/\d{2}\/\d{4} \d{2}:\d{2}$/);
+  });
+});
+
+describe("formatLocalDate", () => {
+  it("reformats a YYYY-MM-DD date string to MM/DD/YYYY without a TZ shift", () => {
+    expect(formatLocalDate("2026-07-05")).toBe("07/05/2026");
+    expect(formatLocalDate("2026-12-31")).toBe("12/31/2026");
   });
 });

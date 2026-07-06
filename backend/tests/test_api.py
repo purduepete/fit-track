@@ -218,6 +218,61 @@ def test_dashboard_trends_are_windowed(client, auth_headers, db_session):
     assert old.strftime("%Y-%m-%d") not in dates
 
 
+def test_dashboard_vo2max_band_and_trend(client, auth_headers, db_session, monkeypatch):
+    from datetime import date, timedelta
+
+    from app.models import DailyMetric
+    from app.routers import dashboard
+    from app.timeutil import utcnow
+
+    now = utcnow()
+    recent = (now - timedelta(days=2)).strftime("%Y-%m-%d")
+    old = (now - timedelta(days=400)).strftime("%Y-%m-%d")
+    db_session.add_all(
+        [
+            DailyMetric(metric_type="vo2_max", local_date=recent, value=38.8, unit="ml/kg/min", updated_utc=now),
+            DailyMetric(metric_type="vo2_max", local_date=old, value=30.0, unit="ml/kg/min", updated_utc=now),
+        ]
+    )
+    db_session.commit()
+
+    class _S:
+        athlete_birth_date = date(1970, 9, 20)
+        athlete_sex = "male"
+
+    monkeypatch.setattr(dashboard, "get_settings", lambda: _S())
+    monkeypatch.setattr(dashboard.vo2max, "age_on", lambda bd, on=None: 55)
+
+    dash = client.get("/api/dashboard", headers=auth_headers).json()
+    assert dash["latest_vo2max"] == 38.8
+    assert dash["vo2max_band"]["category"] == "Good"
+    assert dash["vo2max_band"]["next_at"] == 41.0
+    # 400-day-old point is outside the 365-day window.
+    trend_dates = [p["local_date"] for p in dash["vo2max_trend"]]
+    assert recent in trend_dates
+    assert old not in trend_dates
+
+
+def test_dashboard_vo2max_band_omitted_when_profile_unset(client, auth_headers, db_session):
+    from datetime import timedelta
+
+    from app.models import DailyMetric
+    from app.timeutil import utcnow
+
+    recent = (utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+    db_session.add(
+        DailyMetric(
+            metric_type="vo2_max", local_date=recent, value=42.0, unit="ml/kg/min", updated_utc=utcnow()
+        )
+    )
+    db_session.commit()
+
+    # Default test settings have no athlete profile -> no interpretation.
+    dash = client.get("/api/dashboard", headers=auth_headers).json()
+    assert dash["latest_vo2max"] == 42.0
+    assert dash["vo2max_band"] is None
+
+
 def test_token_last_used_not_rewritten_within_window(client, auth_headers, db_session):
     from datetime import timedelta
 

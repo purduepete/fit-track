@@ -53,14 +53,27 @@ export interface MetricPoint {
   value: number;
 }
 
+export interface Vo2MaxBand {
+  category: string;
+  category_index: number;
+  range_low: number | null;
+  range_high: number | null;
+  next_category: string | null;
+  next_at: number | null;
+  age: number;
+  sex: string;
+}
+
 export interface DashboardSummary {
   workouts_7d: number;
   minutes_7d: number;
   active_kcal_7d: number;
   latest_resting_hr: number | null;
   latest_vo2max: number | null;
+  vo2max_band: Vo2MaxBand | null;
   weekly_minutes: MetricPoint[];
   resting_hr_trend: MetricPoint[];
+  vo2max_trend: MetricPoint[];
 }
 
 const TOKEN_KEY = "fittrack_token";

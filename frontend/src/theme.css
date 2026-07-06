@@ -295,6 +295,70 @@ tbody tr:hover {
   }
 }
 
+/* VO2 max cardio-fitness interpretation (badge on the stat card + the panel
+   with the six-tier scale). Tier colors are inline (red -> green) from the JSX. */
+.vo2-badge {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: var(--radius);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: #fff;
+  vertical-align: middle;
+}
+
+.vo2-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.vo2-category {
+  font-size: 1.7rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.vo2-context,
+.vo2-next {
+  margin: 0;
+  font-size: 0.9rem;
+}
+
+.vo2-scale {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 3px;
+}
+
+.vo2-seg {
+  position: relative;
+  height: 12px;
+  border-radius: var(--radius);
+  opacity: 0.45;
+}
+
+.vo2-seg.current {
+  opacity: 1;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px currentColor;
+}
+
+.vo2-marker {
+  position: absolute;
+  top: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid var(--text);
+}
+
 /* Narrow-screen (phone) tweaks: reclaim horizontal space and turn wide data
    tables into stacked cards so the Workouts list is readable on an iPhone. */
 @media (max-width: 640px) {

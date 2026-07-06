@@ -232,39 +232,69 @@ def _parse_distance_samples(raw: list) -> list[DistanceSample]:
 
 
 # --- top-level parse ---------------------------------------------------------
+def build_workout(
+    *,
+    raw_type: str,
+    start_utc: datetime,
+    end_utc: datetime | None,
+    tz_offset_minutes: int | None,
+    source_name: str | None,
+    device_name: str | None,
+    duration_sec: float | None,
+    distance_m: float | None,
+    active_energy_kcal: float | None,
+    avg_hr: float | None,
+    max_hr: float | None,
+    min_hr: float | None,
+    workout_id: str | None = None,
+    route: list[RoutePoint] | None = None,
+    hr_samples: list[HrSample] | None = None,
+    distance_samples: list[DistanceSample] | None = None,
+) -> ParsedWorkout:
+    """Assemble a :class:`ParsedWorkout` from already-extracted primitive fields.
+
+    Shared by JSON ingest (:func:`parse_workout`) and the XML backfill so both
+    import paths apply identical type-mapping, synthetic-UUID fallback and local
+    date derivation, and cannot drift apart. Callers stay thin field-extractors.
+    """
+    return ParsedWorkout(
+        uuid=str(workout_id) if workout_id else synth_workout_uuid(raw_type, start_utc),
+        workout_type=WORKOUT_TYPE_MAP.get(raw_type, raw_type),
+        source_name=source_name,
+        device_name=device_name,
+        start_utc=start_utc,
+        end_utc=end_utc if end_utc is not None else start_utc,
+        tz_offset_minutes=tz_offset_minutes,
+        local_date=local_date_str(start_utc, tz_offset_minutes),
+        duration_sec=duration_sec,
+        distance_m=distance_m,
+        active_energy_kcal=active_energy_kcal,
+        avg_hr=avg_hr,
+        max_hr=max_hr,
+        min_hr=min_hr,
+        route=route or [],
+        hr_samples=hr_samples or [],
+        distance_samples=distance_samples or [],
+    )
+
+
 def parse_workout(w: dict) -> ParsedWorkout | None:
     start_utc, tz = parse_dt(first(w, "start", "startDate", "start_time"))
     end_utc, _ = parse_dt(first(w, "end", "endDate", "end_time"))
     if start_utc is None:
         return None
-    if end_utc is None:
-        end_utc = start_utc
-
-    raw_type = first(w, "workoutActivityType", "type", "name", default="Workout")
-    workout_type = WORKOUT_TYPE_MAP.get(raw_type, raw_type)
-
-    wid = first(w, "id", "uuid")
-    if not wid:
-        wid = synth_workout_uuid(raw_type, start_utc)
 
     dist_field = first(w, "distance", "totalDistance", "distanceWalkingRunning")
     distance_m = distance_to_meters(dist_field, unit_of(dist_field, first(w, "distanceUnits")))
 
-    hr_samples = _parse_hr_samples(first(w, "heartRateData", default=[]))
-    route = _parse_route(first(w, "route", "routePoints", "gpx", default=[]))
-    distance_samples = _parse_distance_samples(
-        first(w, "walkingAndRunningDistance", default=[])
-    )
-
-    return ParsedWorkout(
-        uuid=str(wid),
-        workout_type=workout_type,
-        source_name=first(w, "sourceName", "source"),
-        device_name=first(w, "device", "deviceName"),
+    return build_workout(
+        raw_type=first(w, "workoutActivityType", "type", "name", default="Workout"),
+        workout_id=first(w, "id", "uuid"),
         start_utc=start_utc,
         end_utc=end_utc,
         tz_offset_minutes=tz,
-        local_date=local_date_str(start_utc, tz),
+        source_name=first(w, "sourceName", "source"),
+        device_name=first(w, "device", "deviceName"),
         duration_sec=as_number(first(w, "duration", "durationSeconds")),
         distance_m=distance_m,
         active_energy_kcal=as_number(
@@ -273,9 +303,11 @@ def parse_workout(w: dict) -> ParsedWorkout | None:
         avg_hr=as_number(first(w, "avgHeartRate", "averageHeartRate")),
         max_hr=as_number(first(w, "maxHeartRate")),
         min_hr=as_number(first(w, "minHeartRate")),
-        route=route,
-        hr_samples=hr_samples,
-        distance_samples=distance_samples,
+        route=_parse_route(first(w, "route", "routePoints", "gpx", default=[])),
+        hr_samples=_parse_hr_samples(first(w, "heartRateData", default=[])),
+        distance_samples=_parse_distance_samples(
+            first(w, "walkingAndRunningDistance", default=[])
+        ),
     )
 
 

@@ -26,15 +26,14 @@ sys.path.insert(0, ".")
 from app.db import SessionLocal  # noqa: E402
 from app.geo import RoutePoint  # noqa: E402
 from app.normalize import (  # noqa: E402
-    WORKOUT_TYPE_MAP,
     ParsedDailyMetric,
     ParsedPayload,
     ParsedWorkout,
+    build_workout,
     distance_to_meters,
     local_date_str,
     parse_dt,
     persist_payload,
-    synth_workout_uuid,
 )
 from lxml import etree  # noqa: E402
 
@@ -58,22 +57,21 @@ def _clear(elem) -> None:
 
 
 def parse_workout_element(w) -> tuple[ParsedWorkout | None, str | None]:
-    """Return (ParsedWorkout, gpx_relative_path) from a <Workout> element."""
+    """Return (ParsedWorkout, gpx_relative_path) from a <Workout> element.
+
+    A thin field-extractor: it pulls raw XML attributes and delegates all
+    mapping / UUID / local-date logic to :func:`normalize.build_workout`.
+    """
     start_utc, tz = parse_dt(w.get("startDate"))
     end_utc, _ = parse_dt(w.get("endDate"))
     if start_utc is None:
         return None, None
-    if end_utc is None:
-        end_utc = start_utc
 
-    raw_type = w.get("workoutActivityType", "Workout")
     duration = w.get("duration")
     duration_sec = None
     if duration is not None:
         val = float(duration)
         duration_sec = val * 60 if w.get("durationUnit", "min") == "min" else val
-
-    distance_m = distance_to_meters(w.get("totalDistance"), w.get("totalDistanceUnit"))
 
     avg_hr = max_hr = min_hr = None
     for stat in w.findall("WorkoutStatistics"):
@@ -89,19 +87,15 @@ def parse_workout_element(w) -> tuple[ParsedWorkout | None, str | None]:
         if ref is not None:
             gpx_path = ref.get("path")
 
-    wid = synth_workout_uuid(raw_type, start_utc)
-
-    pw = ParsedWorkout(
-        uuid=wid,
-        workout_type=WORKOUT_TYPE_MAP.get(raw_type, raw_type),
-        source_name=w.get("sourceName"),
-        device_name=w.get("device"),
+    pw = build_workout(
+        raw_type=w.get("workoutActivityType", "Workout"),
         start_utc=start_utc,
         end_utc=end_utc,
         tz_offset_minutes=tz,
-        local_date=local_date_str(start_utc, tz),
+        source_name=w.get("sourceName"),
+        device_name=w.get("device"),
         duration_sec=duration_sec,
-        distance_m=distance_m,
+        distance_m=distance_to_meters(w.get("totalDistance"), w.get("totalDistanceUnit")),
         active_energy_kcal=_f(w.get("totalEnergyBurned")),
         avg_hr=avg_hr,
         max_hr=max_hr,
@@ -135,53 +129,67 @@ def load_gpx(path: str) -> list[RoutePoint]:
     return pts
 
 
-def backfill(export_dir: str, xml_path: str, include_routes: bool) -> None:
-    workouts: list[ParsedWorkout] = []
-    gpx_by_uuid: dict[str, str] = {}
-    # metric_type -> local_date -> [values] (or running sum/last)
-    agg: dict[str, dict[str, list[float]]] = defaultdict(lambda: defaultdict(list))
+def backfill(export_dir: str, xml_path: str, include_routes: bool, batch_size: int = 500) -> None:
+    batch: list[ParsedWorkout] = []
+    # metric_type -> local_date -> [sum, count, last]; a running accumulator so a
+    # multi-year export never holds every raw metric value in memory.
+    agg: dict[str, dict[str, list[float]]] = defaultdict(
+        lambda: defaultdict(lambda: [0.0, 0.0, 0.0])
+    )
+    totals = {"workouts": 0, "daily_metrics": 0, "splits": 0}
+    n_workouts = n_records = 0
+
+    def flush_workouts() -> None:
+        nonlocal batch
+        if not batch:
+            return
+        with SessionLocal() as db:
+            counts = persist_payload(ParsedPayload(workouts=batch), db)
+        totals["workouts"] += counts["workouts"]
+        totals["splits"] += counts["splits"]
+        batch = []
 
     context = etree.iterparse(xml_path, events=("end",), tag=("Workout", "Record"))
-    n_workouts = n_records = 0
     for _, elem in context:
         if elem.tag == "Workout":
             pw, gpx = parse_workout_element(elem)
             if pw:
-                workouts.append(pw)
                 if gpx and include_routes:
-                    gpx_by_uuid[pw.uuid] = gpx
+                    gpx_file = os.path.join(export_dir, gpx.lstrip("/\\"))
+                    if os.path.exists(gpx_file):
+                        pts = load_gpx(gpx_file)
+                        if len(pts) >= 2:
+                            pw.route = pts
+                batch.append(pw)
                 n_workouts += 1
+                if len(batch) >= batch_size:
+                    flush_workouts()
         else:  # Record
-            rtype = elem.get("type")
-            mapping = RECORD_METRICS.get(rtype)
+            mapping = RECORD_METRICS.get(elem.get("type"))
             if mapping:
                 start_utc, tz = parse_dt(elem.get("startDate"))
                 val = _f(elem.get("value"))
                 if start_utc is not None and val is not None:
-                    d = local_date_str(start_utc, tz)
-                    agg[mapping[0]][d].append(val)
+                    acc = agg[mapping[0]][local_date_str(start_utc, tz)]
+                    acc[0] += val
+                    acc[1] += 1
+                    acc[2] = val
                     n_records += 1
         _clear(elem)
 
-    # Attach GPX routes and let persist compute splits.
-    if include_routes and gpx_by_uuid:
-        base = export_dir
-        by_uuid = {w.uuid: w for w in workouts}
-        for wid, rel in gpx_by_uuid.items():
-            gpx_file = os.path.join(base, rel.lstrip("/\\"))
-            if os.path.exists(gpx_file):
-                pts = load_gpx(gpx_file)
-                if len(pts) >= 2:
-                    by_uuid[wid].route = pts
+    flush_workouts()
 
+    # Daily aggregates span the whole export, so they are finalized and persisted
+    # once at the end (bounded by the running accumulators above, not raw values).
     daily = _aggregate_daily(agg)
+    if daily:
+        with SessionLocal() as db:
+            counts = persist_payload(ParsedPayload(daily_metrics=daily), db)
+        totals["daily_metrics"] += counts["daily_metrics"]
 
-    parsed = ParsedPayload(workouts=workouts, daily_metrics=daily)
-    with SessionLocal() as db:
-        counts = persist_payload(parsed, db)
     print(
         f"Parsed {n_workouts} workouts, {n_records} metric records.\n"
-        f"Persisted: {counts}"
+        f"Persisted: {totals}"
     )
 
 
@@ -189,13 +197,13 @@ def _aggregate_daily(agg: dict[str, dict[str, list[float]]]) -> list[ParsedDaily
     out: list[ParsedDailyMetric] = []
     for metric, per_day in agg.items():
         how = next(v for k, (name, v) in RECORD_METRICS.items() if name == metric)
-        for day, values in per_day.items():
+        for day, (total, count, last) in per_day.items():
             if how == "sum":
-                value = sum(values)
+                value = total
             elif how == "avg":
-                value = sum(values) / len(values)
+                value = total / count if count else 0.0
             else:  # last
-                value = values[-1]
+                value = last
             out.append(
                 ParsedDailyMetric(
                     local_date=day,

@@ -108,17 +108,12 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
     hr: s.avg_hr ? Math.round(s.avg_hr) : null,
   }));
 
-  // Anchor the pace axis to the actual spread (not zero) so a handful of splits
-  // with similar paces still show visible bar-height differences. Pad ~8% each
-  // side, and guarantee a floor range when every split is nearly identical.
+  // Pace is seconds-per-unit (lower = faster). Anchor the axis at 0 so bars grow
+  // up from a real baseline and their heights are proportional/comparable; add
+  // ~8% headroom above the slowest split.
   const paceValues = paceData.map((p) => p.pace);
-  const paceMin = paceValues.length ? Math.min(...paceValues) : 0;
   const paceMax = paceValues.length ? Math.max(...paceValues) : 0;
-  const pacePad = Math.max((paceMax - paceMin) * 0.08, 15);
-  const paceDomain: [number, number] = [
-    Math.max(0, Math.floor(paceMin - pacePad)),
-    Math.ceil(paceMax + pacePad),
-  ];
+  const paceDomain: [number, number] = [0, Math.ceil(paceMax * 1.08)];
 
   const hrData = data.hr_series.map((h) => ({
     t: new Date(h.ts_utc + "Z").getTime(),
@@ -236,12 +231,14 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
               </table>
             </div>
             <div className="card">
+              <p className="muted" style={{ margin: "0 0 8px", fontSize: "0.8rem" }}>
+                Pace per {unit === "mi" ? "mile" : "km"} — taller bars are slower splits.
+              </p>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={paceData}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                   <YAxis
-                    reversed
                     domain={paceDomain}
                     allowDecimals={false}
                     tick={{ fontSize: 11 }}

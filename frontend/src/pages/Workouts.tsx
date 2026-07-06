@@ -5,7 +5,7 @@ import type { WorkoutSummary } from "../lib/api";
 import {
   avgPaceSecPerUnit,
   formatDistance,
-  formatDuration,
+  formatHms,
   formatLocalDate,
   formatLocalTime,
   formatPace,
@@ -186,7 +186,7 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
                     <td data-label="Type">
                       <span className="chip">{w.workout_type}</span>
                     </td>
-                    <td data-label="Duration">{formatDuration(w.duration_sec)}</td>
+                    <td data-label="Duration">{formatHms(w.duration_sec)}</td>
                     <td data-label="Distance">{formatDistance(w.distance_m, "mi")}</td>
                     <td data-label="Avg pace">
                       {formatPace(avgPaceSecPerUnit(w.distance_m, w.duration_sec, "mi"), "mi")}

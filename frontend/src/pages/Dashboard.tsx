@@ -15,7 +15,7 @@ import type { SleepBand, Vo2MaxBand } from "../lib/api";
 import { useApiResource } from "../lib/useApiResource";
 import { StatCard } from "../components/StatCard";
 import { ActivityIcon, ClockIcon, FlameIcon, GaugeIcon, HeartIcon, MoonIcon } from "../components/Icons";
-import { round, formatLocalDate, formatHoursMinutes } from "../lib/format";
+import { round, formatLocalDate, formatHoursMinutes, formatMinutesHms } from "../lib/format";
 import { barCursor, tooltipProps } from "../lib/chart";
 import { usePageRefresh } from "../lib/refresh";
 
@@ -148,7 +148,7 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
       <h1 className="page-title">Dashboard</h1>
       <div className="grid-cards">
         <StatCard icon={<ActivityIcon />} label="Workouts (7d)" value={data.workouts_7d} />
-        <StatCard icon={<ClockIcon />} label="Minutes (7d)" value={round(data.minutes_7d)} unit="min" />
+        <StatCard icon={<ClockIcon />} label="Minutes (7d)" value={formatMinutesHms(data.minutes_7d)} />
         <StatCard icon={<FlameIcon />} label="Active energy (7d)" value={round(data.active_kcal_7d)} unit="kcal" />
         <StatCard icon={<HeartIcon />} label="Resting HR" value={round(data.latest_resting_hr)} unit="bpm" />
         <StatCard icon={<GaugeIcon />} label="VO₂ max" value={vo2Value} />
@@ -165,7 +165,12 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
               <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
               <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip {...tooltipProps} cursor={barCursor} labelFormatter={formatLocalDate} />
+              <Tooltip
+                {...tooltipProps}
+                cursor={barCursor}
+                labelFormatter={formatLocalDate}
+                formatter={(v) => [formatMinutesHms(v as number), "Duration"]}
+              />
               <Bar dataKey="value" fill="#4f46e5" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

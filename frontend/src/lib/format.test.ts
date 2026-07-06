@@ -3,10 +3,12 @@ import {
   avgPaceSecPerUnit,
   formatDistance,
   formatDuration,
+  formatHms,
   formatHoursMinutes,
   formatLocalDate,
   formatLocalDateTime,
   formatLocalTime,
+  formatMinutesHms,
   formatPace,
   metersToUnit,
   round,
@@ -27,6 +29,34 @@ describe("formatDistance", () => {
   });
   it("handles null", () => {
     expect(formatDistance(null, "mi")).toBe("—");
+  });
+});
+
+describe("formatHms", () => {
+  it("labels hours, minutes and seconds", () => {
+    expect(formatHms(3725)).toBe("1h 2m 5s");
+  });
+  it("omits empty leading components", () => {
+    expect(formatHms(90)).toBe("1m 30s");
+    expect(formatHms(45)).toBe("45s");
+  });
+  it("keeps 0s when the total rounds to zero", () => {
+    expect(formatHms(0)).toBe("0s");
+  });
+  it("handles null/invalid", () => {
+    expect(formatHms(null)).toBe("—");
+    expect(formatHms(Infinity)).toBe("—");
+  });
+});
+
+describe("formatMinutesHms", () => {
+  it("converts decimal minutes to labeled h/m/s", () => {
+    expect(formatMinutesHms(45.5)).toBe("45m 30s");
+    expect(formatMinutesHms(62)).toBe("1h 2m");
+  });
+  it("handles null/invalid", () => {
+    expect(formatMinutesHms(null)).toBe("—");
+    expect(formatMinutesHms(Infinity)).toBe("—");
   });
 });
 

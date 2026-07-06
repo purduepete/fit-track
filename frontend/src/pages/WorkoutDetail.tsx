@@ -16,7 +16,7 @@ import { StatCard } from "../components/StatCard";
 import { ActivityIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, FlameIcon, HeartIcon } from "../components/Icons";
 import {
   formatDistance,
-  formatDuration,
+  formatHms,
   formatLocalDateTime,
   formatLocalTime,
   formatPace,
@@ -160,7 +160,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
       </h1>
 
       <div className="grid-cards cards-4">
-        <StatCard icon={<ClockIcon />} label="Duration" value={formatDuration(data.duration_sec)} />
+        <StatCard icon={<ClockIcon />} label="Duration" value={formatHms(data.duration_sec)} />
         <StatCard icon={<ActivityIcon />} label="Distance" value={formatDistance(data.distance_m, unit)} />
         <StatCard icon={<FlameIcon />} label="Active energy" value={round(data.active_energy_kcal)} unit="kcal" />
         <StatCard icon={<HeartIcon />} label="Avg / Max HR" value={`${round(data.avg_hr)} / ${round(data.max_hr)}`} />
@@ -232,7 +232,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                         )}
                       </td>
                       <td>{formatPace(s.pace_sec_per_unit, unit)}</td>
-                      <td>{formatDuration(s.duration_sec)}</td>
+                      <td>{formatHms(s.duration_sec)}</td>
                       <td>{round(s.avg_hr)}</td>
                     </tr>
                   ))}

@@ -24,6 +24,29 @@ export function formatDuration(seconds: number | null): string {
   return `${m}:${String(sec).padStart(2, "0")}`;
 }
 
+/** Seconds -> labeled "Hh Mm Ss" (e.g. 3725 -> "1h 2m 5s", 90 -> "1m 30s", 45 -> "45s").
+ *
+ * Preferred format for durations so time-related data reads as hours/minutes/seconds
+ * rather than decimal values. */
+export function formatHms(seconds: number | null): string {
+  if (seconds == null || !isFinite(seconds)) return "—";
+  const total = Math.round(seconds);
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const parts: string[] = [];
+  if (h > 0) parts.push(`${h}h`);
+  if (m > 0) parts.push(`${m}m`);
+  if (sec > 0 || parts.length === 0) parts.push(`${sec}s`);
+  return parts.join(" ");
+}
+
+/** Decimal minutes -> labeled "Hh Mm Ss" (see ``formatHms``). */
+export function formatMinutesHms(minutes: number | null): string {
+  if (minutes == null || !isFinite(minutes)) return "—";
+  return formatHms(minutes * 60);
+}
+
 /** Seconds-per-unit -> "M:SS" pace string. */
 export function formatPace(secPerUnit: number | null, unit: Unit): string {
   if (secPerUnit == null || !isFinite(secPerUnit) || secPerUnit <= 0) return "—";

@@ -80,3 +80,14 @@ export function round(n: number | null, digits = 0): string {
   if (n == null) return "—";
   return n.toFixed(digits);
 }
+
+/** Decimal hours -> "Hh Mm" (e.g. 6.311 -> "6h 19m", 7 -> "7h", 0.5 -> "30m"). */
+export function formatHoursMinutes(hours: number | null): string {
+  if (hours == null || !isFinite(hours)) return "—";
+  const totalMin = Math.round(hours * 60);
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  if (h === 0) return `${m}m`;
+  if (m === 0) return `${h}h`;
+  return `${h}h ${m}m`;
+}

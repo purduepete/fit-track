@@ -36,10 +36,10 @@ param logWorkspaceName string = 'loggkhw25ijhyzzy'
 param logWorkspaceResourceGroup string = 'investmentportfolio'
 
 @description('Athlete birth date (YYYY-MM-DD) for VO2 max interpretation. Empty disables it.')
-param athleteBirthDate string = ''
+param athleteBirthDate string = '1970-09-20'
 
 @description('Athlete sex (male|female) for VO2 max interpretation. Empty disables it.')
-param athleteSex string = ''
+param athleteSex string = 'male'
 
 var namePrefix = 'fittrack'
 

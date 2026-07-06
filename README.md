@@ -163,14 +163,15 @@ $tag = git rev-parse --short=7 HEAD
 az acr build -r fittrackacrcbc0af -t "fittrack:$tag" -t fittrack:latest .
 az deployment group create -g fittrack-rg -f infra/main.bicep `
   -p acrName=fittrackacrcbc0af `
-     containerImage=fittrackacrcbc0af.azurecr.io/fittrack:$tag `
-     athleteBirthDate=<YYYY-MM-DD> athleteSex=<male|female>
+     containerImage=fittrackacrcbc0af.azurecr.io/fittrack:$tag
 ```
 
-> ⚠️ **Always pass `athleteBirthDate` / `athleteSex`.** `infra/main.bicep`
-> defaults them to empty, so omitting them **clears** the athlete profile on the
-> running app (only VO₂ max interpretation is affected — the app no longer
-> crashes on a blank birth date, see `backend/app/config.py`).
+> ℹ️ **Athlete profile is baked into `infra/main.bicep` defaults**
+> (`athleteBirthDate=1970-09-20`, `athleteSex=male`), so every deploy — manual or
+> via Actions — keeps VO₂ max interpretation working without needing to pass the
+> params. Override them explicitly only to change the profile. (A blank birth date
+> is still tolerated and simply disables interpretation — see
+> `backend/app/config.py`.)
 
 > 🪟 On Windows, `az acr build` often crashes client-side with a
 > `UnicodeEncodeError` (cp1252 vs the `✓` glyph) **while streaming logs** — the

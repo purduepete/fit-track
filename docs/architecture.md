@@ -67,12 +67,13 @@ dedicated Azure Container Registry and authenticates to SQL. The Bicep
 
 VO₂ max interpretation needs the athlete's age + sex. `infra/main.bicep` exposes
 `athleteBirthDate` / `athleteSex` params (→ `ATHLETE_BIRTH_DATE` / `ATHLETE_SEX`
-env), **both defaulting to empty**. So a deploy that doesn't supply them
-**clears** the profile on the running app and disables the VO₂ category/badge.
-A blank birth date is tolerated (normalized to `None` in `backend/app/config.py`)
-and no longer crash-loops the container. Always pass these on a manual deploy, or
-set the `ATHLETE_BIRTH_DATE` / `ATHLETE_SEX` repo variables for the Actions
-workflow — see the [README deploy section](../README.md#deploy-azure).
+env), **defaulting to the athlete's profile** (`1970-09-20` / `male`). So every
+deploy — manual or via Actions — keeps the profile set and VO₂ max
+interpretation working, even when the params aren't supplied. Override them
+explicitly only to change the profile; a blank birth date is still tolerated
+(normalized to `None` in `backend/app/config.py`), disabling interpretation
+without crash-looping the container — see the
+[README deploy section](../README.md#deploy-azure).
 
 ### Granting the deployed app access (one-time)
 

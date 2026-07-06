@@ -172,3 +172,53 @@ def test_parse_daily_metrics():
     assert len(parsed.daily_metrics) == 2
     assert parsed.daily_metrics[0].metric_type == "step_count"
     assert parsed.daily_metrics[0].local_date == "2026-07-05"
+
+
+def _sleep_metric(points):
+    return parse_payload({"data": {"workouts": [], "metrics": [
+        {"name": "sleep_analysis", "units": "hr", "data": points}
+    ]}}).daily_metrics
+
+
+def test_parse_sleep_hours_format_attributed_to_wake_day():
+    # HAE version that exports hours; asleep spans midnight -> attributed to wake day.
+    metrics = _sleep_metric([
+        {"sleepStart": "2026-07-04 23:00:00 -0700",
+         "sleepEnd": "2026-07-05 06:30:00 -0700",
+         "asleep": 7.4, "source": "Apple Watch"},
+    ])
+    assert len(metrics) == 1
+    m = metrics[0]
+    assert m.metric_type == "sleep_asleep_hours"
+    assert m.unit == "hr"
+    assert m.local_date == "2026-07-05"
+    assert m.value == 7.4
+
+
+def test_parse_sleep_seconds_format_normalized_to_hours():
+    # Some HAE versions export seconds; anything > 24 is treated as seconds.
+    metrics = _sleep_metric([
+        {"sleepEnd": "2026-07-05 06:00:00 -0700", "asleep": 27000, "source": "Watch"},
+    ])
+    assert len(metrics) == 1
+    assert metrics[0].value == 7.5
+
+
+def test_parse_sleep_falls_back_to_stage_sum():
+    metrics = _sleep_metric([
+        {"sleepEnd": "2026-07-05 06:00:00 -0700",
+         "core": 4.0, "deep": 1.5, "rem": 1.0, "awake": 0.5},
+    ])
+    assert len(metrics) == 1
+    assert metrics[0].value == 6.5
+
+
+def test_parse_sleep_sums_fragmented_intervals_per_night():
+    # Two points for the same wake day + source should sum, not overwrite.
+    metrics = _sleep_metric([
+        {"sleepEnd": "2026-07-05 02:00:00 -0700", "asleep": 3.0, "source": "Watch"},
+        {"sleepEnd": "2026-07-05 06:30:00 -0700", "asleep": 4.5, "source": "Watch"},
+    ])
+    assert len(metrics) == 1
+    assert metrics[0].local_date == "2026-07-05"
+    assert metrics[0].value == 7.5

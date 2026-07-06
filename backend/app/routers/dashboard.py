@@ -5,12 +5,13 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from .. import sleep as sleepmod
 from .. import vo2max
 from ..auth import require_read
 from ..config import get_settings
 from ..db import get_db
 from ..models import DailyMetric, Workout
-from ..schemas import DashboardSummary, MetricPoint, Vo2MaxBand
+from ..schemas import DashboardSummary, MetricPoint, SleepBand, Vo2MaxBand
 from ..timeutil import utcnow
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -18,12 +19,14 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 # HAE metric names that represent resting HR / VO2 max vary; match loosely.
 RESTING_HR_NAMES = ("resting_heart_rate", "restingHeartRate")
 VO2MAX_NAMES = ("vo2_max", "vo2Max", "vO2Max")
+SLEEP_NAMES = ("sleep_asleep_hours",)
 
 # Trend windows keep dashboard queries/payloads bounded as history grows.
 WEEK_DAYS = 7
 RESTING_TREND_DAYS = 90
 # VO2 max moves slowly, so a longer window is needed to see a trend at all.
 VO2MAX_TREND_DAYS = 365
+SLEEP_TREND_DAYS = 30
 
 
 def _latest_metric(db: Session, names: tuple[str, ...]) -> float | None:
@@ -48,6 +51,11 @@ def _vo2max_band(value: float | None) -> Vo2MaxBand | None:
     return Vo2MaxBand(**result) if result else None
 
 
+def _sleep_band(value: float | None) -> SleepBand | None:
+    result = sleepmod.classify(value)
+    return SleepBand(**result) if result else None
+
+
 @router.get("", response_model=DashboardSummary)
 def dashboard(
     db: Session = Depends(get_db),
@@ -57,6 +65,7 @@ def dashboard(
     # local_date is a "YYYY-MM-DD" string, so lexical >= is a valid date window.
     resting_since = (utcnow() - timedelta(days=RESTING_TREND_DAYS)).strftime("%Y-%m-%d")
     vo2max_since = (utcnow() - timedelta(days=VO2MAX_TREND_DAYS)).strftime("%Y-%m-%d")
+    sleep_since = (utcnow() - timedelta(days=SLEEP_TREND_DAYS)).strftime("%Y-%m-%d")
 
     # One grouped scan of the week: per-day counts/duration/energy. The 7-day
     # KPI totals are derived from these rows, avoiding a second window scan.
@@ -98,6 +107,17 @@ def dashboard(
 
     latest_vo2max = _latest_metric(db, VO2MAX_NAMES)
 
+    sleep_trend = db.execute(
+        select(DailyMetric.local_date, DailyMetric.value)
+        .where(
+            DailyMetric.metric_type.in_(SLEEP_NAMES),
+            DailyMetric.local_date >= sleep_since,
+        )
+        .order_by(DailyMetric.local_date)
+    ).all()
+
+    latest_sleep = _latest_metric(db, SLEEP_NAMES)
+
     return DashboardSummary(
         workouts_7d=workouts_7d,
         minutes_7d=round(duration_7d / 60.0, 1),
@@ -105,7 +125,10 @@ def dashboard(
         latest_resting_hr=_latest_metric(db, RESTING_HR_NAMES),
         latest_vo2max=latest_vo2max,
         vo2max_band=_vo2max_band(latest_vo2max),
+        latest_sleep_hours=latest_sleep,
+        sleep_band=_sleep_band(latest_sleep),
         weekly_minutes=[MetricPoint(local_date=d, value=round(s / 60.0, 1)) for d, _, s, _ in by_date],
         resting_hr_trend=[MetricPoint(local_date=d, value=v) for d, v in resting_trend],
         vo2max_trend=[MetricPoint(local_date=d, value=v) for d, v in vo2max_trend],
+        sleep_trend=[MetricPoint(local_date=d, value=v) for d, v in sleep_trend],
     )

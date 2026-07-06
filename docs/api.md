@@ -60,19 +60,26 @@ retrieve every point. `404` if the workout does not exist.
 ## `GET /api/dashboard`  *(read scope)*
 7-day rollup and trend series. `weekly_workouts`/`weekly_minutes` cover the last
 7 days; `resting_hr_trend` covers the last 90 days; `vo2max_trend` covers the last
-365 days. `vo2max_band` interprets the latest VO2 max against the athlete's age/sex
-(Cooper Institute categories) when `ATHLETE_BIRTH_DATE`/`ATHLETE_SEX` are configured,
-otherwise it is `null`.
+365 days; `sleep_trend` covers the last 30 days. `vo2max_band` interprets the latest
+VO2 max against the athlete's age/sex (Cooper Institute categories) when
+`ATHLETE_BIRTH_DATE`/`ATHLETE_SEX` are configured, otherwise it is `null`.
+`latest_sleep_hours` is the most recent night's asleep hours (parsed from HAE
+`sleep_analysis`, attributed to the wake day); `sleep_band` rates it against a
+7-9 h adult target (Low/Fair/Good/Excellent), or `null` when there is no sleep data.
 ```json
 { "workouts_7d": 3, "minutes_7d": 92.4, "active_kcal_7d": 810,
   "latest_resting_hr": 55, "latest_vo2max": 38.8,
   "vo2max_band": { "category":"Good", "category_index":3, "range_low":35.8,
     "range_high":41.0, "next_category":"Excellent", "next_at":41.0,
     "age":55, "sex":"male" },
+  "latest_sleep_hours": 7.5,
+  "sleep_band": { "category":"Excellent", "category_index":3,
+    "target_low":7.0, "target_high":9.0 },
   "weekly_workouts": [{"local_date":"2026-07-05","value":1}],
   "weekly_minutes":  [{"local_date":"2026-07-05","value":30.9}],
   "resting_hr_trend":[{"local_date":"2026-07-05","value":55}],
-  "vo2max_trend":    [{"local_date":"2026-07-05","value":38.8}] }
+  "vo2max_trend":    [{"local_date":"2026-07-05","value":38.8}],
+  "sleep_trend":     [{"local_date":"2026-07-05","value":7.5}] }
 ```
 
 > Timestamps returned by the API are naive UTC. The frontend converts them to

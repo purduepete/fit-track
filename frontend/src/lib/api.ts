@@ -66,6 +66,13 @@ export interface Vo2MaxBand {
   sex: string;
 }
 
+export interface SleepBand {
+  category: string;
+  category_index: number;
+  target_low: number;
+  target_high: number;
+}
+
 export interface DashboardSummary {
   workouts_7d: number;
   minutes_7d: number;
@@ -73,9 +80,12 @@ export interface DashboardSummary {
   latest_resting_hr: number | null;
   latest_vo2max: number | null;
   vo2max_band: Vo2MaxBand | null;
+  latest_sleep_hours: number | null;
+  sleep_band: SleepBand | null;
   weekly_minutes: MetricPoint[];
   resting_hr_trend: MetricPoint[];
   vo2max_trend: MetricPoint[];
+  sleep_trend: MetricPoint[];
 }
 
 export interface WorkoutList {

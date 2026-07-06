@@ -351,6 +351,33 @@ def test_dashboard_vo2max_band_omitted_when_profile_unset(client, auth_headers, 
     assert dash["vo2max_band"] is None
 
 
+def test_dashboard_sleep_band_and_trend(client, auth_headers, db_session):
+    from datetime import timedelta
+
+    from app.models import DailyMetric
+    from app.timeutil import utcnow
+
+    now = utcnow()
+    recent = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    old = (now - timedelta(days=40)).strftime("%Y-%m-%d")
+    db_session.add_all(
+        [
+            DailyMetric(metric_type="sleep_asleep_hours", local_date=recent, value=7.5, unit="hr", updated_utc=now),
+            DailyMetric(metric_type="sleep_asleep_hours", local_date=old, value=6.0, unit="hr", updated_utc=now),
+        ]
+    )
+    db_session.commit()
+
+    dash = client.get("/api/dashboard", headers=auth_headers).json()
+    assert dash["latest_sleep_hours"] == 7.5
+    assert dash["sleep_band"]["category"] == "Excellent"
+    assert dash["sleep_band"]["category_index"] == 3
+    # 40-day-old point is outside the 30-day sleep window.
+    trend_dates = [p["local_date"] for p in dash["sleep_trend"]]
+    assert recent in trend_dates
+    assert old not in trend_dates
+
+
 def test_token_last_used_not_rewritten_within_window(client, auth_headers, db_session):
     from datetime import timedelta
 

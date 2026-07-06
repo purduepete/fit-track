@@ -14,7 +14,7 @@ import { api } from "../lib/api";
 import type { SleepBand, Vo2MaxBand } from "../lib/api";
 import { useApiResource } from "../lib/useApiResource";
 import { StatCard } from "../components/StatCard";
-import { ActivityIcon, ClockIcon, FlameIcon, GaugeIcon, HeartIcon, MoonIcon } from "../components/Icons";
+import { ActivityIcon, ClockIcon, FlameIcon, GaugeIcon, HeartIcon, MoonIcon, RefreshIcon } from "../components/Icons";
 import { round, formatLocalDate, formatHoursMinutes } from "../lib/format";
 import { barCursor, tooltipProps } from "../lib/chart";
 
@@ -102,7 +102,7 @@ function CardioFitness({ band, value }: { band: Vo2MaxBand; value: number }) {
 }
 
 export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
-  const { data, error } = useApiResource(() => api.dashboard(), [onAuthError], onAuthError);
+  const { data, error, loading, refresh } = useApiResource(() => api.dashboard(), [onAuthError], onAuthError);
 
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="muted">Loading…</p>;
@@ -143,7 +143,13 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
 
   return (
     <>
-      <h1 className="page-title">Dashboard</h1>
+      <div className="page-head">
+        <h1 className="page-title">Dashboard</h1>
+        <button className="refresh-btn" onClick={refresh} disabled={loading} aria-label="Refresh data">
+          <RefreshIcon size={16} style={loading ? { animation: "spin 0.8s linear infinite" } : undefined} />
+          <span>{loading ? "Refreshing…" : "Refresh"}</span>
+        </button>
+      </div>
       <div className="grid-cards">
         <StatCard icon={<ActivityIcon />} label="Workouts (7d)" value={data.workouts_7d} />
         <StatCard icon={<ClockIcon />} label="Minutes (7d)" value={round(data.minutes_7d)} unit="min" />

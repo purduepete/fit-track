@@ -127,11 +127,61 @@ a {
   font-size: 1.6rem;
 }
 
+/* Title row with a right-aligned action (e.g. Refresh). */
+.page-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page-head .page-title {
+  margin: 4px 0 24px;
+}
+
+.refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .grid-cards {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 16px;
   margin-bottom: 28px;
+}
+
+.grid-cards > .card {
+  min-width: 0;
 }
 
 /* Balanced columns that always divide the card count so no card is orphaned:
@@ -186,6 +236,11 @@ a {
   font-size: 0.82rem;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.stat .label svg {
+  flex-shrink: 0;
 }
 
 .stat .value {
@@ -522,6 +577,20 @@ tbody tr:hover {
   .page-title {
     font-size: 1.35rem;
     margin-bottom: 18px;
+  }
+
+  /* Keep each stat-card label on a single line at phone widths: shrink the
+     label font/icon just enough that the longest labels (e.g. "Active energy
+     (7d)", "Sleep (last night)") fit without wrapping. */
+  .stat .label {
+    font-size: 0.68rem;
+    letter-spacing: 0.02em;
+    gap: 6px;
+  }
+
+  .stat .label svg {
+    width: 15px;
+    height: 15px;
   }
 
   /* Only tables opted-in via .stack-table restructure; others (e.g. the splits

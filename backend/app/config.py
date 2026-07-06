@@ -3,6 +3,7 @@
 Reuses the existing webportfolio Azure SQL server; all fittrack tables live in
 the ``fit`` schema of the WebPortfolio database.
 """
+from datetime import date
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,6 +30,12 @@ class Settings(BaseSettings):
 
     # Where the built React app lives (served by FastAPI in production)
     static_dir: str = "static"
+
+    # Athlete profile for VO2 max interpretation (age + sex are required to map a
+    # VO2 max number to a fitness category). Optional: if unset, the dashboard
+    # omits the interpretation and shows the bare value.
+    athlete_birth_date: date | None = None
+    athlete_sex: str = ""
 
     @property
     def sqlalchemy_url(self) -> str:

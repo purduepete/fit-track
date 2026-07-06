@@ -35,6 +35,12 @@ param logWorkspaceName string = 'loggkhw25ijhyzzy'
 @description('Resource group of the existing Log Analytics workspace.')
 param logWorkspaceResourceGroup string = 'investmentportfolio'
 
+@description('Athlete birth date (YYYY-MM-DD) for VO2 max interpretation. Empty disables it.')
+param athleteBirthDate string = ''
+
+@description('Athlete sex (male|female) for VO2 max interpretation. Empty disables it.')
+param athleteSex string = ''
+
 var namePrefix = 'fittrack'
 
 // Dedicated registry for the app image; pulled via the user-assigned identity
@@ -130,6 +136,8 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'DB_SERVER', value: dbServer }
             { name: 'DB_NAME', value: dbName }
             { name: 'DB_SCHEMA', value: 'fit' }
+            { name: 'ATHLETE_BIRTH_DATE', value: athleteBirthDate }
+            { name: 'ATHLETE_SEX', value: athleteSex }
           ]
         }
       ]

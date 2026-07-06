@@ -68,11 +68,24 @@ class MetricPoint(BaseModel):
     value: float
 
 
+class Vo2MaxBand(BaseModel):
+    category: str
+    category_index: int
+    range_low: float | None
+    range_high: float | None
+    next_category: str | None
+    next_at: float | None
+    age: int
+    sex: str
+
+
 class DashboardSummary(BaseModel):
     workouts_7d: int
     minutes_7d: float
     active_kcal_7d: float
     latest_resting_hr: float | None
     latest_vo2max: float | None
+    vo2max_band: Vo2MaxBand | None = None
     weekly_minutes: list[MetricPoint]
     resting_hr_trend: list[MetricPoint]
+    vo2max_trend: list[MetricPoint]

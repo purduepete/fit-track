@@ -56,6 +56,18 @@ if (-not $env:FITTRACK_API_URL -or -not $env:FITTRACK_TOKEN) {
     throw "Set FITTRACK_API_URL and FITTRACK_TOKEN (in backend/.env.local or the environment)."
 }
 
+# Singleton guard: if a watcher is already running, this launch is a no-op.
+# The scheduled task's keep-alive re-checks and restart-on-failure can fire
+# while a healthy watcher already exists; without this guard duplicate watchers
+# accumulate (each poll re-scans the same folder). We treat any live
+# scripts.upload_folder process as the running watcher and exit early.
+$existing = @(Get-CimInstance Win32_Process -Filter "Name='pythonw.exe' OR Name='python.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like '*scripts.upload_folder*' })
+if ($existing.Count -gt 0) {
+    Write-Host "Upload watcher already running (PID(s): $($existing.ProcessId -join ', ')). Nothing to do."
+    return
+}
+
 $venvPython = Join-Path $backend '.venv\Scripts\python.exe'
 $venvPythonw = Join-Path $backend '.venv\Scripts\pythonw.exe'
 if ($Background -and (Test-Path $venvPythonw)) {

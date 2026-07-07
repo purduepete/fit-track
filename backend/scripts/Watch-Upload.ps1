@@ -22,13 +22,20 @@
 .PARAMETER IntervalSeconds
     Poll interval in seconds. Default: 300 (5 minutes).
 
+.PARAMETER Background
+    Run windowless (pythonw.exe) with output redirected to
+    backend/logs/upload-watcher.log instead of the console. Used by the
+    "FitTrack Upload Watcher" scheduled task so no terminal window appears.
+
 .EXAMPLE
     .\Watch-Upload.ps1
     .\Watch-Upload.ps1 -IntervalSeconds 120
+    .\Watch-Upload.ps1 -Background
 #>
 [CmdletBinding()]
 param(
-    [int]$IntervalSeconds = 300
+    [int]$IntervalSeconds = 300,
+    [switch]$Background
 )
 
 $ErrorActionPreference = 'Stop'
@@ -50,7 +57,14 @@ if (-not $env:FITTRACK_API_URL -or -not $env:FITTRACK_TOKEN) {
 }
 
 $venvPython = Join-Path $backend '.venv\Scripts\python.exe'
-$python = if (Test-Path $venvPython) { $venvPython } else { 'python' }
+$venvPythonw = Join-Path $backend '.venv\Scripts\pythonw.exe'
+if ($Background -and (Test-Path $venvPythonw)) {
+    $python = $venvPythonw
+} elseif (Test-Path $venvPython) {
+    $python = $venvPython
+} else {
+    $python = if ($Background) { 'pythonw' } else { 'python' }
+}
 
 # Watch folder + archive subfolder are configurable via .env.local
 # (FITTRACK_WATCH_DIR / FITTRACK_ARCHIVE_NAME); default to the local upload folder.
@@ -63,8 +77,22 @@ if (-not (Test-Path $watchDir)) {
 
 Push-Location $backend
 try {
-    Write-Host "Watching $watchDir -> $($env:FITTRACK_API_URL) (every ${IntervalSeconds}s, archive=$archiveName). Ctrl+C to stop."
-    & $python -m scripts.upload_folder --dir $watchDir --interval $IntervalSeconds --archive-name $archiveName
+    if ($Background) {
+        $logDir = Join-Path $backend 'logs'
+        if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+        $log = Join-Path $logDir 'upload-watcher.log'
+        # Keep the log from growing without bound (~5 MB cap).
+        if ((Test-Path $log) -and (Get-Item $log).Length -gt 5MB) {
+            Move-Item $log "$log.1" -Force
+        }
+        "[$(Get-Date -Format s)] Watching $watchDir -> $($env:FITTRACK_API_URL) (every ${IntervalSeconds}s, archive=$archiveName)." |
+            Out-File -FilePath $log -Append -Encoding utf8
+        & $python -m scripts.upload_folder --dir $watchDir --interval $IntervalSeconds --archive-name $archiveName *>> $log
+    }
+    else {
+        Write-Host "Watching $watchDir -> $($env:FITTRACK_API_URL) (every ${IntervalSeconds}s, archive=$archiveName). Ctrl+C to stop."
+        & $python -m scripts.upload_folder --dir $watchDir --interval $IntervalSeconds --archive-name $archiveName
+    }
 }
 finally {
     Pop-Location

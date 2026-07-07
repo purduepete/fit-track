@@ -72,9 +72,25 @@ stays in Drive:
 
 The `Watch-Upload.ps1` launcher reads `FITTRACK_WATCH_DIR` and
 `FITTRACK_ARCHIVE_NAME` from `backend/.env.local`, so the same setup runs
-unattended via the **`FitTrack Upload Watcher`** logon Scheduled Task. Any other
+unattended via the **`FitTrack Upload Watcher`** Scheduled Task. Any other
 provider (iCloud Drive / OneDrive / Dropbox) works identically — just point
 `FITTRACK_WATCH_DIR` at its local folder.
+
+Register (or re-register) the task with:
+
+```powershell
+.\scripts\Register-UploadWatcherTask.ps1
+```
+
+Because the watcher reads the interactive Google Drive mount (`G:`), the task
+runs **as the current user, only while logged on**. It is **self-healing**: it
+starts at logon and a keep-alive trigger re-checks every 10 minutes — with
+`MultipleInstances=IgnoreNew`, each check is a no-op while the watcher is alive
+and relaunches it if it has died (plus restart-on-failure). The task passes
+`-Background`, so the watcher runs **windowless** via `pythonw.exe` (no terminal
+window) and writes output to `backend/logs/upload-watcher.log`. A healthy
+watcher shows as **two** `pythonw` processes (the venv stub spawns a worker
+child).
 
 ### Direct REST push (optional, Phase 3)
 

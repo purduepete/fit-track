@@ -159,3 +159,54 @@ def test_scan_ignores_the_failed_subfolder(tmp_path, monkeypatch):
     (watch / "_failed").mkdir(parents=True)
     monkeypatch.setattr(upload_folder, "post_payload", lambda *a, **k: {"status": "ok"})
     assert upload_folder.scan_once(str(watch), "http://x", "t") == 0
+
+
+def test_prune_archive_deletes_only_old_files(tmp_path):
+    archive = tmp_path / "processed"
+    archive.mkdir()
+    old = archive / "old.zip"
+    recent = archive / "recent.zip"
+    old.write_text("x")
+    recent.write_text("x")
+    ten_days = time.time() - 10 * 86400
+    one_day = time.time() - 1 * 86400
+    os.utime(str(old), (ten_days, ten_days))
+    os.utime(str(recent), (one_day, one_day))
+
+    removed = upload_folder.prune_archive(str(archive), retention_days=7)
+
+    assert removed == 1
+    assert not old.exists()
+    assert recent.exists()
+
+
+def test_prune_archive_disabled_when_retention_zero(tmp_path):
+    archive = tmp_path / "processed"
+    archive.mkdir()
+    ancient = archive / "ancient.zip"
+    ancient.write_text("x")
+    very_old = time.time() - 365 * 86400
+    os.utime(str(ancient), (very_old, very_old))
+
+    assert upload_folder.prune_archive(str(archive), retention_days=0) == 0
+    assert ancient.exists()
+
+
+def test_scan_prunes_archive_after_processing(tmp_path, monkeypatch):
+    watch = tmp_path / "gdrive"
+    watch.mkdir()
+    archive = watch / "processed"
+    archive.mkdir()
+    stale = archive / "stale.zip"
+    stale.write_text("x")
+    old = time.time() - 30 * 86400
+    os.utime(str(stale), (old, old))
+
+    monkeypatch.setattr(upload_folder, "post_payload", lambda *a, **k: {"status": "ok"})
+
+    upload_folder.scan_once(
+        str(watch), "http://x", "t", archive_name="processed", retention_days=7
+    )
+
+    assert not stale.exists()  # pruned during the scan cycle
+

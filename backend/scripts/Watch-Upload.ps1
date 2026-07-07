@@ -70,6 +70,8 @@ if ($Background -and (Test-Path $venvPythonw)) {
 # (FITTRACK_WATCH_DIR / FITTRACK_ARCHIVE_NAME); default to the local upload folder.
 $watchDir = if ($env:FITTRACK_WATCH_DIR) { $env:FITTRACK_WATCH_DIR } else { Join-Path $repo 'upload' }
 $archiveName = if ($env:FITTRACK_ARCHIVE_NAME) { $env:FITTRACK_ARCHIVE_NAME } else { '_archive' }
+# Delete processed files older than this many days each scan (0 disables).
+$retentionDays = if ($env:FITTRACK_RETENTION_DAYS) { [int]$env:FITTRACK_RETENTION_DAYS } else { 7 }
 
 if (-not (Test-Path $watchDir)) {
     throw "Watch folder not found: $watchDir (check FITTRACK_WATCH_DIR in backend/.env.local)."
@@ -85,13 +87,13 @@ try {
         if ((Test-Path $log) -and (Get-Item $log).Length -gt 5MB) {
             Move-Item $log "$log.1" -Force
         }
-        "[$(Get-Date -Format s)] Watching $watchDir -> $($env:FITTRACK_API_URL) (every ${IntervalSeconds}s, archive=$archiveName)." |
+        "[$(Get-Date -Format s)] Watching $watchDir -> $($env:FITTRACK_API_URL) (every ${IntervalSeconds}s, archive=$archiveName, retentionDays=$retentionDays)." |
             Out-File -FilePath $log -Append -Encoding utf8
-        & $python -m scripts.upload_folder --dir $watchDir --interval $IntervalSeconds --archive-name $archiveName *>> $log
+        & $python -m scripts.upload_folder --dir $watchDir --interval $IntervalSeconds --archive-name $archiveName --retention-days $retentionDays *>> $log
     }
     else {
-        Write-Host "Watching $watchDir -> $($env:FITTRACK_API_URL) (every ${IntervalSeconds}s, archive=$archiveName). Ctrl+C to stop."
-        & $python -m scripts.upload_folder --dir $watchDir --interval $IntervalSeconds --archive-name $archiveName
+        Write-Host "Watching $watchDir -> $($env:FITTRACK_API_URL) (every ${IntervalSeconds}s, archive=$archiveName, retentionDays=$retentionDays). Ctrl+C to stop."
+        & $python -m scripts.upload_folder --dir $watchDir --interval $IntervalSeconds --archive-name $archiveName --retention-days $retentionDays
     }
 }
 finally {

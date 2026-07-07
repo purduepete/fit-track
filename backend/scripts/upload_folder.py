@@ -97,6 +97,31 @@ def _is_permanent_failure(exc: Exception) -> bool:
     return isinstance(exc, (zipfile.BadZipFile, UnicodeDecodeError, json.JSONDecodeError))
 
 
+def prune_archive(archive: str, retention_days: int) -> int:
+    """Delete files in the archive folder older than retention_days.
+
+    Age is measured from the file's modified time. A retention_days <= 0
+    disables pruning. Only the archive (processed) folder is touched — the
+    _failed quarantine is left alone so failures stay visible.
+    """
+    if retention_days <= 0 or not os.path.isdir(archive):
+        return 0
+    cutoff = time.time() - retention_days * 86400
+    removed = 0
+    for name in os.listdir(archive):
+        full = os.path.join(archive, name)
+        if not os.path.isfile(full):
+            continue
+        try:
+            if os.path.getmtime(full) < cutoff:
+                os.remove(full)
+                removed += 1
+                _log(f"PRUNED (>{retention_days}d) from {os.path.basename(archive)}: {name}")
+        except OSError as exc:
+            _log(f"ERROR pruning {name}: {exc}")
+    return removed
+
+
 def scan_once(
     folder: str,
     api_url: str,
@@ -104,6 +129,7 @@ def scan_once(
     archive_name: str = "_archive",
     min_age_seconds: int = 15,
     failed_name: str = "_failed",
+    retention_days: int = 0,
 ) -> int:
     archive = os.path.join(folder, archive_name)
     failed = os.path.join(folder, failed_name)
@@ -146,6 +172,7 @@ def scan_once(
             else:
                 # Transient (server 5xx / network) — leave in place to retry.
                 _log(f"ERROR {name} (will retry): {exc}")
+    prune_archive(archive, retention_days)
     return processed
 
 
@@ -166,6 +193,14 @@ def main() -> None:
         help="Skip files modified more recently than this (avoids reading a file still "
         "syncing from the cloud). Default: 15. Use 0 to disable.",
     )
+    p.add_argument(
+        "--retention-days",
+        type=int,
+        default=0,
+        help="Delete files in the archive (processed) folder older than this many days "
+        "each scan. Default: 0 (disabled). Only the archive folder is pruned; _failed "
+        "is left alone.",
+    )
     args = p.parse_args()
 
     api_url = os.environ.get("FITTRACK_API_URL")
@@ -179,11 +214,17 @@ def main() -> None:
 
     _log(f"Watching {folder} -> {api_url}{INGEST_PATH} (archive={args.archive_name})")
     if args.once:
-        n = scan_once(folder, api_url, token, args.archive_name, args.min_age_seconds)
+        n = scan_once(
+            folder, api_url, token, args.archive_name, args.min_age_seconds,
+            retention_days=args.retention_days,
+        )
         _log(f"Done. Processed {n} file(s).")
         return
     while True:
-        scan_once(folder, api_url, token, args.archive_name, args.min_age_seconds)
+        scan_once(
+            folder, api_url, token, args.archive_name, args.min_age_seconds,
+            retention_days=args.retention_days,
+        )
         time.sleep(args.interval)
 
 

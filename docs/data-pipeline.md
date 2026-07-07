@@ -70,11 +70,17 @@ stays in Drive:
 .\.venv\Scripts\python.exe -m scripts.upload_folder --dir "G:\My Drive\fittrack" --archive-name processed
 ```
 
-The `Watch-Upload.ps1` launcher reads `FITTRACK_WATCH_DIR` and
-`FITTRACK_ARCHIVE_NAME` from `backend/.env.local`, so the same setup runs
-unattended via the **`FitTrack Upload Watcher`** Scheduled Task. Any other
-provider (iCloud Drive / OneDrive / Dropbox) works identically — just point
-`FITTRACK_WATCH_DIR` at its local folder.
+The `Watch-Upload.ps1` launcher reads `FITTRACK_WATCH_DIR`,
+`FITTRACK_ARCHIVE_NAME` and `FITTRACK_RETENTION_DAYS` from `backend/.env.local`,
+so the same setup runs unattended via the **`FitTrack Upload Watcher`** Scheduled
+Task. Any other provider (iCloud Drive / OneDrive / Dropbox) works identically —
+just point `FITTRACK_WATCH_DIR` at its local folder.
+
+**Retention:** processed archives are auto-pruned. `Watch-Upload.ps1` passes
+`--retention-days` (default **7**, override with `FITTRACK_RETENTION_DAYS`; set
+`0` to disable), so each scan deletes files in the `processed` folder older than
+that many days — freeing Google Drive space. Only `processed` is pruned; the
+`_failed` quarantine is left alone so failures stay visible.
 
 Register (or re-register) the task with:
 

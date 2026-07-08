@@ -7,6 +7,9 @@ COPY frontend/ ./
 RUN npm run build
 
 FROM python:3.12-slim AS runtime
+# Links the ghcr.io package to the source repo (appears under the repo's Packages
+# tab and inherits repo access) — GitHub auto-connects on push via this label.
+LABEL org.opencontainers.image.source="https://github.com/purduepete/fittrack"
 ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     STATIC_DIR=/app/static

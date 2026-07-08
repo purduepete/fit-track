@@ -105,5 +105,6 @@ Rollback: `DROP USER [fittrack-identity];` (removes the user and its grants).
   day-grouping matches what you saw on the watch.
 - **Cost**: Container Apps Consumption with `minReplicas: 0` idles at ~zero; the
   Azure SQL server and Log Analytics workspace are reused (no new database or
-  workspace resource). The only always-on cost is the dedicated ACR (Basic SKU,
-  ~$5/mo) that stores the app image.
+  workspace resource). The app image lives in a **private GitHub Container
+  Registry package** (`ghcr.io/purduepete/fittrack`), which is free on the GitHub
+  free tier — so there is no always-on registry cost.

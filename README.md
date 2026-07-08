@@ -133,10 +133,12 @@ CI (`.github/workflows/ci.yml`) runs both on every push/PR. See
 
 Cheapest path is **Azure Container Apps** on the Consumption plan
 (`minReplicas: 0` → scales to zero when idle). The app runs in a **dedicated
-resource group** (`fittrack-rg`, **eastus2**) with its own ACR
-(`fittrackacrcbc0af`) and a **user-assigned managed identity**
-(`fittrack-identity`) used for both AcrPull and Azure SQL (`DB_AUTH=aad`, no DB
-password). The Azure SQL server is reused cross-RG (see
+resource group** (`fittrack-rg`, **eastus2**) and pulls its image from a
+**private GitHub Container Registry package** (`ghcr.io/purduepete/fittrack`,
+free on the GitHub free tier — avoids the ACR Basic daily fee). A **user-assigned
+managed identity** (`fittrack-identity`) is used for Azure SQL (`DB_AUTH=aad`, no
+DB password); the private ghcr image is pulled with a PAT (`read:packages`) stored
+as a Container App secret. The Azure SQL server is reused cross-RG (see
 [architecture](docs/architecture.md)).
 
 ### Option A — GitHub Actions (manual trigger)
@@ -148,8 +150,8 @@ or `gh workflow run deploy.yml`. It requires:
 | Kind | Name | Example |
 | --- | --- | --- |
 | secret | `AZURE_CREDENTIALS` | output of `az ad sp create-for-rbac --sdk-auth` |
+| secret | `GHCR_PAT` | classic PAT with `read:packages` (Container App pulls the private image with it) |
 | variable | `FITTRACK_RG` | `fittrack-rg` |
-| variable | `FITTRACK_ACR` | `fittrackacrcbc0af` |
 | variable | `ATHLETE_BIRTH_DATE` | `1970-09-20` (blank = disables VO₂ interpretation) |
 | variable | `ATHLETE_SEX` | `male` \| `female` |
 
@@ -160,10 +162,19 @@ or `gh workflow run deploy.yml`. It requires:
 
 ```powershell
 $tag = git rev-parse --short=7 HEAD
-az acr build -r fittrackacrcbc0af -t "fittrack:$tag" -t fittrack:latest .
+$image = "ghcr.io/purduepete/fittrack:$tag"
+
+# Build + push to the private ghcr package (needs a PAT with write:packages):
+docker build -t $image -t ghcr.io/purduepete/fittrack:latest .
+$env:CR_PAT | docker login ghcr.io -u purduepete --password-stdin
+docker push $image
+docker push ghcr.io/purduepete/fittrack:latest
+
 az deployment group create -g fittrack-rg -f infra/main.bicep `
-  -p acrName=fittrackacrcbc0af `
-     containerImage=fittrackacrcbc0af.azurecr.io/fittrack:$tag
+  -p containerImage=$image `
+     registryServer=ghcr.io `
+     registryUsername=purduepete `
+     registryPassword=$env:CR_PAT
 ```
 
 > ℹ️ **Athlete profile is baked into `infra/main.bicep` defaults**
@@ -173,11 +184,9 @@ az deployment group create -g fittrack-rg -f infra/main.bicep `
 > is still tolerated and simply disables interpretation — see
 > `backend/app/config.py`.)
 
-> 🪟 On Windows, `az acr build` often crashes client-side with a
-> `UnicodeEncodeError` (cp1252 vs the `✓` glyph) **while streaming logs** — the
-> **remote build still succeeds**. Verify with
-> `az acr task list-runs -r fittrackacrcbc0af --top 1 --query "[0].status"` and
-> check the pushed tag; don't assume the build failed.
+> 🪟 The local build uses your Docker daemon (Docker Desktop) — no `az acr build`,
+> so the old Windows cp1252 log-streaming crash no longer applies. Create the
+> `CR_PAT` env var from a GitHub PAT with `write:packages` before pushing.
 
 Confirm the new revision came up healthy (a bad env/config would crash-loop and
 traffic would stay on the previous revision):

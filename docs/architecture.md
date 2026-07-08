@@ -57,10 +57,9 @@ elsewhere (webportfolio) and may rotate; token auth avoids depending on it.
 **The deployed Container App uses `DB_AUTH=aad` with a **user-assigned** managed
 identity (`fittrack-identity`)** provisioned by `infra/main.bicep` — no password is
 passed at deploy time. `AZURE_CLIENT_ID` is set to that identity's client id so
-`DefaultAzureCredential` selects it. A user-assigned (rather than system-assigned)
-identity is used so its **AcrPull** role assignment can exist *before* the app does,
-avoiding a first-image-pull race; the same identity both pulls the image from the
-dedicated Azure Container Registry and authenticates to SQL. The Bicep
+`DefaultAzureCredential` selects it. The private container image is pulled from
+GitHub Container Registry (`ghcr.io`) using a PAT (`read:packages`) stored as a
+Container App secret — the managed identity is used for SQL only. The Bicep
 `identityName` / `identityClientId` / `identityPrincipalId` outputs surface it.
 
 ### Athlete profile env (deploy-time params)

@@ -1,20 +1,23 @@
 name: Deploy
 
-# Manual deploy: builds the image in Azure Container Registry (az acr build) and
-# points the Container App at the new tag. Deploys touch the SHARED WebPortfolio
-# Azure SQL server (fit schema), so this is intentionally manual
+# Manual deploy: builds the image, pushes it to GitHub Container Registry
+# (ghcr.io) and points the Container App at the new tag. Deploys touch the SHARED
+# WebPortfolio Azure SQL server (fit schema), so this is intentionally manual
 # (workflow_dispatch), never on push.
 #
-# The app authenticates to Azure SQL AND pulls its image with the same
-# USER-ASSIGNED managed identity (fittrack-identity, DB_AUTH=aad) — no DB password
-# and no registry credentials are passed. Grant the identity access to the fit
-# schema once after the first deploy (see docs/architecture.md).
+# The app authenticates to Azure SQL with its USER-ASSIGNED managed identity
+# (fittrack-identity, DB_AUTH=aad) — no DB password. The container image is a
+# PRIVATE ghcr.io package, so the Container App pulls it with a PAT
+# (read:packages) passed as registryPassword and stored as a Container App secret.
+# Grant the identity access to the fit schema once after the first deploy (see
+# docs/architecture.md).
 #
 # Required repo secrets:
 #   AZURE_CREDENTIALS   - output of `az ad sp create-for-rbac --sdk-auth`
+#   GHCR_PAT            - classic PAT with read:packages (used by the Container App
+#                         to pull the private image at runtime)
 # Required repo variables:
 #   FITTRACK_RG         - resource group (e.g. fittrack-rg)
-#   FITTRACK_ACR        - Azure Container Registry name (e.g. fittrackacrcbc0af)
 # Optional repo variables (VO2 max interpretation). Leave BOTH unset to fall back
 # to the athlete profile baked into infra/main.bicep defaults; set them only to
 # override that profile (they are passed to the deploy only when non-empty, so an
@@ -30,26 +33,34 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image to ghcr.io
+        id: build
+        run: |
+          TAG="${GITHUB_SHA::7}"
+          IMAGE_REPO="ghcr.io/${GITHUB_REPOSITORY,,}"
+          docker build \
+            -t "${IMAGE_REPO}:${TAG}" \
+            -t "${IMAGE_REPO}:latest" \
+            .
+          docker push "${IMAGE_REPO}:${TAG}"
+          docker push "${IMAGE_REPO}:latest"
+          echo "IMAGE=${IMAGE_REPO}:${TAG}" >> "$GITHUB_ENV"
 
       - name: Azure login
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Build image in ACR
-        uses: azure/cli@v2
-        with:
-          inlineScript: |
-            TAG="${GITHUB_SHA::7}"
-            az acr build \
-              -r "${{ vars.FITTRACK_ACR }}" \
-              -t "fittrack:${TAG}" \
-              -t "fittrack:latest" \
-              .
-            LOGIN_SERVER=$(az acr show -n "${{ vars.FITTRACK_ACR }}" --query loginServer -o tsv)
-            echo "IMAGE=${LOGIN_SERVER}/fittrack:${TAG}" >> "$GITHUB_ENV"
 
       - name: Deploy infra + image
         uses: azure/cli@v2
@@ -65,7 +76,12 @@ jobs:
             if [ -n "${{ vars.ATHLETE_SEX }}" ]; then
               EXTRA="$EXTRA athleteSex=${{ vars.ATHLETE_SEX }}"
             fi
+            REPO_OWNER="${GITHUB_REPOSITORY%%/*}"
             az deployment group create \
               -g "${{ vars.FITTRACK_RG }}" \
               -f infra/main.bicep \
-              -p acrName="${{ vars.FITTRACK_ACR }}" containerImage="$IMAGE" $EXTRA
+              -p containerImage="$IMAGE" \
+                 registryServer="ghcr.io" \
+                 registryUsername="$REPO_OWNER" \
+                 registryPassword="${{ secrets.GHCR_PAT }}" \
+                 $EXTRA

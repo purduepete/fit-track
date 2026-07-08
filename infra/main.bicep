@@ -1,27 +1,39 @@
 // fittrack infrastructure — Azure Container Apps (Consumption, scale-to-zero).
-// Provisions a dedicated ACR and a user-assigned managed identity; the Azure SQL
-// server AND the Log Analytics workspace are reused cross-RG from the existing
-// webportfolio deployment (tables live in the `fit` schema of the WebPortfolio
-// database), so neither a database nor a workspace resource is created here.
+// Provisions a user-assigned managed identity; the container image is pulled from
+// GitHub Container Registry (ghcr.io) — NOT a dedicated Azure Container Registry —
+// to avoid the ACR Basic daily fee (ghcr private packages are free within the
+// GitHub free tier). The Azure SQL server AND the Log Analytics workspace are
+// reused cross-RG from the existing webportfolio deployment (tables live in the
+// `fit` schema of the WebPortfolio database), so neither a database nor a
+// workspace resource is created here.
 //
 //   az group create -n fittrack-rg -l eastus2
-//   az acr build -r <acrName> -t fittrack:v1 -t fittrack:latest .
+//   # build + push the image to ghcr.io (see .github/workflows/deploy.yml)
 //   az deployment group create -g fittrack-rg -f infra/main.bicep \
-//        -p acrName=<acrName> containerImage=<acrName>.azurecr.io/fittrack:v1
+//        -p containerImage=ghcr.io/<owner>/fittrack:v1 \
+//           registryUsername=<owner> registryPassword=<ghcr-PAT>
 //
 // The app authenticates to Azure SQL with its USER-ASSIGNED managed identity
-// (DB_AUTH=aad; AZURE_CLIENT_ID selects it) and pulls its image from the ACR with
-// the same identity. After the first deploy, grant the identity
-// ([fittrack-identity]) access to the fit schema (see docs/architecture.md).
+// (DB_AUTH=aad; AZURE_CLIENT_ID selects it). The ghcr.io image is a PRIVATE
+// package, so the app pulls it using a PAT (read:packages) stored as a Container
+// App secret. After the first deploy, grant the identity ([fittrack-identity])
+// access to the fit schema (see docs/architecture.md).
 
 @description('Location for all resources.')
 param location string = resourceGroup().location
 
-@description('Container image, e.g. <acrName>.azurecr.io/fittrack:v1.')
+@description('Container image, e.g. ghcr.io/<owner>/fittrack:v1.')
 param containerImage string
 
-@description('Name of the Azure Container Registry the image is pulled from (created here).')
-param acrName string
+@description('Container registry login server (ghcr.io for GitHub Container Registry).')
+param registryServer string = 'ghcr.io'
+
+@description('Container registry username (GitHub username/owner for ghcr.io).')
+param registryUsername string
+
+@description('Registry PAT with read:packages scope. Stored as a Container App secret and used to pull the private image.')
+@secure()
+param registryPassword string
 
 @description('Azure SQL server FQDN (existing webportfolio server).')
 param dbServer string = 'sqlgkhw25ijhyzzy.database.windows.net'
@@ -43,32 +55,12 @@ param athleteSex string = 'male'
 
 var namePrefix = 'fittrack'
 
-// Dedicated registry for the app image; pulled via the user-assigned identity
-// below (no admin user / registry passwords).
-resource acr 'Microsoft.ContainerRegistry/registries@2023-11-01-preview' = {
-  name: acrName
-  location: location
-  sku: { name: 'Basic' }
-  properties: { adminUserEnabled: false }
-}
-
-// One identity used for BOTH ACR pull and Azure SQL (DB_AUTH=aad). Using a
-// user-assigned identity (rather than system-assigned) lets the AcrPull role be
-// granted before the app exists, avoiding a first-pull race.
+// One identity used for Azure SQL auth (DB_AUTH=aad). Using a user-assigned
+// identity (rather than system-assigned) keeps the same client id stable across
+// deployments for the SQL CREATE USER ... FROM EXTERNAL PROVIDER grant.
 resource uami 'Microsoft.ManagedIdentity/userAssignedIdentities@2023-01-31' = {
   name: '${namePrefix}-identity'
   location: location
-}
-
-resource acrPull 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(acr.id, uami.id, 'AcrPull')
-  scope: acr
-  properties: {
-    // AcrPull built-in role.
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '7f951dda-4ed3-4680-a7ca-43fe172d538d')
-    principalId: uami.properties.principalId
-    principalType: 'ServicePrincipal'
-  }
 }
 
 // Reuse the existing (webportfolio) workspace cross-RG rather than creating a
@@ -102,9 +94,7 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
       '${uami.id}': {}
     }
   }
-  dependsOn: [
-    acrPull
-  ]
+  dependsOn: []
   properties: {
     managedEnvironmentId: env.id
     configuration: {
@@ -113,10 +103,18 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         targetPort: 8000
         transport: 'auto'
       }
+      secrets: [
+        {
+          // PAT (read:packages) used to pull the private ghcr.io image.
+          name: 'registry-password'
+          value: registryPassword
+        }
+      ]
       registries: [
         {
-          server: acr.properties.loginServer
-          identity: uami.id
+          server: registryServer
+          username: registryUsername
+          passwordSecretRef: 'registry-password'
         }
       ]
     }
@@ -202,9 +200,6 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
 }
 
 output apiUrl string = 'https://${app.properties.configuration.ingress.fqdn}'
-
-@description('Registry the image is pulled from.')
-output acrLoginServer string = acr.properties.loginServer
 
 @description('Name of the app user-assigned identity — used for the SQL CREATE USER ... FROM EXTERNAL PROVIDER grant.')
 output identityName string = uami.name

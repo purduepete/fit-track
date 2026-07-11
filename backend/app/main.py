@@ -67,6 +67,18 @@ app.include_router(workouts.router)
 app.include_router(dashboard.router)
 
 
+@app.middleware("http")
+async def _revalidate_app_shell(request, call_next):
+    """Serve the SW script and HTML shell with ``no-cache`` so a new deploy is
+    picked up promptly (the browser revalidates instead of serving stale bytes
+    from the HTTP cache). Content-hashed JS/CSS keep their default caching and
+    are served from the service-worker precache."""
+    response = await call_next(request)
+    if request.url.path in ("/", "/index.html", "/sw.js"):
+        response.headers["Cache-Control"] = "no-cache"
+    return response
+
+
 @app.get("/api/health", tags=["meta"])
 def health() -> dict:
     """Unauthenticated liveness probe used by Azure Container Apps."""

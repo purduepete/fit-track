@@ -42,7 +42,11 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          # The ghcr package is private and NOT linked to this repo, so the
+          # workflow's GITHUB_TOKEN cannot push to it. Use a user PAT with
+          # write:packages instead. (GHCR_PAT is read-only, used at runtime by
+          # the Container App to pull; GHCR_PUSH_TOKEN is write, used to push.)
+          password: ${{ secrets.GHCR_PUSH_TOKEN }}
 
       - name: Build and push image to ghcr.io
         id: build

@@ -4,14 +4,145 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>fittrack</title>
+
+    <!-- Pre-paint theme: set data-theme + launch colours before first paint so the
+         installed PWA never flashes white before React mounts (FOUC fix). -->
+    <script>
+      (function () {
+        var html = document.documentElement;
+        var theme = 'dark';
+        try {
+          var stored = localStorage.getItem('fittrack_theme');
+          if (stored === 'light' || stored === 'dark') {
+            theme = stored;
+          } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+            theme = 'light';
+          }
+        } catch (e) {}
+        html.setAttribute('data-theme', theme);
+        html.style.colorScheme = theme;
+        html.style.setProperty('--launch-bg', theme === 'dark' ? '#0e0f1a' : '#f4f5fb');
+        html.style.setProperty('--launch-fg', theme === 'dark' ? '#e8e9f3' : '#1a1b2e');
+      })();
+    </script>
+
     <style>
-      /* Pin iOS text autosizing at first paint so standalone PWA cold launches
-         don't briefly boost text then shrink it back (viewport resettle flash). */
       html {
         -webkit-text-size-adjust: 100%;
         text-size-adjust: 100%;
+        background: var(--launch-bg, #0e0f1a);
+        color: var(--launch-fg, #e8e9f3);
+      }
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+      body {
+        min-height: 100dvh;
+        background: var(--launch-bg, #0e0f1a);
+      }
+
+      /* iOS standalone cold-launch mask: keep #root hidden behind a themed backdrop
+         until the launch viewport settles, so the whole-page rescale ("font shrink")
+         is never visible. Applied only on iOS home-screen launch; the class lives on
+         <html> and is never re-added, so routing/desktop are unaffected. */
+      #root {
+        transition: opacity 0.18s ease-out;
+      }
+      html.pwa-launch-mask #root {
+        visibility: hidden !important;
+        opacity: 0 !important;
+      }
+      html.pwa-launch-mask::before {
+        content: '';
+        position: fixed;
+        inset: 0;
+        z-index: 2147483647;
+        pointer-events: none;
+        background: var(--launch-bg, #0e0f1a);
+      }
+      html.pwa-launch-mask *,
+      html.pwa-no-motion * {
+        transition: none !important;
+        animation: none !important;
       }
     </style>
+
+    <script>
+      (function () {
+        var html = document.documentElement;
+        var isIOS =
+          /iPad|iPhone|iPod/.test(navigator.platform) ||
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        var isStandalone =
+          navigator.standalone === true ||
+          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+        if (!isIOS || !isStandalone) return;
+
+        html.classList.add('pwa-launch-mask', 'pwa-no-motion');
+
+        var done = false,
+          raf = 0,
+          fallback = 0;
+        var start = performance.now(),
+          lastChange = start;
+        var lastW = -1,
+          lastH = -1,
+          lastScale = -1;
+        var MIN_HOLD = 170,
+          QUIET = 55,
+          MAX_HOLD = 450;
+        var vv = window.visualViewport;
+
+        function markChanged() {
+          lastChange = performance.now();
+        }
+        if (vv) {
+          vv.addEventListener('resize', markChanged, { passive: true });
+          vv.addEventListener('scroll', markChanged, { passive: true });
+        }
+        window.addEventListener('resize', markChanged, { passive: true });
+
+        function cleanup() {
+          if (vv) {
+            vv.removeEventListener('resize', markChanged);
+            vv.removeEventListener('scroll', markChanged);
+          }
+          window.removeEventListener('resize', markChanged);
+        }
+        function reveal() {
+          if (done) return;
+          done = true;
+          cancelAnimationFrame(raf);
+          clearTimeout(fallback);
+          cleanup();
+          html.classList.remove('pwa-launch-mask');
+          requestAnimationFrame(function () {
+            requestAnimationFrame(function () {
+              html.classList.remove('pwa-no-motion');
+            });
+          });
+        }
+        function tick() {
+          var v = window.visualViewport;
+          var w = Math.round(v ? v.width : window.innerWidth);
+          var h = Math.round(v ? v.height : window.innerHeight);
+          var s = Math.round((v ? v.scale : 1) * 1000);
+          if (w !== lastW || h !== lastH || s !== lastScale) {
+            lastW = w;
+            lastH = h;
+            lastScale = s;
+            lastChange = performance.now();
+          }
+          var now = performance.now();
+          if (now - start >= MIN_HOLD && now - lastChange >= QUIET) reveal();
+          else raf = requestAnimationFrame(tick);
+        }
+        fallback = setTimeout(reveal, MAX_HOLD);
+        raf = requestAnimationFrame(tick);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -51,7 +51,7 @@
          is never visible. Applied only on iOS home-screen launch; the class lives on
          <html> and is never re-added, so routing/desktop are unaffected. */
       #root {
-        transition: opacity 0.18s ease-out;
+        transition: opacity 0.35s ease-out;
       }
       html.pwa-launch-mask #root {
         visibility: hidden !important;
@@ -126,11 +126,11 @@
           clearTimeout(fallback);
           window.removeEventListener('resize', onChange);
           if (window.visualViewport) window.visualViewport.removeEventListener('resize', onChange);
-          html.classList.remove('pwa-launch-mask');
+          // Re-enable transitions first, then drop the mask one frame later so
+          // #root animates opacity 0 -> 1 (a gentle fade) instead of snapping in.
+          html.classList.remove('pwa-no-motion');
           requestAnimationFrame(function () {
-            requestAnimationFrame(function () {
-              html.classList.remove('pwa-no-motion');
-            });
+            html.classList.remove('pwa-launch-mask');
           });
         }
         function check() {

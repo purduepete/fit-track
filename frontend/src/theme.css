@@ -40,6 +40,9 @@ body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
 }
 
 a {
@@ -55,6 +58,7 @@ a {
   align-items: center;
   gap: 20px;
   padding: 12px 24px;
+  padding-top: max(12px, env(safe-area-inset-top));
   background: var(--bar-bg);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -541,6 +545,7 @@ tbody tr:hover {
   .app-bar {
     gap: 12px;
     padding: 10px 14px;
+    padding-top: max(10px, env(safe-area-inset-top));
   }
 
   .nav a {
@@ -664,6 +669,7 @@ tbody tr:hover {
   .app-bar {
     gap: 8px;
     padding: 10px 12px;
+    padding-top: max(10px, env(safe-area-inset-top));
   }
 
   .brand-name {

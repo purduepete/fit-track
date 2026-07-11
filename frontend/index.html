@@ -2,7 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="mobile-web-app-capable" content="yes" />
     <title>fittrack</title>
 
     <!-- Pre-paint theme: set data-theme + launch colours before first paint so the
@@ -80,43 +83,17 @@
           (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
         if (!isIOS || !isStandalone) return;
 
+        // viewport-fit=cover forces the final full-screen standalone viewport from
+        // frame 1, so the old visualViewport-settle poll is no longer needed. Keep a
+        // minimal mask that hides #root only until React has painted, then reveal.
         html.classList.add('pwa-launch-mask', 'pwa-no-motion');
 
         var done = false,
-          raf = 0,
           fallback = 0;
-        var start = performance.now(),
-          lastChange = start;
-        var lastW = -1,
-          lastH = -1,
-          lastScale = -1;
-        var MIN_HOLD = 170,
-          QUIET = 55,
-          MAX_HOLD = 450;
-        var vv = window.visualViewport;
-
-        function markChanged() {
-          lastChange = performance.now();
-        }
-        if (vv) {
-          vv.addEventListener('resize', markChanged, { passive: true });
-          vv.addEventListener('scroll', markChanged, { passive: true });
-        }
-        window.addEventListener('resize', markChanged, { passive: true });
-
-        function cleanup() {
-          if (vv) {
-            vv.removeEventListener('resize', markChanged);
-            vv.removeEventListener('scroll', markChanged);
-          }
-          window.removeEventListener('resize', markChanged);
-        }
         function reveal() {
           if (done) return;
           done = true;
-          cancelAnimationFrame(raf);
           clearTimeout(fallback);
-          cleanup();
           html.classList.remove('pwa-launch-mask');
           requestAnimationFrame(function () {
             requestAnimationFrame(function () {
@@ -124,23 +101,14 @@
             });
           });
         }
-        function tick() {
-          var v = window.visualViewport;
-          var w = Math.round(v ? v.width : window.innerWidth);
-          var h = Math.round(v ? v.height : window.innerHeight);
-          var s = Math.round((v ? v.scale : 1) * 1000);
-          if (w !== lastW || h !== lastH || s !== lastScale) {
-            lastW = w;
-            lastH = h;
-            lastScale = s;
-            lastChange = performance.now();
-          }
-          var now = performance.now();
-          if (now - start >= MIN_HOLD && now - lastChange >= QUIET) reveal();
-          else raf = requestAnimationFrame(tick);
+        function whenPainted() {
+          var root = document.getElementById('root');
+          if (root && root.childElementCount > 0) reveal();
+          else requestAnimationFrame(whenPainted);
         }
-        fallback = setTimeout(reveal, MAX_HOLD);
-        raf = requestAnimationFrame(tick);
+        requestAnimationFrame(whenPainted);
+        // Safety net: never keep content hidden longer than this.
+        fallback = setTimeout(reveal, 800);
       })();
     </script>
   </head>

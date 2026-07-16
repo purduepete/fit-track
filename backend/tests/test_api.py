@@ -378,6 +378,64 @@ def test_dashboard_sleep_band_and_trend(client, auth_headers, db_session):
     assert old not in trend_dates
 
 
+def test_dashboard_steps_trend(client, auth_headers, db_session):
+    from datetime import timedelta
+
+    from app.models import DailyMetric
+    from app.timeutil import utcnow
+
+    now = utcnow()
+    recent = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    old = (now - timedelta(days=40)).strftime("%Y-%m-%d")
+    db_session.add_all(
+        [
+            DailyMetric(metric_type="step_count", local_date=recent, value=8200.0, unit="count", updated_utc=now),
+            DailyMetric(metric_type="step_count", local_date=old, value=5000.0, unit="count", updated_utc=now),
+        ]
+    )
+    db_session.commit()
+
+    dash = client.get("/api/dashboard", headers=auth_headers).json()
+    # latest = most recent day with data; stored float is rounded to an int.
+    assert dash["latest_steps"] == 8200
+    assert dash["latest_steps_date"] == recent
+    # 40-day-old point is outside the 30-day steps window.
+    trend_dates = [p["local_date"] for p in dash["steps_trend"]]
+    assert recent in trend_dates
+    assert old not in trend_dates
+
+
+def test_dashboard_steps_multi_source_dedup(client, auth_headers, db_session):
+    """Two sources reporting steps for the same day collapse to one MAX point."""
+    from datetime import timedelta
+
+    from app.models import DailyMetric
+    from app.timeutil import utcnow
+
+    now = utcnow()
+    day = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    db_session.add_all(
+        [
+            DailyMetric(
+                metric_type="step_count", local_date=day, value=5000.0,
+                unit="count", source_name="iPhone", updated_utc=now,
+            ),
+            DailyMetric(
+                metric_type="step_count", local_date=day, value=7000.0,
+                unit="count", source_name="Apple Watch", updated_utc=now,
+            ),
+        ]
+    )
+    db_session.commit()
+
+    dash = client.get("/api/dashboard", headers=auth_headers).json()
+    same_day = [p for p in dash["steps_trend"] if p["local_date"] == day]
+    # Exactly one aggregated point for the day, taking MAX (not the sum 12000).
+    assert len(same_day) == 1
+    assert same_day[0]["value"] == 7000
+    assert dash["latest_steps"] == 7000
+
+
 def test_token_last_used_not_rewritten_within_window(client, auth_headers, db_session):
     from datetime import timedelta
 

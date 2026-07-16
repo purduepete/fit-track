@@ -24,8 +24,8 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   route (with a distance-sample fallback for indoor workouts). mi/km toggle.
 - **Route map** — the GPS track drawn on OpenStreetMap (no API key).
 - **Heart-rate chart** — HR over the course of the workout.
-- **Dashboard** — 7-day workout count / minutes / active energy, resting-HR and
-  VO₂ max trends.
+- **Dashboard** — 7-day workout count / minutes / active energy, resting-HR,
+  VO₂ max and sleep trends, plus a 30-day daily-steps chart with a 10k goal line.
 - **Idempotent ingest** — keyed on the Apple workout UUID; re-ingesting the same
   export never duplicates. Raw payloads are stored for safe re-processing.
 - **Simple token auth** — bearer tokens you generate locally; only the hash is

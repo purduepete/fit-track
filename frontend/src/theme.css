@@ -236,6 +236,36 @@ a {
   margin-left: 4px;
 }
 
+/* Dedicated "Daily steps" card headline: the latest-day count above its chart. */
+.steps-headline {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 2px 0 14px;
+}
+
+.steps-headline svg {
+  align-self: center;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+
+.steps-headline .steps-value {
+  font-size: 1.9rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.steps-headline .steps-date {
+  font-size: 0.8rem;
+}
+
+@media (max-width: 640px) {
+  .steps-headline .steps-value {
+    font-size: 1.5rem;
+  }
+}
+
 .section {
   margin-bottom: 28px;
 }

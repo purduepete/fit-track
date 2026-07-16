@@ -5,6 +5,7 @@ import {
   Line,
   LineChart,
   ReferenceArea,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -14,8 +15,8 @@ import { api } from "../lib/api";
 import type { SleepBand, Vo2MaxBand } from "../lib/api";
 import { useApiResource } from "../lib/useApiResource";
 import { StatCard } from "../components/StatCard";
-import { ActivityIcon, ClockIcon, FlameIcon, GaugeIcon, HeartIcon, MoonIcon } from "../components/Icons";
-import { round, formatLocalDate, formatHoursMinutes, formatMinutesHms } from "../lib/format";
+import { ActivityIcon, ClockIcon, FlameIcon, FootprintsIcon, GaugeIcon, HeartIcon, MoonIcon } from "../components/Icons";
+import { round, formatLocalDate, formatHoursMinutes, formatMinutesHms, formatSteps } from "../lib/format";
 import { barCursor, tooltipProps } from "../lib/chart";
 import { usePageRefresh } from "../lib/refresh";
 
@@ -174,6 +175,55 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
               <Bar dataKey="value" fill="#4f46e5" radius={[2, 2, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
+        </div>
+      </section>
+
+      <section className="dash-section">
+        <h2 className="section-title">Activity</h2>
+        <div className="card">
+          <h2>Daily steps</h2>
+          <p className="muted chart-caption">
+            Steps per day over the last 30 days; the dashed line marks a 10,000-step goal.
+          </p>
+          {data.steps_trend.length > 0 ? (
+            <>
+              <div className="steps-headline">
+                <FootprintsIcon size={20} />
+                <span className="steps-value">{formatSteps(data.latest_steps)}</span>
+                <span className="muted steps-date">
+                  latest day{data.latest_steps_date ? ` · ${formatLocalDate(data.latest_steps_date)}` : ""}
+                </span>
+              </div>
+              <ResponsiveContainer width="100%" height={240}>
+                <BarChart data={data.steps_trend}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
+                  <YAxis
+                    domain={[0, (max: number) => Math.max(max, 10000)]}
+                    tickFormatter={(v) => formatSteps(v as number)}
+                    tick={{ fontSize: 11 }}
+                    width={48}
+                  />
+                  <Tooltip
+                    {...tooltipProps}
+                    cursor={barCursor}
+                    labelFormatter={formatLocalDate}
+                    formatter={(v) => [formatSteps(v as number), "Steps"]}
+                  />
+                  <ReferenceLine
+                    y={10000}
+                    stroke="#22c55e"
+                    strokeDasharray="4 4"
+                    ifOverflow="extendDomain"
+                    label={{ value: "Goal 10k", position: "insideTopRight", fontSize: 11, fill: "#22c55e" }}
+                  />
+                  <Bar dataKey="value" fill="#4f46e5" radius={[2, 2, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </>
+          ) : (
+            <p className="muted">Enable “Steps” in Health Auto Export to track daily steps here.</p>
+          )}
         </div>
       </section>
 

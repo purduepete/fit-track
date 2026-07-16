@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 RESTING_HR_NAMES = ("resting_heart_rate", "restingHeartRate")
 VO2MAX_NAMES = ("vo2_max", "vo2Max", "vO2Max")
 SLEEP_NAMES = ("sleep_asleep_hours",)
+STEP_NAMES = ("step_count",)
 
 # Trend windows keep dashboard queries/payloads bounded as history grows.
 WEEK_DAYS = 7
@@ -27,6 +28,7 @@ RESTING_TREND_DAYS = 90
 # VO2 max moves slowly, so a longer window is needed to see a trend at all.
 VO2MAX_TREND_DAYS = 365
 SLEEP_TREND_DAYS = 30
+STEPS_TREND_DAYS = 30
 
 
 def _latest_metric(db: Session, names: tuple[str, ...]) -> float | None:
@@ -66,6 +68,7 @@ def dashboard(
     resting_since = (utcnow() - timedelta(days=RESTING_TREND_DAYS)).strftime("%Y-%m-%d")
     vo2max_since = (utcnow() - timedelta(days=VO2MAX_TREND_DAYS)).strftime("%Y-%m-%d")
     sleep_since = (utcnow() - timedelta(days=SLEEP_TREND_DAYS)).strftime("%Y-%m-%d")
+    steps_since = (utcnow() - timedelta(days=STEPS_TREND_DAYS)).strftime("%Y-%m-%d")
 
     # One grouped scan of the week: per-day counts/duration/energy. The 7-day
     # KPI totals are derived from these rows, avoiding a second window scan.
@@ -118,6 +121,24 @@ def dashboard(
 
     latest_sleep = _latest_metric(db, SLEEP_NAMES)
 
+    # Steps can arrive from multiple sources (iPhone + Watch) for the same day,
+    # so aggregate per local_date with MAX (avoids double-counting overlapping
+    # devices; equals the value when there's a single source) instead of using
+    # _latest_metric on raw rows.
+    steps_rows = db.execute(
+        select(DailyMetric.local_date, func.max(DailyMetric.value))
+        .where(
+            DailyMetric.metric_type.in_(STEP_NAMES),
+            DailyMetric.local_date >= steps_since,
+        )
+        .group_by(DailyMetric.local_date)
+        .order_by(DailyMetric.local_date)
+    ).all()
+    steps_trend = [MetricPoint(local_date=d, value=round(v)) for d, v in steps_rows]
+    # latest = most recent day *with data* (not necessarily today).
+    latest_steps = steps_trend[-1].value if steps_trend else None
+    latest_steps_date = steps_trend[-1].local_date if steps_trend else None
+
     return DashboardSummary(
         workouts_7d=workouts_7d,
         minutes_7d=round(duration_7d / 60.0, 1),
@@ -127,8 +148,11 @@ def dashboard(
         vo2max_band=_vo2max_band(latest_vo2max),
         latest_sleep_hours=latest_sleep,
         sleep_band=_sleep_band(latest_sleep),
+        latest_steps=latest_steps,
+        latest_steps_date=latest_steps_date,
         weekly_minutes=[MetricPoint(local_date=d, value=round(s / 60.0, 1)) for d, _, s, _ in by_date],
         resting_hr_trend=[MetricPoint(local_date=d, value=v) for d, v in resting_trend],
         vo2max_trend=[MetricPoint(local_date=d, value=v) for d, v in vo2max_trend],
         sleep_trend=[MetricPoint(local_date=d, value=v) for d, v in sleep_trend],
+        steps_trend=steps_trend,
     )

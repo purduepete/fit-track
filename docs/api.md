@@ -66,6 +66,10 @@ VO2 max against the athlete's age/sex (Cooper Institute categories) when
 `latest_sleep_hours` is the most recent night's asleep hours (parsed from HAE
 `sleep_analysis`, attributed to the wake day); `sleep_band` rates it against a
 7-9 h adult target (Low/Fair/Good/Excellent), or `null` when there is no sleep data.
+`steps_trend` covers the last 30 days, aggregated per day with MAX across sources
+(so overlapping devices are not double-counted) and rounded to whole steps;
+`latest_steps` is the value of the most recent day with data and `latest_steps_date`
+is that day (both `null` when there is no step data).
 ```json
 { "workouts_7d": 3, "minutes_7d": 92.4, "active_kcal_7d": 810,
   "latest_resting_hr": 55, "latest_vo2max": 38.8,
@@ -75,11 +79,13 @@ VO2 max against the athlete's age/sex (Cooper Institute categories) when
   "latest_sleep_hours": 7.5,
   "sleep_band": { "category":"Excellent", "category_index":3,
     "target_low":7.0, "target_high":9.0 },
+  "latest_steps": 8200, "latest_steps_date": "2026-07-05",
   "weekly_workouts": [{"local_date":"2026-07-05","value":1}],
   "weekly_minutes":  [{"local_date":"2026-07-05","value":30.9}],
   "resting_hr_trend":[{"local_date":"2026-07-05","value":55}],
   "vo2max_trend":    [{"local_date":"2026-07-05","value":38.8}],
-  "sleep_trend":     [{"local_date":"2026-07-05","value":7.5}] }
+  "sleep_trend":     [{"local_date":"2026-07-05","value":7.5}],
+  "steps_trend":     [{"local_date":"2026-07-05","value":8200}] }
 ```
 
 > Timestamps returned by the API are naive UTC. The frontend converts them to

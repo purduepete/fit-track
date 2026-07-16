@@ -82,10 +82,13 @@ export interface DashboardSummary {
   vo2max_band: Vo2MaxBand | null;
   latest_sleep_hours: number | null;
   sleep_band: SleepBand | null;
+  latest_steps: number | null;
+  latest_steps_date: string | null;
   weekly_minutes: MetricPoint[];
   resting_hr_trend: MetricPoint[];
   vo2max_trend: MetricPoint[];
   sleep_trend: MetricPoint[];
+  steps_trend: MetricPoint[];
 }
 
 export interface WorkoutList {

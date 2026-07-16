@@ -1,7 +1,7 @@
 """Pydantic response/request schemas for the fittrack API."""
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class IngestResult(BaseModel):
@@ -103,7 +103,10 @@ class DashboardSummary(BaseModel):
     vo2max_band: Vo2MaxBand | None = None
     latest_sleep_hours: float | None = None
     sleep_band: SleepBand | None = None
+    latest_steps: float | None = None
+    latest_steps_date: str | None = None
     weekly_minutes: list[MetricPoint]
     resting_hr_trend: list[MetricPoint]
     vo2max_trend: list[MetricPoint]
     sleep_trend: list[MetricPoint] = []
+    steps_trend: list[MetricPoint] = Field(default_factory=list)

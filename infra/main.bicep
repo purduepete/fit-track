@@ -166,9 +166,13 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        // Scale to zero when idle to minimise cost; a KEDA cron rule keeps one
-        // warm replica during active hours (06:00-23:00 local) to avoid
-        // cold-start latency, while still dropping to zero overnight.
+        // Scale to zero when idle to minimise cost; two narrow KEDA cron rules
+        // keep one warm replica only during the hours the app is actually used
+        // (07:00-09:00 and 17:00-21:00 local, 6h/day) to avoid cold-start
+        // latency then, while dropping to zero the rest of the day/night. A
+        // 24/7-ish warm window burns the monthly free vCPU-second grant in ~12
+        // days and then costs ~$0.17/day, mostly idle usage — hence the tight
+        // windows below.
         minReplicas: 0
         maxReplicas: 2
         rules: [
@@ -180,15 +184,27 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
             http: { metadata: { concurrentRequests: '5' } }
           }
           {
-            name: 'warm-hours'
-            // Keep 1 replica warm 06:00-23:00 America/Los_Angeles; overnight
-            // the app is allowed to scale to zero (cold start acceptable then).
+            name: 'warm-morning'
+            // Keep 1 replica warm 07:00-09:00 America/Los_Angeles.
             custom: {
               type: 'cron'
               metadata: {
                 timezone: 'America/Los_Angeles'
-                start: '0 6 * * *'
-                end: '0 23 * * *'
+                start: '0 7 * * *'
+                end: '0 9 * * *'
+                desiredReplicas: '1'
+              }
+            }
+          }
+          {
+            name: 'warm-evening'
+            // Keep 1 replica warm 17:00-21:00 America/Los_Angeles.
+            custom: {
+              type: 'cron'
+              metadata: {
+                timezone: 'America/Los_Angeles'
+                start: '0 17 * * *'
+                end: '0 21 * * *'
                 desiredReplicas: '1'
               }
             }

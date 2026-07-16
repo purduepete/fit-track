@@ -1,6 +1,7 @@
 import {
   Bar,
   BarChart,
+  Cell,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -8,7 +9,6 @@ import {
   ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
-  Scatter,
   Tooltip,
   XAxis,
   YAxis,
@@ -17,7 +17,7 @@ import { api } from "../lib/api";
 import type { SleepBand, Vo2MaxBand } from "../lib/api";
 import { useApiResource } from "../lib/useApiResource";
 import { StatCard } from "../components/StatCard";
-import { ActivityIcon, ClockIcon, DumbbellIcon, FlameIcon, FootprintsIcon, GaugeIcon, HeartIcon, MoonIcon } from "../components/Icons";
+import { ActivityIcon, ClockIcon, FlameIcon, FootprintsIcon, GaugeIcon, HeartIcon, MoonIcon } from "../components/Icons";
 import { round, formatLocalDate, formatHoursMinutes, formatMinutesHms, formatSteps } from "../lib/format";
 import { barCursor, tooltipProps } from "../lib/chart";
 import { usePageRefresh } from "../lib/refresh";
@@ -30,21 +30,9 @@ const VO2_TIERS = ["Very Poor", "Poor", "Fair", "Good", "Excellent", "Superior"]
 const SLEEP_COLORS = ["#dc2626", "#f59e0b", "#84cc16", "#22c55e"];
 const SLEEP_TIERS = ["Low", "Fair", "Good", "Excellent"];
 
-const STEPS_AVG_COLOR = "#f59e0b"; // amber — 7-day moving average line
-const WORKOUT_MARKER_COLOR = "#4f46e5"; // indigo — dumbbell icon on workout days
-
-// Recharts Scatter custom shape: a small dumbbell drawn just above the bar top to
-// flag a day that has a logged workout. cx/cy are the point's pixel coordinates.
-function WorkoutMarker(props: { cx?: number; cy?: number }) {
-  const { cx, cy } = props;
-  if (typeof cx !== "number" || typeof cy !== "number") return null;
-  const s = 15;
-  return (
-    <g transform={`translate(${cx - s / 2}, ${cy - s - 6})`} style={{ color: WORKOUT_MARKER_COLOR }} pointerEvents="none">
-      <DumbbellIcon size={s} />
-    </g>
-  );
-}
+const STEPS_BAR_COLOR = "#4f46e5"; // indigo — base daily-steps bar
+const STEPS_AVG_COLOR = "#f59e0b"; // amber — 7-day block-average line
+const WORKOUT_BAR_COLOR = "#ec4899"; // pink — bar highlight on days with a logged workout
 
 function SleepQuality({ band, hours }: { band: SleepBand; hours: number }) {
   const color = SLEEP_COLORS[band.category_index] ?? "#4f46e5";
@@ -217,16 +205,13 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
           <p className="muted chart-caption">
             Steps per day over the last 30 days. The dashed green line marks a 10,000-step
             goal; the amber line is the 7-day block average (each flat segment averages one
-            calendar week).
+            calendar week). Pink bars are days with a logged workout.
           </p>
           {hasStepData ? (
             <>
               <div className="steps-headline">
                 <FootprintsIcon size={20} />
                 <span className="steps-value">{formatSteps(data.latest_steps)}</span>
-                <span className="muted steps-date">
-                  latest day{data.latest_steps_date ? ` · ${formatLocalDate(data.latest_steps_date)}` : ""}
-                </span>
               </div>
               <div className="chart-legend">
                 <span className="chart-legend-item">
@@ -235,13 +220,15 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                   </svg>
                   7-day block average
                 </span>
-                <span className="chart-legend-item" style={{ color: WORKOUT_MARKER_COLOR }}>
-                  <DumbbellIcon size={15} />
-                  <span className="muted">Workout logged</span>
+                <span className="chart-legend-item">
+                  <svg width="12" height="12" aria-hidden="true">
+                    <rect width="12" height="12" rx="2" fill={WORKOUT_BAR_COLOR} />
+                  </svg>
+                  Workout logged
                 </span>
               </div>
               <ResponsiveContainer width="100%" height={240}>
-                <ComposedChart data={stepsChartData} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
+                <ComposedChart data={stepsChartData} margin={{ top: 18, right: 52, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis
                     dataKey="local_date"
@@ -262,7 +249,6 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                     labelFormatter={formatLocalDate}
                     formatter={(v, name) => {
                       if (name === "avg") return [formatSteps(v as number), "7-day block avg"];
-                      if (name === "workout") return ["Yes", "Workout"];
                       return [formatSteps(v as number), "Steps"];
                     }}
                   />
@@ -271,9 +257,16 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                     stroke="#22c55e"
                     strokeDasharray="4 4"
                     ifOverflow="extendDomain"
-                    label={{ value: "Goal 10k", position: "insideTopRight", fontSize: 11, fill: "#22c55e" }}
+                    label={{ value: "Goal 10k", position: "right", fontSize: 11, fill: "#22c55e" }}
                   />
-                  <Bar dataKey="value" fill="#4f46e5" radius={[2, 2, 0, 0]} />
+                  <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+                    {stepsChartData.map((d) => (
+                      <Cell
+                        key={d.local_date}
+                        fill={d.workout != null ? WORKOUT_BAR_COLOR : STEPS_BAR_COLOR}
+                      />
+                    ))}
+                  </Bar>
                   <Line
                     type="stepAfter"
                     dataKey="avg"
@@ -283,7 +276,6 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                     connectNulls={false}
                     isAnimationActive={false}
                   />
-                  <Scatter dataKey="workout" shape={<WorkoutMarker />} isAnimationActive={false} />
                 </ComposedChart>
               </ResponsiveContainer>
             </>

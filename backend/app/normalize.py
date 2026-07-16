@@ -326,6 +326,10 @@ SLEEP_METRIC_NAMES = ("sleep_analysis", "sleepanalysis", "sleep")
 # Metric type persisted for nightly asleep hours (unit: hours).
 SLEEP_METRIC_TYPE = "sleep_asleep_hours"
 
+# HAE exports steps as the cumulative-counter metric ``step_count``.
+STEP_METRIC_NAMES = ("step_count",)
+STEP_METRIC_TYPE = "step_count"
+
 
 def _to_hours(value) -> float | None:
     """Coerce an HAE sleep duration to hours.
@@ -403,6 +407,38 @@ def _parse_sleep_metric(points: list) -> list[ParsedDailyMetric]:
     ]
 
 
+def _parse_step_metric(points: list) -> list[ParsedDailyMetric]:
+    """Sum step counts into one device-agnostic total per local day.
+
+    HAE exports ``step_count`` as many intraday (per-minute) points, each holding
+    the steps taken in that interval, so the daily total is their sum — not the
+    last point (which the generic path would keep, yielding a single minute's
+    count). Apple/HAE already de-duplicates overlapping devices *within* each
+    interval point (hence the joined ``Watch|iPhone`` source labels), so points
+    are summed across sources into a single source-less daily total. Summing
+    per-source and taking the max would instead drop steps recorded under a
+    different source label on the same day.
+    """
+    totals: dict[str, float] = {}
+    for point in points or []:
+        ts, tz = parse_dt(first(point, "date", "timestamp"))
+        qty = as_number(first(point, "qty", "value"))
+        if ts is None or qty is None or qty < 0:
+            continue
+        local_date = local_date_str(ts, tz)
+        totals[local_date] = totals.get(local_date, 0.0) + qty
+    return [
+        ParsedDailyMetric(
+            local_date=local_date,
+            metric_type=STEP_METRIC_TYPE,
+            value=round(steps),
+            unit="count",
+            source_name="",
+        )
+        for local_date, steps in totals.items()
+    ]
+
+
 def parse_daily_metrics(metrics: list) -> list[ParsedDailyMetric]:
     out: list[ParsedDailyMetric] = []
     for m in metrics or []:
@@ -412,6 +448,9 @@ def parse_daily_metrics(metrics: list) -> list[ParsedDailyMetric]:
             continue
         if str(name).lower() in SLEEP_METRIC_NAMES:
             out.extend(_parse_sleep_metric(first(m, "data", default=[])))
+            continue
+        if str(name).lower() in STEP_METRIC_NAMES:
+            out.extend(_parse_step_metric(first(m, "data", default=[])))
             continue
         for point in first(m, "data", default=[]):
             ts, tz = parse_dt(first(point, "date", "timestamp"))

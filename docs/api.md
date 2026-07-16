@@ -66,10 +66,12 @@ VO2 max against the athlete's age/sex (Cooper Institute categories) when
 `latest_sleep_hours` is the most recent night's asleep hours (parsed from HAE
 `sleep_analysis`, attributed to the wake day); `sleep_band` rates it against a
 7-9 h adult target (Low/Fair/Good/Excellent), or `null` when there is no sleep data.
-`steps_trend` covers the last 30 days, aggregated per day with MAX across sources
-(so overlapping devices are not double-counted) and rounded to whole steps;
-`latest_steps` is the value of the most recent day with data and `latest_steps_date`
-is that day (both `null` when there is no step data).
+`steps_trend` covers the last 30 days. HAE exports `step_count` as many intraday
+points, so each day's value is the **sum** of all points for that day, taken as a
+single device-agnostic total (HAE already de-duplicates overlapping devices
+within each interval point) and rounded to whole steps; `latest_steps` is the
+value of the most recent day with data and `latest_steps_date` is that day (both
+`null` when there is no step data).
 ```json
 { "workouts_7d": 3, "minutes_7d": 92.4, "active_kcal_7d": 810,
   "latest_resting_hr": 55, "latest_vo2max": 38.8,

@@ -34,6 +34,14 @@ def main() -> int:
     ap.add_argument("--dry-run", action="store_true", help="parse and report; do not write")
     ap.add_argument("--limit", type=int, default=None, help="reprocess only the N newest events")
     ap.add_argument(
+        "--oldest-first",
+        action="store_true",
+        help=(
+            "process events oldest-first so the most recent (complete) rolling-window "
+            "export wins the final upsert for a day; use for a full rebuild"
+        ),
+    )
+    ap.add_argument(
         "--contains",
         default=None,
         help="only reprocess events whose raw payload contains this substring",
@@ -42,7 +50,8 @@ def main() -> int:
 
     db = SessionLocal()
     try:
-        stmt = select(RawIngestEvent).order_by(desc(RawIngestEvent.received_utc))
+        order = RawIngestEvent.received_utc.asc() if args.oldest_first else desc(RawIngestEvent.received_utc)
+        stmt = select(RawIngestEvent).order_by(order)
         if args.limit:
             stmt = stmt.limit(args.limit)
         events = db.execute(stmt).scalars().all()

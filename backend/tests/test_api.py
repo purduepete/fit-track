@@ -405,35 +405,39 @@ def test_dashboard_steps_trend(client, auth_headers, db_session):
     assert old not in trend_dates
 
 
-def test_dashboard_steps_multi_source_dedup(client, auth_headers, db_session):
-    """Two sources reporting steps for the same day collapse to one MAX point."""
+def test_dashboard_steps_summed_from_ingest(client, auth_headers):
+    """Intraday step points (multiple per day, mixed sources) sum into the
+    dashboard's daily total rather than showing a single point's count."""
     from datetime import timedelta
 
-    from app.models import DailyMetric
     from app.timeutil import utcnow
 
-    now = utcnow()
-    day = (now - timedelta(days=1)).strftime("%Y-%m-%d")
-    db_session.add_all(
-        [
-            DailyMetric(
-                metric_type="step_count", local_date=day, value=5000.0,
-                unit="count", source_name="iPhone", updated_utc=now,
-            ),
-            DailyMetric(
-                metric_type="step_count", local_date=day, value=7000.0,
-                unit="count", source_name="Apple Watch", updated_utc=now,
-            ),
-        ]
-    )
-    db_session.commit()
+    day = (utcnow() - timedelta(days=1)).strftime("%Y-%m-%d")
+    payload = {
+        "data": {
+            "workouts": [],
+            "metrics": [
+                {
+                    "name": "step_count",
+                    "units": "count",
+                    "data": [
+                        {"date": f"{day} 08:00:00 -0700", "qty": 5000, "source": "iPhone"},
+                        {"date": f"{day} 12:00:00 -0700", "qty": 4000, "source": "Apple Watch"},
+                        {"date": f"{day} 18:00:00 -0700", "qty": 1234, "source": "Apple Watch|iPhone"},
+                    ],
+                }
+            ],
+        }
+    }
+    assert _ingest(client, auth_headers, payload=payload).status_code == 200
 
     dash = client.get("/api/dashboard", headers=auth_headers).json()
     same_day = [p for p in dash["steps_trend"] if p["local_date"] == day]
-    # Exactly one aggregated point for the day, taking MAX (not the sum 12000).
+    # One aggregated point summing every intraday count (not the last, not the max).
     assert len(same_day) == 1
-    assert same_day[0]["value"] == 7000
-    assert dash["latest_steps"] == 7000
+    assert same_day[0]["value"] == 10234
+    assert dash["latest_steps"] == 10234
+    assert dash["latest_steps_date"] == day
 
 
 def test_token_last_used_not_rewritten_within_window(client, auth_headers, db_session):

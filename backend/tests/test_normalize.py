@@ -169,9 +169,39 @@ def test_parse_daily_metrics():
         }
     }
     parsed = parse_payload(payload)
-    assert len(parsed.daily_metrics) == 2
-    assert parsed.daily_metrics[0].metric_type == "step_count"
-    assert parsed.daily_metrics[0].local_date == "2026-07-05"
+    # Intraday step points sum into one source-less daily total.
+    assert len(parsed.daily_metrics) == 1
+    m = parsed.daily_metrics[0]
+    assert m.metric_type == "step_count"
+    assert m.local_date == "2026-07-05"
+    assert m.value == 1500
+    assert m.source_name == ""
+
+
+def test_parse_step_metric_sums_across_sources_and_days():
+    # HAE ships steps as many intraday points, sometimes with distinct (even
+    # pipe-joined) source labels; all points for a day sum into one total.
+    payload = {
+        "data": {
+            "workouts": [],
+            "metrics": [
+                {
+                    "name": "step_count",
+                    "units": "count",
+                    "data": [
+                        {"date": "2026-07-05 08:00:00 -0700", "qty": 1200, "source": "iPhone"},
+                        {"date": "2026-07-05 09:00:00 -0700", "qty": 800, "source": "Apple Watch"},
+                        {"date": "2026-07-05 10:00:00 -0700", "qty": 400.6, "source": "Apple Watch|iPhone"},
+                        {"date": "2026-07-06 07:00:00 -0700", "qty": 5000, "source": "iPhone"},
+                    ],
+                }
+            ],
+        }
+    }
+    metrics = {m.local_date: m for m in parse_payload(payload).daily_metrics}
+    assert metrics["2026-07-05"].value == 2401  # 1200 + 800 + 400.6, rounded
+    assert metrics["2026-07-06"].value == 5000
+    assert all(m.source_name == "" for m in metrics.values())
 
 
 def _sleep_metric(points):

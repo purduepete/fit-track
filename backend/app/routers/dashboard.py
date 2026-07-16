@@ -121,17 +121,14 @@ def dashboard(
 
     latest_sleep = _latest_metric(db, SLEEP_NAMES)
 
-    # Steps can arrive from multiple sources (iPhone + Watch) for the same day,
-    # so aggregate per local_date with MAX (avoids double-counting overlapping
-    # devices; equals the value when there's a single source) instead of using
-    # _latest_metric on raw rows.
+    # Steps are normalized to exactly one source-less total row per day (summed
+    # across all intraday points), so read the per-day values directly.
     steps_rows = db.execute(
-        select(DailyMetric.local_date, func.max(DailyMetric.value))
+        select(DailyMetric.local_date, DailyMetric.value)
         .where(
             DailyMetric.metric_type.in_(STEP_NAMES),
             DailyMetric.local_date >= steps_since,
         )
-        .group_by(DailyMetric.local_date)
         .order_by(DailyMetric.local_date)
     ).all()
     steps_trend = [MetricPoint(local_date=d, value=round(v)) for d, v in steps_rows]

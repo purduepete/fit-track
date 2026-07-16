@@ -162,17 +162,18 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
       "—"
     );
 
-  // Merge the steps series with its rolling 7-day average (by date) for the
-  // ComposedChart, and derive the workout-day points for the dumbbell markers.
+  // Build ONE shared data array for the ComposedChart: the daily steps value,
+  // the 7-day block average, and a `workout` y (= that day's steps) only on days
+  // with a logged workout. All series must share this single array — giving the
+  // Scatter its own `data` prop hijacks the category axis and hides the bars/line.
   const stepsAvgByDate = new Map(data.steps_avg7_trend.map((p) => [p.local_date, p.value]));
-  const stepsChartData = data.steps_trend.map((p) => ({
-    ...p,
-    avg: stepsAvgByDate.get(p.local_date) ?? null,
-  }));
   const workoutDaySet = new Set(data.workout_days);
-  const workoutPoints = data.steps_trend.filter(
-    (p) => workoutDaySet.has(p.local_date) && p.value != null,
-  );
+  const stepsChartData = data.steps_trend.map((p) => ({
+    local_date: p.local_date,
+    value: p.value,
+    avg: stepsAvgByDate.get(p.local_date) ?? null,
+    workout: workoutDaySet.has(p.local_date) && p.value != null ? p.value : null,
+  }));
   const hasStepData = data.steps_trend.some((p) => p.value != null);
 
   return (
@@ -259,10 +260,11 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                     {...tooltipProps}
                     cursor={barCursor}
                     labelFormatter={formatLocalDate}
-                    formatter={(v, name) => [
-                      formatSteps(v as number),
-                      name === "avg" ? "7-day block avg" : "Steps",
-                    ]}
+                    formatter={(v, name) => {
+                      if (name === "avg") return [formatSteps(v as number), "7-day block avg"];
+                      if (name === "workout") return ["Yes", "Workout"];
+                      return [formatSteps(v as number), "Steps"];
+                    }}
                   />
                   <ReferenceLine
                     y={10000}
@@ -281,7 +283,7 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                     connectNulls={false}
                     isAnimationActive={false}
                   />
-                  <Scatter data={workoutPoints} dataKey="value" shape={<WorkoutMarker />} isAnimationActive={false} />
+                  <Scatter dataKey="workout" shape={<WorkoutMarker />} isAnimationActive={false} />
                 </ComposedChart>
               </ResponsiveContainer>
             </>

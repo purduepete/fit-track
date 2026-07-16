@@ -232,7 +232,7 @@ def test_ingest_rejects_oversized_payload(client, auth_headers):
         r = _ingest(client, auth_headers)
         assert r.status_code == 413, r.text
     finally:
-        get_settings().max_ingest_bytes = 25 * 1024 * 1024
+        get_settings().max_ingest_bytes = 64 * 1024 * 1024
 
 
 def test_ingest_streams_and_caps_body_without_content_length(client, auth_headers):
@@ -255,7 +255,7 @@ def test_ingest_streams_and_caps_body_without_content_length(client, auth_header
         )
         assert r.status_code == 413, r.text
     finally:
-        get_settings().max_ingest_bytes = 25 * 1024 * 1024
+        get_settings().max_ingest_bytes = 64 * 1024 * 1024
 
 
 def test_dashboard_trends_are_windowed(client, auth_headers, db_session):

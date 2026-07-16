@@ -124,8 +124,8 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'api'
           image: containerImage
           resources: {
-            cpu: json('0.25')
-            memory: '0.5Gi'
+            cpu: json('0.5')
+            memory: '1.0Gi'
           }
           env: [
             { name: 'DB_AUTH', value: 'aad' }
@@ -178,9 +178,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         rules: [
           {
             name: 'http'
-            // Bound concurrency: each request buffers the full body (up to
-            // max_ingest_bytes) so keep this low on a small-memory replica.
-            // Also handles request-based wake-from-zero outside warm hours.
+          // Bound concurrency: a large ingest buffers the full body (up to
+          // max_ingest_bytes, ~64 MiB) and deserializes it, which is memory
+          // heavy, so keep this modest even on the 1 GiB replica. Also handles
+          // request-based wake-from-zero outside warm hours.
             http: { metadata: { concurrentRequests: '5' } }
           }
           {

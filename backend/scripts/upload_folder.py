@@ -43,7 +43,10 @@ INGEST_PATH = "/api/ingest/health-auto-export"
 
 
 def _log(msg: str) -> None:
-    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
+    # flush=True so output is visible immediately even under pythonw.exe (no
+    # console), where stdout would otherwise be block-buffered and never flush —
+    # which previously hid ingest errors from the watcher log entirely.
+    print(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}", flush=True)
 
 
 def extract_json_from_zip(zip_path: str) -> str | None:

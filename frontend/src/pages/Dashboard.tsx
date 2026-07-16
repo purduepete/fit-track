@@ -32,7 +32,7 @@ const SLEEP_TIERS = ["Low", "Fair", "Good", "Excellent"];
 
 const STEPS_BAR_COLOR = "#4f46e5"; // indigo — base daily-steps bar
 const STEPS_AVG_COLOR = "#f59e0b"; // amber — 7-day block-average line
-const WORKOUT_BAR_COLOR = "#ec4899"; // pink — bar highlight on days with a logged workout
+const WORKOUT_BAR_COLOR = "#10b981"; // emerald — bar highlight on days with a logged workout
 
 function SleepQuality({ band, hours }: { band: SleepBand; hours: number }) {
   const color = SLEEP_COLORS[band.category_index] ?? "#4f46e5";
@@ -205,7 +205,7 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
           <p className="muted chart-caption">
             Steps per day over the last 30 days. The dashed green line marks a 10,000-step
             goal; the amber line is the 7-day block average (each flat segment averages one
-            calendar week). Pink bars are days with a logged workout.
+            calendar week). Green bars are days with a logged workout.
           </p>
           {hasStepData ? (
             <>

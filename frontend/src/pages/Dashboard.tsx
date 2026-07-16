@@ -246,7 +246,8 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                     dataKey="local_date"
                     tickFormatter={formatLocalDate}
                     tick={{ fontSize: 11 }}
-                    minTickGap={24}
+                    interval="preserveStartEnd"
+                    minTickGap={16}
                   />
                   <YAxis
                     domain={[0, (max: number) => Math.max(max, 10000) * 1.08]}

@@ -110,3 +110,5 @@ class DashboardSummary(BaseModel):
     vo2max_trend: list[MetricPoint]
     sleep_trend: list[MetricPoint] = []
     steps_trend: list[MetricPoint] = Field(default_factory=list)
+    steps_avg7_trend: list[MetricPoint] = Field(default_factory=list)
+    workout_days: list[str] = Field(default_factory=list)

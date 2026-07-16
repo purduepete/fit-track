@@ -2,11 +2,13 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  ComposedChart,
   Line,
   LineChart,
   ReferenceArea,
   ReferenceLine,
   ResponsiveContainer,
+  Scatter,
   Tooltip,
   XAxis,
   YAxis,
@@ -15,7 +17,7 @@ import { api } from "../lib/api";
 import type { SleepBand, Vo2MaxBand } from "../lib/api";
 import { useApiResource } from "../lib/useApiResource";
 import { StatCard } from "../components/StatCard";
-import { ActivityIcon, ClockIcon, FlameIcon, FootprintsIcon, GaugeIcon, HeartIcon, MoonIcon } from "../components/Icons";
+import { ActivityIcon, ClockIcon, DumbbellIcon, FlameIcon, FootprintsIcon, GaugeIcon, HeartIcon, MoonIcon } from "../components/Icons";
 import { round, formatLocalDate, formatHoursMinutes, formatMinutesHms, formatSteps } from "../lib/format";
 import { barCursor, tooltipProps } from "../lib/chart";
 import { usePageRefresh } from "../lib/refresh";
@@ -27,6 +29,22 @@ const VO2_TIERS = ["Very Poor", "Poor", "Fair", "Good", "Excellent", "Superior"]
 // Red -> green scale, indexed by sleep rating (0=Low .. 3=Excellent).
 const SLEEP_COLORS = ["#dc2626", "#f59e0b", "#84cc16", "#22c55e"];
 const SLEEP_TIERS = ["Low", "Fair", "Good", "Excellent"];
+
+const STEPS_AVG_COLOR = "#f59e0b"; // amber — 7-day moving average line
+const WORKOUT_MARKER_COLOR = "#4f46e5"; // indigo — dumbbell icon on workout days
+
+// Recharts Scatter custom shape: a small dumbbell drawn just above the bar top to
+// flag a day that has a logged workout. cx/cy are the point's pixel coordinates.
+function WorkoutMarker(props: { cx?: number; cy?: number }) {
+  const { cx, cy } = props;
+  if (typeof cx !== "number" || typeof cy !== "number") return null;
+  const s = 15;
+  return (
+    <g transform={`translate(${cx - s / 2}, ${cy - s - 6})`} style={{ color: WORKOUT_MARKER_COLOR }} pointerEvents="none">
+      <DumbbellIcon size={s} />
+    </g>
+  );
+}
 
 function SleepQuality({ band, hours }: { band: SleepBand; hours: number }) {
   const color = SLEEP_COLORS[band.category_index] ?? "#4f46e5";
@@ -144,6 +162,16 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
       "—"
     );
 
+  // Merge the steps series with its rolling 7-day average (by date) for the
+  // ComposedChart, and derive the workout-day points for the dumbbell markers.
+  const stepsAvgByDate = new Map(data.steps_avg7_trend.map((p) => [p.local_date, p.value]));
+  const stepsChartData = data.steps_trend.map((p) => ({
+    ...p,
+    avg: stepsAvgByDate.get(p.local_date) ?? null,
+  }));
+  const workoutDaySet = new Set(data.workout_days);
+  const workoutPoints = data.steps_trend.filter((p) => workoutDaySet.has(p.local_date));
+
   return (
     <>
       <h1 className="page-title">Dashboard</h1>
@@ -183,7 +211,8 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
         <div className="card">
           <h2>Daily steps</h2>
           <p className="muted chart-caption">
-            Steps per day over the last 30 days; the dashed line marks a 10,000-step goal.
+            Steps per day over the last 30 days. The dashed green line marks a 10,000-step
+            goal; the amber line is a 7-day moving average.
           </p>
           {data.steps_trend.length > 0 ? (
             <>
@@ -194,12 +223,24 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                   latest day{data.latest_steps_date ? ` · ${formatLocalDate(data.latest_steps_date)}` : ""}
                 </span>
               </div>
+              <div className="chart-legend">
+                <span className="chart-legend-item">
+                  <svg width="20" height="10" aria-hidden="true">
+                    <line x1="0" y1="5" x2="20" y2="5" stroke={STEPS_AVG_COLOR} strokeWidth="2" />
+                  </svg>
+                  7-day average
+                </span>
+                <span className="chart-legend-item" style={{ color: WORKOUT_MARKER_COLOR }}>
+                  <DumbbellIcon size={15} />
+                  <span className="muted">Workout logged</span>
+                </span>
+              </div>
               <ResponsiveContainer width="100%" height={240}>
-                <BarChart data={data.steps_trend}>
+                <ComposedChart data={stepsChartData} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
                   <YAxis
-                    domain={[0, (max: number) => Math.max(max, 10000)]}
+                    domain={[0, (max: number) => Math.max(max, 10000) * 1.08]}
                     tickFormatter={(v) => formatSteps(v as number)}
                     tick={{ fontSize: 11 }}
                     width={48}
@@ -208,7 +249,10 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                     {...tooltipProps}
                     cursor={barCursor}
                     labelFormatter={formatLocalDate}
-                    formatter={(v) => [formatSteps(v as number), "Steps"]}
+                    formatter={(v, name) => [
+                      formatSteps(v as number),
+                      name === "avg" ? "7-day avg" : "Steps",
+                    ]}
                   />
                   <ReferenceLine
                     y={10000}
@@ -218,7 +262,17 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                     label={{ value: "Goal 10k", position: "insideTopRight", fontSize: 11, fill: "#22c55e" }}
                   />
                   <Bar dataKey="value" fill="#4f46e5" radius={[2, 2, 0, 0]} />
-                </BarChart>
+                  <Line
+                    type="monotone"
+                    dataKey="avg"
+                    stroke={STEPS_AVG_COLOR}
+                    strokeWidth={2}
+                    dot={false}
+                    connectNulls
+                    isAnimationActive={false}
+                  />
+                  <Scatter data={workoutPoints} dataKey="value" shape={<WorkoutMarker />} isAnimationActive={false} />
+                </ComposedChart>
               </ResponsiveContainer>
             </>
           ) : (

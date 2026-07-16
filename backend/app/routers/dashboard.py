@@ -136,6 +136,27 @@ def dashboard(
     latest_steps = steps_trend[-1].value if steps_trend else None
     latest_steps_date = steps_trend[-1].local_date if steps_trend else None
 
+    # Rolling 7-day moving average aligned to the steps series: each point is the
+    # mean of that day and the previous six days present in the window (a shorter
+    # window at the start averages whatever is available).
+    steps_avg7_trend: list[MetricPoint] = []
+    for i, point in enumerate(steps_trend):
+        window = steps_trend[max(0, i - 6): i + 1]
+        avg = sum(p.value for p in window) / len(window)
+        steps_avg7_trend.append(MetricPoint(local_date=point.local_date, value=round(avg)))
+
+    # Days within the steps window that have at least one logged workout, so the
+    # chart can flag them. local_date is a "YYYY-MM-DD" string window like steps.
+    workout_days = [
+        d
+        for (d,) in db.execute(
+            select(Workout.local_date)
+            .where(Workout.local_date >= steps_since)
+            .distinct()
+            .order_by(Workout.local_date)
+        ).all()
+    ]
+
     return DashboardSummary(
         workouts_7d=workouts_7d,
         minutes_7d=round(duration_7d / 60.0, 1),
@@ -152,4 +173,6 @@ def dashboard(
         vo2max_trend=[MetricPoint(local_date=d, value=v) for d, v in vo2max_trend],
         sleep_trend=[MetricPoint(local_date=d, value=v) for d, v in sleep_trend],
         steps_trend=steps_trend,
+        steps_avg7_trend=steps_avg7_trend,
+        workout_days=workout_days,
     )

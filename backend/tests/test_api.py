@@ -440,6 +440,71 @@ def test_dashboard_steps_summed_from_ingest(client, auth_headers):
     assert dash["latest_steps_date"] == day
 
 
+def test_dashboard_steps_rolling_avg7(client, auth_headers, db_session):
+    """steps_avg7_trend is the trailing 7-day mean aligned to the steps series;
+    early days average only the days available."""
+    from datetime import timedelta
+
+    from app.models import DailyMetric
+    from app.timeutil import utcnow
+
+    now = utcnow()
+    # 8 consecutive days ending yesterday, values 1000..8000.
+    days = [(now - timedelta(days=8 - i)).strftime("%Y-%m-%d") for i in range(8)]
+    values = [1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000]
+    db_session.add_all(
+        [
+            DailyMetric(metric_type="step_count", local_date=d, value=float(v), unit="count", updated_utc=now)
+            for d, v in zip(days, values, strict=True)
+        ]
+    )
+    db_session.commit()
+
+    dash = client.get("/api/dashboard", headers=auth_headers).json()
+    avg = {p["local_date"]: p["value"] for p in dash["steps_avg7_trend"]}
+    # First day: window is just itself.
+    assert avg[days[0]] == 1000
+    # Third day: mean(1000,2000,3000) = 2000.
+    assert avg[days[2]] == 2000
+    # 7th day: full 7-day window mean(1000..7000) = 4000.
+    assert avg[days[6]] == 4000
+    # 8th day: trailing 7 (2000..8000) = 5000 (first day drops out of the window).
+    assert avg[days[7]] == 5000
+    # One average point per steps point.
+    assert len(dash["steps_avg7_trend"]) == len(dash["steps_trend"])
+
+
+def test_dashboard_workout_days_within_window(client, auth_headers, db_session):
+    """workout_days lists distinct workout dates inside the 30-day steps window
+    and excludes older workouts."""
+    from datetime import timedelta
+
+    from app.models import Workout
+    from app.timeutil import utcnow
+
+    now = utcnow()
+    recent = now - timedelta(days=2)
+    old = now - timedelta(days=45)
+    recent_day = recent.strftime("%Y-%m-%d")
+    old_day = old.strftime("%Y-%m-%d")
+    db_session.add_all(
+        [
+            Workout(uuid="w-recent-1", workout_type="run", start_utc=recent, end_utc=recent,
+                    local_date=recent_day, created_utc=now, updated_utc=now),
+            # Second workout the same day must not duplicate the date.
+            Workout(uuid="w-recent-2", workout_type="walk", start_utc=recent, end_utc=recent,
+                    local_date=recent_day, created_utc=now, updated_utc=now),
+            Workout(uuid="w-old", workout_type="run", start_utc=old, end_utc=old, local_date=old_day,
+                    created_utc=now, updated_utc=now),
+        ]
+    )
+    db_session.commit()
+
+    dash = client.get("/api/dashboard", headers=auth_headers).json()
+    assert dash["workout_days"].count(recent_day) == 1
+    assert old_day not in dash["workout_days"]
+
+
 def test_token_last_used_not_rewritten_within_window(client, auth_headers, db_session):
     from datetime import timedelta
 

@@ -71,7 +71,11 @@ points, so each day's value is the **sum** of all points for that day, taken as 
 single device-agnostic total (HAE already de-duplicates overlapping devices
 within each interval point) and rounded to whole steps; `latest_steps` is the
 value of the most recent day with data and `latest_steps_date` is that day (both
-`null` when there is no step data).
+`null` when there is no step data). `steps_avg7_trend` is a trailing 7-day moving
+average aligned to `steps_trend` (each point is the mean of that day and the
+previous six days present in the window, rounded). `workout_days` lists the
+distinct `local_date`s within the 30-day steps window that have at least one
+logged workout, so the steps chart can flag them.
 ```json
 { "workouts_7d": 3, "minutes_7d": 92.4, "active_kcal_7d": 810,
   "latest_resting_hr": 55, "latest_vo2max": 38.8,
@@ -87,7 +91,9 @@ value of the most recent day with data and `latest_steps_date` is that day (both
   "resting_hr_trend":[{"local_date":"2026-07-05","value":55}],
   "vo2max_trend":    [{"local_date":"2026-07-05","value":38.8}],
   "sleep_trend":     [{"local_date":"2026-07-05","value":7.5}],
-  "steps_trend":     [{"local_date":"2026-07-05","value":8200}] }
+  "steps_trend":     [{"local_date":"2026-07-05","value":8200}],
+  "steps_avg7_trend":[{"local_date":"2026-07-05","value":7600}],
+  "workout_days":    ["2026-07-05"] }
 ```
 
 > Timestamps returned by the API are naive UTC. The frontend converts them to

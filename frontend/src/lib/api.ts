@@ -89,6 +89,8 @@ export interface DashboardSummary {
   vo2max_trend: MetricPoint[];
   sleep_trend: MetricPoint[];
   steps_trend: MetricPoint[];
+  steps_avg7_trend: MetricPoint[];
+  workout_days: string[];
 }
 
 export interface WorkoutList {

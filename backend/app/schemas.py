@@ -73,7 +73,9 @@ class WorkoutDetail(WorkoutSummary):
 
 class MetricPoint(BaseModel):
     local_date: str
-    value: float
+    # Nullable so padded trend series (e.g. steps) can represent a day with no
+    # data as a gap rather than a zero.
+    value: float | None = None
 
 
 class Vo2MaxBand(BaseModel):

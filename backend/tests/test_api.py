@@ -440,9 +440,10 @@ def test_dashboard_steps_summed_from_ingest(client, auth_headers):
     assert dash["latest_steps_date"] == day
 
 
-def test_dashboard_steps_rolling_avg7(client, auth_headers, db_session):
-    """steps_avg7_trend is the trailing 7-day mean aligned to the steps series;
-    early days average only the days available."""
+def test_dashboard_steps_block_avg7(client, auth_headers, db_session):
+    """steps_avg7_trend is a stepped 7-day *block* average anchored to today: the
+    most recent 7 days form one block, the prior 7 another, etc. Every day in a
+    block reports that block's mean over the days that have data."""
     from datetime import timedelta
 
     from app.models import DailyMetric
@@ -462,16 +463,43 @@ def test_dashboard_steps_rolling_avg7(client, auth_headers, db_session):
 
     dash = client.get("/api/dashboard", headers=auth_headers).json()
     avg = {p["local_date"]: p["value"] for p in dash["steps_avg7_trend"]}
-    # First day: window is just itself.
-    assert avg[days[0]] == 1000
-    # Third day: mean(1000,2000,3000) = 2000.
-    assert avg[days[2]] == 2000
-    # 7th day: full 7-day window mean(1000..7000) = 4000.
-    assert avg[days[6]] == 4000
-    # 8th day: trailing 7 (2000..8000) = 5000 (first day drops out of the window).
-    assert avg[days[7]] == 5000
-    # One average point per steps point.
-    assert len(dash["steps_avg7_trend"]) == len(dash["steps_trend"])
+    # Block 0 = today back through today-6, so today-1..today-6 (values 3000..8000)
+    # → mean 5500. Every day in the block reports the same value.
+    assert avg[days[7]] == 5500  # today-1
+    assert avg[days[6]] == 5500  # today-2
+    # Block 1 = today-7 back through today-13, so today-7 (2000) + today-8 (1000)
+    # → mean 1500.
+    assert avg[days[1]] == 1500  # today-7
+    assert avg[days[0]] == 1500  # today-8
+    # One average point per steps point, and the series is padded to the window.
+    assert len(dash["steps_avg7_trend"]) == len(dash["steps_trend"]) == 30
+
+
+def test_dashboard_steps_trend_padded_to_window(client, auth_headers, db_session):
+    """The steps trend is padded to a contiguous 30-day window (newest last);
+    days without data are gaps (value=None)."""
+    from datetime import timedelta
+
+    from app.models import DailyMetric
+    from app.timeutil import utcnow
+
+    now = utcnow()
+    recent = (now - timedelta(days=1)).strftime("%Y-%m-%d")
+    db_session.add(
+        DailyMetric(metric_type="step_count", local_date=recent, value=8200.0, unit="count", updated_utc=now)
+    )
+    db_session.commit()
+
+    dash = client.get("/api/dashboard", headers=auth_headers).json()
+    trend = dash["steps_trend"]
+    assert len(trend) == 30
+    # Newest day is today; oldest is 29 days back; dates are contiguous.
+    assert trend[-1]["local_date"] == now.strftime("%Y-%m-%d")
+    assert trend[0]["local_date"] == (now - timedelta(days=29)).strftime("%Y-%m-%d")
+    by_date = {p["local_date"]: p["value"] for p in trend}
+    assert by_date[recent] == 8200
+    # A day with no data is present but null (a gap).
+    assert by_date[now.strftime("%Y-%m-%d")] is None
 
 
 def test_dashboard_workout_days_within_window(client, auth_headers, db_session):

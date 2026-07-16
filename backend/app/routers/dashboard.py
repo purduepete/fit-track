@@ -131,27 +131,44 @@ def dashboard(
         )
         .order_by(DailyMetric.local_date)
     ).all()
-    steps_trend = [MetricPoint(local_date=d, value=round(v)) for d, v in steps_rows]
-    # latest = most recent day *with data* (not necessarily today).
-    latest_steps = steps_trend[-1].value if steps_trend else None
-    latest_steps_date = steps_trend[-1].local_date if steps_trend else None
+    steps_by_date = {d: round(v) for d, v in steps_rows}
 
-    # Rolling 7-day moving average aligned to the steps series: each point is the
-    # mean of that day and the previous six days present in the window (a shorter
-    # window at the start averages whatever is available).
+    # Pad to a contiguous window (oldest first, today last) so the chart always
+    # shows every calendar day; days without data are gaps (value=None).
+    end_date = utcnow().date()
+    window_dates = [
+        (end_date - timedelta(days=offset)).strftime("%Y-%m-%d")
+        for offset in range(STEPS_TREND_DAYS - 1, -1, -1)
+    ]
+    steps_trend = [MetricPoint(local_date=d, value=steps_by_date.get(d)) for d in window_dates]
+    # latest = most recent day *with data* (not necessarily today).
+    days_with_data = [p for p in steps_trend if p.value is not None]
+    latest_steps = days_with_data[-1].value if days_with_data else None
+    latest_steps_date = days_with_data[-1].local_date if days_with_data else None
+
+    # 7-day block averages anchored to the most recent day: the last 7 days form
+    # one block, the prior 7 another, and so on. Every day in a block takes that
+    # block's mean (over the days that actually have data), so the chart draws a
+    # flat line per block that steps at each boundary. A block with no data at all
+    # stays None (a gap in the line).
+    last_index = len(steps_trend) - 1
+    block_values: dict[int, list[float]] = {}
+    for i, point in enumerate(steps_trend):
+        if point.value is not None:
+            block_values.setdefault((last_index - i) // 7, []).append(point.value)
     steps_avg7_trend: list[MetricPoint] = []
     for i, point in enumerate(steps_trend):
-        window = steps_trend[max(0, i - 6): i + 1]
-        avg = sum(p.value for p in window) / len(window)
-        steps_avg7_trend.append(MetricPoint(local_date=point.local_date, value=round(avg)))
+        values = block_values.get((last_index - i) // 7)
+        avg = round(sum(values) / len(values)) if values else None
+        steps_avg7_trend.append(MetricPoint(local_date=point.local_date, value=avg))
 
-    # Days within the steps window that have at least one logged workout, so the
-    # chart can flag them. local_date is a "YYYY-MM-DD" string window like steps.
+    # Days within the padded steps window that have at least one logged workout,
+    # so the chart can flag them. local_date is a "YYYY-MM-DD" string like steps.
     workout_days = [
         d
         for (d,) in db.execute(
             select(Workout.local_date)
-            .where(Workout.local_date >= steps_since)
+            .where(Workout.local_date >= window_dates[0])
             .distinct()
             .order_by(Workout.local_date)
         ).all()

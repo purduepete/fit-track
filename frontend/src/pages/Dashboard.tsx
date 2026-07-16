@@ -170,7 +170,10 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
     avg: stepsAvgByDate.get(p.local_date) ?? null,
   }));
   const workoutDaySet = new Set(data.workout_days);
-  const workoutPoints = data.steps_trend.filter((p) => workoutDaySet.has(p.local_date));
+  const workoutPoints = data.steps_trend.filter(
+    (p) => workoutDaySet.has(p.local_date) && p.value != null,
+  );
+  const hasStepData = data.steps_trend.some((p) => p.value != null);
 
   return (
     <>
@@ -212,9 +215,10 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
           <h2>Daily steps</h2>
           <p className="muted chart-caption">
             Steps per day over the last 30 days. The dashed green line marks a 10,000-step
-            goal; the amber line is a 7-day moving average.
+            goal; the amber line is the 7-day block average (each flat segment averages one
+            calendar week).
           </p>
-          {data.steps_trend.length > 0 ? (
+          {hasStepData ? (
             <>
               <div className="steps-headline">
                 <FootprintsIcon size={20} />
@@ -228,7 +232,7 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                   <svg width="20" height="10" aria-hidden="true">
                     <line x1="0" y1="5" x2="20" y2="5" stroke={STEPS_AVG_COLOR} strokeWidth="2" />
                   </svg>
-                  7-day average
+                  7-day block average
                 </span>
                 <span className="chart-legend-item" style={{ color: WORKOUT_MARKER_COLOR }}>
                   <DumbbellIcon size={15} />
@@ -238,7 +242,12 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
               <ResponsiveContainer width="100%" height={240}>
                 <ComposedChart data={stepsChartData} margin={{ top: 18, right: 8, left: 0, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
+                  <XAxis
+                    dataKey="local_date"
+                    tickFormatter={formatLocalDate}
+                    tick={{ fontSize: 11 }}
+                    minTickGap={24}
+                  />
                   <YAxis
                     domain={[0, (max: number) => Math.max(max, 10000) * 1.08]}
                     tickFormatter={(v) => formatSteps(v as number)}
@@ -251,7 +260,7 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                     labelFormatter={formatLocalDate}
                     formatter={(v, name) => [
                       formatSteps(v as number),
-                      name === "avg" ? "7-day avg" : "Steps",
+                      name === "avg" ? "7-day block avg" : "Steps",
                     ]}
                   />
                   <ReferenceLine
@@ -263,12 +272,12 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                   />
                   <Bar dataKey="value" fill="#4f46e5" radius={[2, 2, 0, 0]} />
                   <Line
-                    type="monotone"
+                    type="stepAfter"
                     dataKey="avg"
                     stroke={STEPS_AVG_COLOR}
                     strokeWidth={2}
                     dot={false}
-                    connectNulls
+                    connectNulls={false}
                     isAnimationActive={false}
                   />
                   <Scatter data={workoutPoints} dataKey="value" shape={<WorkoutMarker />} isAnimationActive={false} />

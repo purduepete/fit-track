@@ -71,11 +71,14 @@ points, so each day's value is the **sum** of all points for that day, taken as 
 single device-agnostic total (HAE already de-duplicates overlapping devices
 within each interval point) and rounded to whole steps; `latest_steps` is the
 value of the most recent day with data and `latest_steps_date` is that day (both
-`null` when there is no step data). `steps_avg7_trend` is a trailing 7-day moving
-average aligned to `steps_trend` (each point is the mean of that day and the
-previous six days present in the window, rounded). `workout_days` lists the
-distinct `local_date`s within the 30-day steps window that have at least one
-logged workout, so the steps chart can flag them.
+`null` when there is no step data). `steps_trend` is padded to a contiguous
+30-day window (newest last); days with no data appear with `value: null` (a gap).
+`steps_avg7_trend` is a stepped **7-day block average** anchored to today: the
+most recent 7 days form one block, the prior 7 another, and so on. Every day in a
+block reports that block's mean (over the days that have data, rounded), so the
+chart draws a flat line per week that steps at each boundary. `workout_days` lists
+the distinct `local_date`s within the window that have at least one logged
+workout, so the steps chart can flag them.
 ```json
 { "workouts_7d": 3, "minutes_7d": 92.4, "active_kcal_7d": 810,
   "latest_resting_hr": 55, "latest_vo2max": 38.8,

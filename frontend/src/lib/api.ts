@@ -52,7 +52,8 @@ export interface WorkoutDetail extends WorkoutSummary {
 
 export interface MetricPoint {
   local_date: string;
-  value: number;
+  // null represents a padded day with no data (e.g. a gap in the steps series).
+  value: number | null;
 }
 
 export interface Vo2MaxBand {

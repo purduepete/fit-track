@@ -26,8 +26,8 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
 - **Heart-rate chart** — HR over the course of the workout.
 - **Dashboard** — 7-day workout count / minutes / active energy, resting-HR,
   VO₂ max and sleep trends, plus a 30-day daily-steps chart with a 10k goal line,
-  a stepped 7-day block-average line, and a dumbbell marker on days with a logged
-  workout.
+  a stepped 7-day block-average line, and green bars on days with a logged
+  workout (tap one to open that day on the Workouts page).
 - **Idempotent ingest** — keyed on the Apple workout UUID; re-ingesting the same
   export never duplicates. Raw payloads are stored for safe re-processing.
 - **Simple token auth** — bearer tokens you generate locally; only the hash is

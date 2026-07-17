@@ -78,7 +78,9 @@ most recent 7 days form one block, the prior 7 another, and so on. Every day in 
 block reports that block's mean (over the days that have data, rounded), so the
 chart draws a flat line per week that steps at each boundary. `workout_days` lists
 the distinct `local_date`s within the window that have at least one logged
-workout, so the steps chart can flag them.
+workout, so the steps chart can flag them. In the UI, tapping a flagged (green)
+steps bar deep-links to `GET /api/workouts?date_from=<day>&date_to=<day>` (the
+Workouts page at `#/workouts?date=<day>`), scoped to that single day.
 ```json
 { "workouts_7d": 3, "minutes_7d": 92.4, "active_kcal_7d": 810,
   "latest_resting_hr": 55, "latest_vo2max": 38.8,

@@ -13,6 +13,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import type { SleepBand, Vo2MaxBand } from "../lib/api";
 import { useApiResource } from "../lib/useApiResource";
@@ -112,6 +113,21 @@ function CardioFitness({ band, value }: { band: Vo2MaxBand; value: number }) {
 export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
   const { data, error, loading, refresh } = useApiResource(() => api.dashboard(), [onAuthError], onAuthError);
   usePageRefresh(refresh, loading);
+  const navigate = useNavigate();
+
+  // Navigate to the Workouts page scoped to a clicked bar's day. Recharts nests
+  // the original row under `.payload`; fall back to the top level defensively.
+  // Only workout days (workout != null) link.
+  function handleStepsBarClick(entry: {
+    local_date?: string;
+    workout?: number | null;
+    payload?: { local_date?: string; workout?: number | null };
+  }) {
+    const row = entry?.payload ?? entry;
+    if (row?.local_date && row.workout != null) {
+      navigate(`/workouts?date=${row.local_date}`);
+    }
+  }
 
   if (error) return <p className="error">{error}</p>;
   if (!data) return <p className="muted">Loading…</p>;
@@ -205,7 +221,8 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
           <p className="muted chart-caption">
             Steps per day over the last 30 days. The dashed green line marks a 10,000-step
             goal; the amber line is the 7-day block average (each flat segment averages one
-            calendar week). Green bars are days with a logged workout.
+            calendar week). Green bars are days with a logged workout — tap one to view that
+            day's workout.
           </p>
           {hasStepData ? (
             <>
@@ -259,11 +276,12 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                     ifOverflow="extendDomain"
                     label={{ value: "Goal 10k", position: "right", fontSize: 11, fill: "#22c55e" }}
                   />
-                  <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+                  <Bar dataKey="value" radius={[2, 2, 0, 0]} onClick={handleStepsBarClick}>
                     {stepsChartData.map((d) => (
                       <Cell
                         key={d.local_date}
                         fill={d.workout != null ? WORKOUT_BAR_COLOR : STEPS_BAR_COLOR}
+                        cursor={d.workout != null ? "pointer" : "default"}
                       />
                     ))}
                   </Bar>

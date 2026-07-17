@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError, clearToken } from "../lib/api";
 import type { WorkoutSummary } from "../lib/api";
 import {
@@ -36,6 +36,12 @@ function rangeToDateFrom(key: string): string | undefined {
 
 export function Workouts({ onAuthError }: { onAuthError: () => void }) {
   const nav = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // Deep-link support: `/workouts?date=YYYY-MM-DD` scopes the list to a single
+  // day (used by the Dashboard steps chart's workout bars). Ignore a malformed
+  // value rather than forwarding it to the API.
+  const rawDate = searchParams.get("date");
+  const dateParam = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null;
   const [type, setType] = useState("");
   const [range, setRange] = useState("30");
   const [search, setSearch] = useState("");
@@ -45,19 +51,30 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const dateFrom = useMemo(() => rangeToDateFrom(range), [range]);
+  // When a specific day is deep-linked, filter to exactly that day
+  // (dateFrom == dateTo); otherwise use the range preset's lower bound.
+  const dateFrom = useMemo(
+    () => (dateParam ? dateParam : rangeToDateFrom(range)),
+    [dateParam, range],
+  );
+  const dateTo = dateParam ?? undefined;
+
+  // A deep-linked date must not be hidden by a leftover client-side search term.
+  useEffect(() => {
+    if (dateParam) setSearch("");
+  }, [dateParam]);
 
   useEffect(() => {
     api.workoutTypes().then(setTypes).catch(() => setTypes([]));
   }, []);
 
-  // (Re)load from the start whenever a server-side filter (type/range) changes.
+  // (Re)load from the start whenever a server-side filter (type/range/day) changes.
   useEffect(() => {
     let active = true;
     setLoading(true);
     setError(null);
     api
-      .workouts({ type: type || undefined, dateFrom, limit: PAGE_SIZE, offset: 0 })
+      .workouts({ type: type || undefined, dateFrom, dateTo, limit: PAGE_SIZE, offset: 0 })
       .then((res) => {
         if (!active) return;
         setItems(res.items);
@@ -79,12 +96,12 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
       active = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [type, dateFrom]);
+  }, [type, dateFrom, dateTo]);
 
   function loadMore() {
     setLoading(true);
     api
-      .workouts({ type: type || undefined, dateFrom, limit: PAGE_SIZE, offset: items.length })
+      .workouts({ type: type || undefined, dateFrom, dateTo, limit: PAGE_SIZE, offset: items.length })
       .then((res) => {
         setItems((prev) => [...prev, ...res.items]);
         setTotal(res.total);
@@ -124,6 +141,12 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
 
   const hasMore = items.length < total && !search;
 
+  function clearDate() {
+    const next = new URLSearchParams(searchParams);
+    next.delete("date");
+    setSearchParams(next);
+  }
+
   return (
     <>
       <h1 className="page-title">Workouts</h1>
@@ -137,7 +160,13 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
             </option>
           ))}
         </select>
-        <select value={range} onChange={(e) => setRange(e.target.value)} aria-label="Date range">
+        <select
+          value={range}
+          onChange={(e) => setRange(e.target.value)}
+          aria-label="Date range"
+          disabled={!!dateParam}
+          title={dateParam ? "Showing a single day — clear the day filter to use ranges" : undefined}
+        >
           {RANGES.map((r) => (
             <option key={r.key} value={r.key}>
               {r.label}
@@ -152,6 +181,17 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
           aria-label="Search workouts"
         />
       </div>
+
+      {dateParam && (
+        <div className="active-filter">
+          <span>
+            Showing workouts on <strong>{formatLocalDate(dateParam)}</strong>
+          </span>
+          <button type="button" className="active-filter-clear" onClick={clearDate}>
+            Clear
+          </button>
+        </div>
+      )}
 
       {error && <p className="error">{error}</p>}
 

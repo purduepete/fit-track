@@ -102,6 +102,7 @@ export interface WorkoutList {
 export interface WorkoutQuery {
   type?: string;
   dateFrom?: string;
+  dateTo?: string;
   limit?: number;
   offset?: number;
 }
@@ -143,6 +144,7 @@ export const api = {
     const p = new URLSearchParams();
     if (q.type) p.set("workout_type", q.type);
     if (q.dateFrom) p.set("date_from", q.dateFrom);
+    if (q.dateTo) p.set("date_to", q.dateTo);
     if (q.limit != null) p.set("limit", String(q.limit));
     if (q.offset != null) p.set("offset", String(q.offset));
     const qs = p.toString();

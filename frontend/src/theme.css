@@ -556,6 +556,36 @@ tbody tr:hover {
   min-width: 160px;
 }
 
+/* Active single-day filter banner (Dashboard steps chart -> Workouts deep-link). */
+.active-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 8px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 0.9rem;
+}
+
+.active-filter-clear {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.active-filter-clear:hover {
+  border-color: var(--accent);
+}
+
 /* Day-group header row inside the workouts table. */
 .group-row td {
   background: var(--surface-2);

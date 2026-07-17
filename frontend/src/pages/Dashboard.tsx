@@ -221,10 +221,8 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
         <div className="card">
           <h2>Daily steps</h2>
           <p className="muted chart-caption">
-            Steps per day over the last 30 days. The dashed green line marks a 10,000-step
-            goal; the amber line is the 7-day block average (each flat segment averages one
-            calendar week). Green bars are days with a logged workout — tap one to view that
-            day's workout.
+            Last 30 days. Dashed line = 10k goal, amber = weekly average. Green bars have a
+            workout — tap to view it.
           </p>
           {hasStepData ? (
             <>

@@ -115,17 +115,19 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
   usePageRefresh(refresh, loading);
   const navigate = useNavigate();
 
-  // Navigate to the Workouts page scoped to a clicked bar's day. Recharts nests
-  // the original row under `.payload`; fall back to the top level defensively.
-  // Only workout days (workout != null) link.
-  function handleStepsBarClick(entry: {
-    local_date?: string;
-    workout?: number | null;
-    payload?: { local_date?: string; workout?: number | null };
+  // Navigate to the Workouts page scoped to a clicked bar's day. The click is
+  // handled on the chart (not the <Bar>) because the Tooltip cursor overlay sits
+  // on top of the bars and would otherwise swallow Bar clicks. Recharts gives us
+  // the active day via `activeLabel` / `activePayload[].payload`. Only workout
+  // days (workout != null) link.
+  function handleChartClick(state: {
+    activeLabel?: string;
+    activePayload?: Array<{ payload?: { local_date?: string; workout?: number | null } }>;
   }) {
-    const row = entry?.payload ?? entry;
-    if (row?.local_date && row.workout != null) {
-      navigate(`/workouts?date=${row.local_date}`);
+    const row = state?.activePayload?.[0]?.payload;
+    const day = row?.local_date ?? state?.activeLabel;
+    if (day && row?.workout != null) {
+      navigate(`/workouts?date=${day}`);
     }
   }
 
@@ -245,7 +247,7 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                 </span>
               </div>
               <ResponsiveContainer width="100%" height={240}>
-                <ComposedChart data={stepsChartData} margin={{ top: 18, right: 52, left: 0, bottom: 0 }}>
+                <ComposedChart data={stepsChartData} margin={{ top: 18, right: 52, left: 0, bottom: 0 }} onClick={handleChartClick}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis
                     dataKey="local_date"
@@ -276,7 +278,7 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
                     ifOverflow="extendDomain"
                     label={{ value: "Goal 10k", position: "right", fontSize: 11, fill: "#22c55e" }}
                   />
-                  <Bar dataKey="value" radius={[2, 2, 0, 0]} onClick={handleStepsBarClick}>
+                  <Bar dataKey="value" radius={[2, 2, 0, 0]}>
                     {stepsChartData.map((d) => (
                       <Cell
                         key={d.local_date}

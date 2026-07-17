@@ -68,7 +68,11 @@ def post_payload(api_url: str, token: str, raw_json: str) -> dict:
             "Authorization": f"Bearer {token}",
         },
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    # A full ~35 MiB export (30 days of intraday points) can take several
+    # minutes to deserialize + upsert on a cold, low-vCPU replica, so allow a
+    # generous read timeout. Too short a timeout looks like a transient failure
+    # and makes the watcher retry forever without ever completing.
+    with urllib.request.urlopen(req, timeout=600) as resp:
         return json.loads(resp.read().decode("utf-8"))
 
 

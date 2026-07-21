@@ -166,13 +166,10 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
         }
       ]
       scale: {
-        // Scale to zero when idle to minimise cost; two narrow KEDA cron rules
-        // keep one warm replica only during the hours the app is actually used
-        // (07:00-09:00 and 17:00-21:00 local, 6h/day) to avoid cold-start
-        // latency then, while dropping to zero the rest of the day/night. A
-        // 24/7-ish warm window burns the monthly free vCPU-second grant in ~12
-        // days and then costs ~$0.17/day, mostly idle usage — hence the tight
-        // windows below.
+        // Scale to zero when idle. The KEDA warm-cron windows were removed
+        // (cost consolidation): at this personal-use volume the app fits inside
+        // the Container Apps free grant (180,000 vCPU-s/mo) when it scales to
+        // zero, and the small first-hit cold start is acceptable.
         minReplicas: 0
         maxReplicas: 2
         rules: [
@@ -181,34 +178,8 @@ resource app 'Microsoft.App/containerApps@2024-03-01' = {
           // Bound concurrency: a large ingest buffers the full body (up to
           // max_ingest_bytes, ~64 MiB) and deserializes it, which is memory
           // heavy, so keep this modest even on the 1 GiB replica. Also handles
-          // request-based wake-from-zero outside warm hours.
+          // request-based wake-from-zero.
             http: { metadata: { concurrentRequests: '5' } }
-          }
-          {
-            name: 'warm-morning'
-            // Keep 1 replica warm 07:00-09:00 America/Los_Angeles.
-            custom: {
-              type: 'cron'
-              metadata: {
-                timezone: 'America/Los_Angeles'
-                start: '0 7 * * *'
-                end: '0 9 * * *'
-                desiredReplicas: '1'
-              }
-            }
-          }
-          {
-            name: 'warm-evening'
-            // Keep 1 replica warm 17:00-21:00 America/Los_Angeles.
-            custom: {
-              type: 'cron'
-              metadata: {
-                timezone: 'America/Los_Angeles'
-                start: '0 17 * * *'
-                end: '0 21 * * *'
-                desiredReplicas: '1'
-              }
-            }
           }
         ]
       }

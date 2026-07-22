@@ -23,9 +23,10 @@
     Poll interval in seconds. Default: 300 (5 minutes).
 
 .PARAMETER Background
-    Run windowless (pythonw.exe) with output redirected to
-    backend/logs/upload-watcher.log instead of the console. Used by the
-    "FitTrack Upload Watcher" scheduled task so no terminal window appears.
+    Run with output redirected to backend/logs/upload-watcher.log instead of
+    the console. Used by the "FitTrack Upload Watcher" scheduled task; the
+    wscript wrapper (run-watcher-hidden.vbs) already launches pwsh hidden, so
+    the inherited console stays hidden and no terminal window appears.
 
 .EXAMPLE
     .\Watch-Upload.ps1
@@ -68,14 +69,22 @@ if ($existing.Count -gt 0) {
     return
 }
 
+# Always use the CONSOLE python.exe -- even in -Background. pythonw.exe is a
+# GUI-subsystem binary that PowerShell does NOT wait on (even with the *>>
+# output redirection below): the & call returns immediately, so the parent
+# pwsh exits, the wscript wrapper's bWaitOnReturn returns, the scheduled-task
+# instance stops (reporting success in seconds and breaking the
+# MultipleInstances=IgnoreNew dedup), and the orphaned pythonw is left with a
+# stdout pipe owned by the now-dead pwsh -- its next print(flush=True) hits a
+# broken pipe and the watcher dies. The console python.exe makes pwsh block for
+# the watcher's whole lifetime, keeping the task instance alive. No window
+# appears because run-watcher-hidden.vbs already starts pwsh hidden and the
+# child console inherits that hidden console.
 $venvPython = Join-Path $backend '.venv\Scripts\python.exe'
-$venvPythonw = Join-Path $backend '.venv\Scripts\pythonw.exe'
-if ($Background -and (Test-Path $venvPythonw)) {
-    $python = $venvPythonw
-} elseif (Test-Path $venvPython) {
+if (Test-Path $venvPython) {
     $python = $venvPython
 } else {
-    $python = if ($Background) { 'pythonw' } else { 'python' }
+    $python = 'python'
 }
 
 # Watch folder + archive subfolder are configurable via .env.local

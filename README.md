@@ -234,9 +234,30 @@ expired value.
 
 The PAT currently in use is a **classic PAT with no expiration**, so this should
 not recur on a timer — but it can still break if the token is revoked, regenerated,
-or auto-removed by GitHub after a long period of disuse. Because the app scales to
-zero, such a break is **silent until someone opens the page**; an availability
-alert on the ingress FQDN is the cheapest way to find out first.
+or auto-removed by GitHub (classic PATs are revoked after **one year of disuse**).
+Because the app scales to zero, such a break is **silent until someone opens the
+page** — which is exactly how the 2026-08-03 outage went unnoticed.
+
+### Uptime monitoring
+
+`.github/workflows/uptime.yml` guards against that silence: it GETs `/api/health`
+from a GitHub runner **three times a day** and fails the run (which emails you)
+if the app doesn't return 200 after three tries.
+
+It deliberately runs *outside* Azure. Because `minReplicas: 0`, **zero replicas is
+the normal idle state**, so an Azure metric alert on replica count or restarts
+cannot tell "idle" from "broken" — only a real HTTP request that forces a cold
+start can. The retries exist because that cold start takes ~20s.
+
+The frequency is deliberately low: every probe wakes the app, so checking every
+few minutes would keep it permanently warm and negate the scale-to-zero saving
+that justifies the Consumption plan. Run it on demand — or test the check itself
+against a different host — with:
+
+```powershell
+gh workflow run uptime.yml                          # probe production
+gh workflow run uptime.yml -f base_url=https://...  # probe something else
+```
 
 > 🔑 **Follow-up — the stored pull credential is over-privileged.** During the
 > 2026-08-03 recovery the app's `registry-password` was set to the local `CR_PAT`,

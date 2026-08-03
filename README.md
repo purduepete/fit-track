@@ -175,8 +175,9 @@ or `gh workflow run deploy.yml`. It requires:
 > ```
 >
 > Note this scope grants the CI principal write access to everything else in
-> `jimbpersonal-rg` (webbookmarksapi, func-worklog). Moving fittrack to its own
-> resource group would shrink that blast radius.
+> `jimbpersonal-rg` (webbookmarksapi, func-worklog). This is a **known and
+> accepted trade-off** for a personal resource group — do not change role
+> assignments to "fix" it without asking first.
 
 ### Option B — local az CLI (what to run today)
 

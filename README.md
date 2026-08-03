@@ -153,12 +153,30 @@ or `gh workflow run deploy.yml`. It requires:
 | --- | --- | --- |
 | secret | `AZURE_CREDENTIALS` | output of `az ad sp create-for-rbac --sdk-auth` |
 | secret | `GHCR_PAT` | classic PAT with `read:packages` (Container App pulls the private image with it) |
+| secret | `GHCR_PUSH_TOKEN` | classic PAT with `write:packages` (pushes the image from the runner) |
 | variable | `FITTRACK_RG` | `jimbpersonal-rg` |
 | variable | `ATHLETE_BIRTH_DATE` | `1970-09-20` (blank = disables VO₂ interpretation) |
 | variable | `ATHLETE_SEX` | `male` \| `female` |
 
 > ⚠️ If `AZURE_CREDENTIALS` is not set the workflow fails at the Azure login
 > step — use Option B.
+
+> 🔐 **The service principal needs RBAC, not just credentials.** `AZURE_CREDENTIALS`
+> authenticating is not enough: the SP (`fittrack-gh-deploy`) must hold
+> **Contributor on `jimbpersonal-rg`**, because the bicep creates a user-assigned
+> identity, a managed environment and the container app there. Without it the
+> deploy authenticates fine and then dies with
+> `AuthorizationFailed ... Microsoft.Resources/deployments/validate/action`. It
+> also needs **Log Analytics Contributor** on the reused workspace in
+> `investmentportfolio` (cross-RG). Verify with:
+>
+> ```powershell
+> az role assignment list --assignee <sp-object-id> --all -o table
+> ```
+>
+> Note this scope grants the CI principal write access to everything else in
+> `jimbpersonal-rg` (webbookmarksapi, func-worklog). Moving fittrack to its own
+> resource group would shrink that blast radius.
 
 ### Option B — local az CLI (what to run today)
 
@@ -201,11 +219,14 @@ az containerapp revision list -n fittrack-api -g jimbpersonal-rg `
 ### Troubleshooting: site hangs / won't load
 
 The most common cause is an **expired ghcr PAT**. The Container App stores the
-`read:packages` PAT as the `ghcrio-purduepete` secret (the name `az containerapp
-registry set` generates — check
-`properties.configuration.registries[].passwordSecretRef` rather than assuming);
-when that PAT expires the image pull fails and — because the app scales to zero —
-there is no running replica left to serve traffic, so every request just times out.
+`read:packages` PAT as the **`registry-password`** secret (the name `infra/main.bicep`
+assigns). Beware: `az containerapp registry set` writes to a *different*,
+CLI-generated secret name (e.g. `ghcrio-purduepete`) and leaves the bicep one
+orphaned — a later deploy then switches the reference back. So always read
+`properties.configuration.registries[].passwordSecretRef` rather than assuming a
+name. When that PAT expires the image pull fails and — because the app scales to
+zero — there is no running replica left to serve traffic, so every request just
+times out.
 
 Diagnose (look for `ErrImagePull` / `403 Forbidden` from `ghcr.io/token`):
 
@@ -236,7 +257,7 @@ To confirm a stored credential really works (without printing it):
 
 ```powershell
 $sec = az containerapp secret show -n fittrack-api -g jimbpersonal-rg `
-  --secret-name ghcrio-purduepete --query value -o tsv
+  --secret-name registry-password --query value -o tsv
 $b64 = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("purduepete:$sec"))
 $t = Invoke-RestMethod -Headers @{Authorization="Basic $b64"} `
   "https://ghcr.io/token?scope=repository%3Apurduepete%2Ffittrack%3Apull&service=ghcr.io"

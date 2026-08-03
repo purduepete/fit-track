@@ -238,6 +238,13 @@ or auto-removed by GitHub after a long period of disuse. Because the app scales 
 zero, such a break is **silent until someone opens the page**; an availability
 alert on the ingress FQDN is the cheapest way to find out first.
 
+> 🔑 **Follow-up — the stored pull credential is over-privileged.** During the
+> 2026-08-03 recovery the app's `registry-password` was set to the local `CR_PAT`,
+> which carries `repo` + `write:packages`. A pull credential only needs
+> `read:packages`. Mint a dedicated read-only classic PAT and re-run
+> `az containerapp registry set` (and update the `GHCR_PAT` secret) so a leaked
+> Container App secret can't push images or read repos.
+
 ## ⚠️ Database-change policy
 
 `init_db.py` and `backfill_export_xml.py` **alter the shared WebPortfolio

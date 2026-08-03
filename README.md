@@ -259,6 +259,11 @@ gh workflow run uptime.yml                          # probe production
 gh workflow run uptime.yml -f base_url=https://...  # probe something else
 ```
 
+Runs started with `base_url` are labelled **MANUAL OVERRIDE — not production** in
+the log and failure annotation, so a deliberate test of the check is never
+mistaken for a real outage. Scheduled runs never set it: a red run whose log says
+`Probing production` is genuine.
+
 > 🔑 **Follow-up — the stored pull credential is over-privileged.** During the
 > 2026-08-03 recovery the app's `registry-password` was set to the local `CR_PAT`,
 > which carries `repo` + `write:packages`. A pull credential only needs

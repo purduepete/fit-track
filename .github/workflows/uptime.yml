@@ -43,6 +43,16 @@ jobs:
           base="${INPUT_URL:-$DEFAULT_URL}"
           url="$base/api/health"
 
+          # A run started with a base_url override is a test of the check itself,
+          # not a production outage. Say so in the failure annotation, otherwise a
+          # deliberate test is indistinguishable from a real one at a glance.
+          if [ -n "$INPUT_URL" ]; then
+            target="MANUAL OVERRIDE ($url) — not production"
+          else
+            target="production ($url)"
+          fi
+          echo "Probing $target"
+
           # Scale-from-zero can take a while, and the first attempt is the one
           # that pays the cold start, so retry before calling it an outage.
           for attempt in 1 2 3; do
@@ -61,5 +71,5 @@ jobs:
             [ "$attempt" -lt 3 ] && sleep 30
           done
 
-          echo "::error::fittrack did not return 200 after 3 attempts. Check for image-pull failures: az containerapp logs show -n fittrack-api -g jimbpersonal-rg --type system --tail 30"
+          echo "::error::No 200 after 3 attempts from $target. If this is production, check for image-pull failures: az containerapp logs show -n fittrack-api -g jimbpersonal-rg --type system --tail 30"
           exit 1

@@ -134,8 +134,8 @@ CI (`.github/workflows/ci.yml`) runs both on every push/PR. See
 ## Deploy (Azure)
 
 Cheapest path is **Azure Container Apps** on the Consumption plan
-(`minReplicas: 0` → scales to zero when idle). The app runs in a **dedicated
-resource group** (`fittrack-rg`, **eastus2**) and pulls its image from a
+(`minReplicas: 0` → scales to zero when idle). The app (`fittrack-api`) runs in
+the **`jimbpersonal-rg`** resource group (**eastus2**) and pulls its image from a
 **private GitHub Container Registry package** (`ghcr.io/purduepete/fittrack`,
 free on the GitHub free tier — avoids the ACR Basic daily fee). A **user-assigned
 managed identity** (`fittrack-identity`) is used for Azure SQL (`DB_AUTH=aad`, no
@@ -153,7 +153,7 @@ or `gh workflow run deploy.yml`. It requires:
 | --- | --- | --- |
 | secret | `AZURE_CREDENTIALS` | output of `az ad sp create-for-rbac --sdk-auth` |
 | secret | `GHCR_PAT` | classic PAT with `read:packages` (Container App pulls the private image with it) |
-| variable | `FITTRACK_RG` | `fittrack-rg` |
+| variable | `FITTRACK_RG` | `jimbpersonal-rg` |
 | variable | `ATHLETE_BIRTH_DATE` | `1970-09-20` (blank = disables VO₂ interpretation) |
 | variable | `ATHLETE_SEX` | `male` \| `female` |
 
@@ -172,7 +172,7 @@ $env:CR_PAT | docker login ghcr.io -u purduepete --password-stdin
 docker push $image
 docker push ghcr.io/purduepete/fittrack:latest
 
-az deployment group create -g fittrack-rg -f infra/main.bicep `
+az deployment group create -g jimbpersonal-rg -f infra/main.bicep `
   -p containerImage=$image `
      registryServer=ghcr.io `
      registryUsername=purduepete `
@@ -194,9 +194,38 @@ Confirm the new revision came up healthy (a bad env/config would crash-loop and
 traffic would stay on the previous revision):
 
 ```powershell
-az containerapp revision list -n fittrack-api -g fittrack-rg `
+az containerapp revision list -n fittrack-api -g jimbpersonal-rg `
   --query "[?properties.active].{rev:name,running:properties.runningState,health:properties.healthState,image:properties.template.containers[0].image}" -o table
 ```
+
+### Troubleshooting: site hangs / won't load
+
+The most common cause is an **expired ghcr PAT**. The Container App stores the
+`read:packages` PAT as the `registry-password` secret; when that PAT expires the
+image pull fails and — because the app scales to zero — there is no running
+replica left to serve traffic, so every request just times out.
+
+Diagnose (look for `ErrImagePull` / `403 Forbidden` from `ghcr.io/token`):
+
+```powershell
+az containerapp logs show -n fittrack-api -g jimbpersonal-rg --type system --tail 30
+```
+
+Fix by refreshing the stored credential with a current PAT, then restarting the
+active revision so the backed-off replicas retry the pull:
+
+```powershell
+az containerapp registry set -n fittrack-api -g jimbpersonal-rg `
+  --server ghcr.io --username purduepete --password $env:CR_PAT
+
+az containerapp revision restart -n fittrack-api -g jimbpersonal-rg `
+  --revision <active-revision>
+```
+
+Note: `az containerapp registry set` alone does **not** recover already
+crash-looping replicas — the restart is required. Remember to update the
+`GHCR_PAT` GitHub secret too, or the next Actions deploy will re-store the
+expired value.
 
 ## ⚠️ Database-change policy
 

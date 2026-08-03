@@ -17,7 +17,7 @@ name: Deploy
 #   GHCR_PAT            - classic PAT with read:packages (used by the Container App
 #                         to pull the private image at runtime)
 # Required repo variables:
-#   FITTRACK_RG         - resource group (e.g. fittrack-rg)
+#   FITTRACK_RG         - resource group (e.g. jimbpersonal-rg)
 # Optional repo variables (VO2 max interpretation). Leave BOTH unset to fall back
 # to the athlete profile baked into infra/main.bicep defaults; set them only to
 # override that profile (they are passed to the deploy only when non-empty, so an

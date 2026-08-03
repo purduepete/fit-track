@@ -7,9 +7,9 @@
 // `fit` schema of the WebPortfolio database), so neither a database nor a
 // workspace resource is created here.
 //
-//   az group create -n fittrack-rg -l eastus2
+//   # deployed into the existing jimbpersonal-rg (eastus2)
 //   # build + push the image to ghcr.io (see .github/workflows/deploy.yml)
-//   az deployment group create -g fittrack-rg -f infra/main.bicep \
+//   az deployment group create -g jimbpersonal-rg -f infra/main.bicep \
 //        -p containerImage=ghcr.io/<owner>/fittrack:v1 \
 //           registryUsername=<owner> registryPassword=<ghcr-PAT>
 //

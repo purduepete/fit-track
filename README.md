@@ -227,6 +227,17 @@ crash-looping replicas — the restart is required. Remember to update the
 `GHCR_PAT` GitHub secret too, or the next Actions deploy will re-store the
 expired value.
 
+> ❗ **Managed identity cannot replace this PAT.** Container Apps' identity-based
+> image pull is **Azure Container Registry only**; ghcr.io accepts only a
+> username + PAT. So `fittrack-identity` handles Azure SQL auth, but the registry
+> credential must stay a secret. Don't burn time trying to eliminate it.
+
+The PAT currently in use is a **classic PAT with no expiration**, so this should
+not recur on a timer — but it can still break if the token is revoked, regenerated,
+or auto-removed by GitHub after a long period of disuse. Because the app scales to
+zero, such a break is **silent until someone opens the page**; an availability
+alert on the ingress FQDN is the cheapest way to find out first.
+
 ## ⚠️ Database-change policy
 
 `init_db.py` and `backfill_export_xml.py` **alter the shared WebPortfolio

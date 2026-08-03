@@ -201,9 +201,11 @@ az containerapp revision list -n fittrack-api -g jimbpersonal-rg `
 ### Troubleshooting: site hangs / won't load
 
 The most common cause is an **expired ghcr PAT**. The Container App stores the
-`read:packages` PAT as the `registry-password` secret; when that PAT expires the
-image pull fails and — because the app scales to zero — there is no running
-replica left to serve traffic, so every request just times out.
+`read:packages` PAT as the `ghcrio-purduepete` secret (the name `az containerapp
+registry set` generates — check
+`properties.configuration.registries[].passwordSecretRef` rather than assuming);
+when that PAT expires the image pull fails and — because the app scales to zero —
+there is no running replica left to serve traffic, so every request just times out.
 
 Diagnose (look for `ErrImagePull` / `403 Forbidden` from `ghcr.io/token`):
 
@@ -222,10 +224,25 @@ az containerapp revision restart -n fittrack-api -g jimbpersonal-rg `
   --revision <active-revision>
 ```
 
-Note: `az containerapp registry set` alone does **not** recover already
-crash-looping replicas — the restart is required. Remember to update the
-`GHCR_PAT` GitHub secret too, or the next Actions deploy will re-store the
-expired value.
+Note: `az containerapp registry set` **does not create a new revision and does not
+restart anything** — running replicas keep serving with the credential they
+started with, and a node-cached image can hide a broken new credential until the
+next cold start. So always follow a credential change with a revision restart,
+both to recover crash-looping replicas and to *prove* the new secret can actually
+pull. Remember to update the `GHCR_PAT` GitHub secret too, or the next Actions
+deploy will re-store the expired value.
+
+To confirm a stored credential really works (without printing it):
+
+```powershell
+$sec = az containerapp secret show -n fittrack-api -g jimbpersonal-rg `
+  --secret-name ghcrio-purduepete --query value -o tsv
+$b64 = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("purduepete:$sec"))
+$t = Invoke-RestMethod -Headers @{Authorization="Basic $b64"} `
+  "https://ghcr.io/token?scope=repository%3Apurduepete%2Ffittrack%3Apull&service=ghcr.io"
+Invoke-WebRequest -UseBasicParsing -Headers @{Authorization="Bearer $($t.token)"} `
+  "https://ghcr.io/v2/purduepete/fittrack/manifests/<tag>" | % StatusCode   # expect 200
+```
 
 > ❗ **Managed identity cannot replace this PAT.** Container Apps' identity-based
 > image pull is **Azure Container Registry only**; ghcr.io accepts only a
@@ -264,12 +281,12 @@ the log and failure annotation, so a deliberate test of the check is never
 mistaken for a real outage. Scheduled runs never set it: a red run whose log says
 `Probing production` is genuine.
 
-> 🔑 **Follow-up — the stored pull credential is over-privileged.** During the
-> 2026-08-03 recovery the app's `registry-password` was set to the local `CR_PAT`,
-> which carries `repo` + `write:packages`. A pull credential only needs
-> `read:packages`. Mint a dedicated read-only classic PAT and re-run
-> `az containerapp registry set` (and update the `GHCR_PAT` secret) so a leaked
-> Container App secret can't push images or read repos.
+> 🔑 **The pull credential is scoped to `read:packages` — keep it that way.**
+> During the 2026-08-03 recovery the app briefly held the local `CR_PAT`
+> (`repo` + `write:packages`), which was then replaced by a dedicated read-only
+> classic PAT and verified to pull. `CR_PAT` still needs `write:packages` for
+> *pushing* images from your machine, so only the value stored **in the app**
+> should be read-only. When rotating, don't paste `CR_PAT` back in.
 
 ## ⚠️ Database-change policy
 

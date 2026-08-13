@@ -38,7 +38,7 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
 | Path | Purpose |
 | --- | --- |
 | `backend/app/` | FastAPI app: config, db, models, auth, normalizer, geo/splits, routers |
-| `backend/scripts/` | `init_db`, `token_admin` / `New-IngestToken.ps1`, `upload_folder` / `Watch-Upload.ps1`, `backfill_export_xml` |
+| `backend/scripts/` | `init_db`, `check_config`, `token_admin` / `New-IngestToken.ps1`, `upload_folder` / `Watch-Upload.ps1`, `backfill_export_xml` |
 | `backend/tests/` | pytest suite (geo, normalizer, persistence, API) |
 | `frontend/` | React + Vite + TS dashboard (Recharts, react-leaflet) |
 | `infra/main.bicep` | Azure Container Apps (Consumption, scale-to-zero) |
@@ -75,6 +75,42 @@ cd frontend
 npm install
 npm run dev        # http://localhost:5173  (paste the read token)
 ```
+
+## Setting up on another machine
+
+Moving to a second machine needs no schema work — the `fit` schema already
+exists, so **skip `scripts.init_db`** and run everything above except step 2.
+Carry `backend/.env` and `backend/.env.local` over a secure channel (both are
+gitignored) and re-mint a read token, since only the SHA-256 hash of a token is
+stored and the raw value cannot be recovered.
+
+When something doesn't connect, run the config doctor before anything else. It
+prints no secret values:
+
+```powershell
+cd backend
+.\.venv\Scripts\python.exe -m scripts.check_config
+```
+
+It reports where the env file is expected, whether it exists and parses, its
+encoding, which `DB_*` process variables outrank it, the effective auth mode,
+the installed ODBC drivers, whether an Azure AD token can be acquired, and who
+the connection authenticates as.
+
+### Two errors that name the wrong culprit
+
+**`Login failed for user 'sqladmin'`** usually means the env file was never
+applied, not that the password is wrong. Every field falls back to its default,
+and the defaults are `DB_AUTH=sql` with an empty password against user
+`sqladmin`. Check that `backend/.env` really is in `backend/`, that it is UTF-8
+(a UTF-16 save parses to zero keys), and that Windows didn't save it as
+`.env.txt`. Before `384ba60` this also happened whenever the process started
+outside `backend/`, because `env_file` was a relative path.
+
+**`403` from a dashboard endpoint** is a scope mismatch, not a bad token — an
+invalid token returns `401`. The dashboard needs a `read`-scoped token, so a
+`403` normally means the `ingest` token from `.env.local` was pasted instead.
+Check with `python -m scripts.token_admin list`.
 
 ## Daily workflow
 

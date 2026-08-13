@@ -97,6 +97,9 @@ class SleepBand(BaseModel):
 
 
 class DashboardSummary(BaseModel):
+    # When data was last uploaded (newest processed ingest event), or null if
+    # nothing has been ingested yet.
+    last_ingest_utc: datetime | None = None
     workouts_7d: int
     minutes_7d: float
     active_kcal_7d: float

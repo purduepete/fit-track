@@ -75,6 +75,8 @@ export interface SleepBand {
 }
 
 export interface DashboardSummary {
+  /** Naive-UTC ISO timestamp of the newest processed ingest, or null. */
+  last_ingest_utc: string | null;
   workouts_7d: number;
   minutes_7d: number;
   active_kcal_7d: number;

@@ -533,6 +533,36 @@ def test_dashboard_workout_days_within_window(client, auth_headers, db_session):
     assert old_day not in dash["workout_days"]
 
 
+def test_dashboard_last_ingest_utc(client, auth_headers, db_session):
+    """last_ingest_utc reports the newest *processed* ingest; unprocessed events
+    (failed mid-persist) are ignored, and it is null before any ingest."""
+    from datetime import timedelta
+
+    from app.models import RawIngestEvent
+    from app.timeutil import utcnow
+
+    assert client.get("/api/dashboard", headers=auth_headers).json()["last_ingest_utc"] is None
+
+    now = utcnow()
+    older = now - timedelta(hours=6)
+    newest = now - timedelta(minutes=10)
+    db_session.add_all(
+        [
+            RawIngestEvent(source="test", received_utc=older, payload_hash="h1", payload_json="{}",
+                           status="processed", processed_utc=older),
+            RawIngestEvent(source="test", received_utc=newest, payload_hash="h2", payload_json="{}",
+                           status="processed", processed_utc=newest),
+            # Newer, but never finished processing -> must not win.
+            RawIngestEvent(source="test", received_utc=now, payload_hash="h3", payload_json="{}",
+                           status="received"),
+        ]
+    )
+    db_session.commit()
+
+    dash = client.get("/api/dashboard", headers=auth_headers).json()
+    assert dash["last_ingest_utc"].startswith(newest.replace(microsecond=0).isoformat()[:16])
+
+
 def test_token_last_used_not_rewritten_within_window(client, auth_headers, db_session):
     from datetime import timedelta
 

@@ -144,6 +144,33 @@ a {
   font-size: 1.6rem;
 }
 
+/* Title row: heading on the left, "last updated" stamp on the right. Wraps to
+   two lines on narrow screens. */
+.page-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.page-head .page-title {
+  margin-bottom: 0;
+}
+
+.page-head {
+  margin-bottom: 24px;
+}
+
+.last-updated {
+  margin: 0;
+  font-size: 0.8rem;
+}
+
+.last-updated-ago {
+  opacity: 0.75;
+}
+
 @keyframes spin {
   from {
     transform: rotate(0deg);

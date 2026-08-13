@@ -120,3 +120,20 @@ export function formatHoursMinutes(hours: number | null): string {
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
 }
+
+/** ISO/naive-UTC string -> coarse "time ago" label ("just now", "5m ago", "3d ago").
+ *
+ * ``now`` is injectable so the output is testable. A future timestamp (clock skew
+ * between server and browser) reads as "just now" rather than a negative age. */
+export function formatRelative(iso: string | null, now: number = Date.now()): string {
+  if (!iso) return "—";
+  const then = toDate(iso).getTime();
+  if (!isFinite(then)) return "—";
+  const sec = Math.round((now - then) / 1000);
+  if (sec < 60) return "just now";
+  const min = Math.floor(sec / 60);
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return `${Math.floor(hr / 24)}d ago`;
+}

@@ -10,7 +10,7 @@ from .. import vo2max
 from ..auth import require_read
 from ..config import get_settings
 from ..db import get_db
-from ..models import DailyMetric, Workout
+from ..models import DailyMetric, RawIngestEvent, Workout
 from ..schemas import DashboardSummary, MetricPoint, SleepBand, Vo2MaxBand
 from ..timeutil import utcnow
 
@@ -174,7 +174,15 @@ def dashboard(
         ).all()
     ]
 
+    # When data was last uploaded: the newest successfully processed ingest.
+    # Events still in "received" (failed mid-persist) don't count, since none of
+    # their rows are visible.
+    last_ingest_utc = db.execute(
+        select(func.max(RawIngestEvent.processed_utc)).where(RawIngestEvent.status == "processed")
+    ).scalar_one_or_none()
+
     return DashboardSummary(
+        last_ingest_utc=last_ingest_utc,
         workouts_7d=workouts_7d,
         minutes_7d=round(duration_7d / 60.0, 1),
         active_kcal_7d=round(energy_7d, 0),

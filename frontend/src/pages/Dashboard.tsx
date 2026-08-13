@@ -19,7 +19,7 @@ import type { SleepBand, Vo2MaxBand } from "../lib/api";
 import { useApiResource } from "../lib/useApiResource";
 import { StatCard } from "../components/StatCard";
 import { ActivityIcon, ClockIcon, FlameIcon, FootprintsIcon, GaugeIcon, HeartIcon, MoonIcon } from "../components/Icons";
-import { round, formatLocalDate, formatHoursMinutes, formatMinutesHms, formatSteps } from "../lib/format";
+import { round, formatLocalDate, formatHoursMinutes, formatLocalDateTime, formatMinutesHms, formatRelative, formatSteps } from "../lib/format";
 import { barCursor, tooltipProps } from "../lib/chart";
 import { usePageRefresh } from "../lib/refresh";
 
@@ -184,7 +184,19 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
 
   return (
     <>
-      <h1 className="page-title">Dashboard</h1>
+      <div className="page-head">
+        <h1 className="page-title">Dashboard</h1>
+        <p className="muted last-updated">
+          {data.last_ingest_utc ? (
+            <>
+              Last updated {formatLocalDateTime(data.last_ingest_utc)}{" "}
+              <span className="last-updated-ago">({formatRelative(data.last_ingest_utc)})</span>
+            </>
+          ) : (
+            "No data uploaded yet"
+          )}
+        </p>
+      </div>
       <div className="grid-cards">
         <StatCard icon={<ActivityIcon />} label="Workouts (7d)" value={data.workouts_7d} />
         <StatCard icon={<ClockIcon />} label="Minutes (7d)" value={formatMinutesHms(data.minutes_7d)} />

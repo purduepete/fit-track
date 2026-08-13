@@ -10,6 +10,7 @@ import {
   formatLocalTime,
   formatMinutesHms,
   formatPace,
+  formatRelative,
   metersToUnit,
   round,
 } from "./format";
@@ -151,5 +152,31 @@ describe("formatHoursMinutes", () => {
   it("handles null/invalid", () => {
     expect(formatHoursMinutes(null)).toBe("—");
     expect(formatHoursMinutes(Infinity)).toBe("—");
+  });
+});
+
+describe("formatRelative", () => {
+  const now = Date.parse("2026-08-13T17:00:00Z");
+
+  it("treats a naive timestamp as UTC", () => {
+    expect(formatRelative("2026-08-13T14:30:00", now)).toBe("2h ago");
+  });
+
+  it("labels the last minute as just now", () => {
+    expect(formatRelative("2026-08-13T16:59:30Z", now)).toBe("just now");
+  });
+
+  it("formats minutes, hours and days", () => {
+    expect(formatRelative("2026-08-13T16:15:00Z", now)).toBe("45m ago");
+    expect(formatRelative("2026-08-13T06:00:00Z", now)).toBe("11h ago");
+    expect(formatRelative("2026-08-10T17:00:00Z", now)).toBe("3d ago");
+  });
+
+  it("does not go negative on clock skew", () => {
+    expect(formatRelative("2026-08-13T17:05:00Z", now)).toBe("just now");
+  });
+
+  it("renders a dash for null", () => {
+    expect(formatRelative(null, now)).toBe("—");
   });
 });

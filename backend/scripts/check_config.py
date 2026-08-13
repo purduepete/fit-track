@@ -18,7 +18,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.config import Settings, _BACKEND_DIR  # noqa: E402
+from app.config import _BACKEND_DIR, Settings  # noqa: E402
 
 DB_KEYS = (
     "DB_SERVER",
@@ -147,9 +147,8 @@ def main() -> int:
     print()
     print("== connection ==")
     try:
-        from sqlalchemy import text
-
         from app.db import engine
+        from sqlalchemy import text
 
         with engine.connect() as conn:
             who = conn.execute(text("SELECT SUSER_SNAME()")).scalar()

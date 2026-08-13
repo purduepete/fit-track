@@ -112,6 +112,29 @@ invalid token returns `401`. The dashboard needs a `read`-scoped token, so a
 `403` normally means the `ingest` token from `.env.local` was pasted instead.
 Check with `python -m scripts.token_admin list`.
 
+### Two healthy states that look like failures
+
+**`Last Run Result` of `0x800710E0`** ("the operator or administrator has
+refused the request") on the `FitTrack Upload Watcher` task is the design
+working. The task is registered `MultipleInstances IgnoreNew` with a keep-alive
+trigger every 10 minutes, so each repeat is refused while the watcher is alive
+and only relaunches it if it died. Read the `Status` column instead: `Running`
+plus recent `OK ...` lines in `backend/logs/upload-watcher.log` is healthy.
+`Ready` with a stale log is the real failure.
+
+**Two `python.exe` processes** for `scripts.upload_folder` is one watcher, not
+two. `.venv\Scripts\python.exe` is a launcher stub that re-execs the base
+interpreter as its child. Check the relationship rather than the count:
+
+```powershell
+Get-CimInstance Win32_Process |
+  Where-Object { $_.CommandLine -match 'scripts.upload_folder' } |
+  Select ProcessId, ParentProcessId, ExecutablePath
+```
+
+A stub plus its own child is expected. Two unrelated parents, or two `Watching
+...` startup lines in the log, would be a genuine duplicate.
+
 ## Daily workflow
 
 1. In **Health Auto Export**, configure an automation to export **JSON**

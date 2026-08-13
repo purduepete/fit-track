@@ -5,13 +5,23 @@ the ``fit`` schema of the WebPortfolio database.
 """
 from datetime import date
 from functools import lru_cache
+from pathlib import Path
+from urllib.parse import quote_plus
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Anchor the env file to the backend directory rather than the process working
+# directory. A bare relative ".env" only loads when the process happens to start
+# in backend/; from anywhere else pydantic silently falls back to the field
+# defaults, which means db_auth="sql" and an empty password, and the connection
+# then fails with a bare "Login failed for user 'sqladmin'" that says nothing
+# about the real cause.
+_BACKEND_DIR = Path(__file__).resolve().parents[1]
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=_BACKEND_DIR / ".env", extra="ignore")
 
     # Azure SQL connection (existing webportfolio server)
     db_server: str = "sqlgkhw25ijhyzzy.database.windows.net"
@@ -54,8 +64,12 @@ class Settings(BaseSettings):
     def sqlalchemy_url(self) -> str:
         encrypt = "yes" if self.db_encrypt else "no"
         driver = self.db_odbc_driver.replace(" ", "+")
+        # Credentials go into a URL, so anything with @ : / ? # % in it has to be
+        # percent-encoded or the URL parses into the wrong host/password.
+        user = quote_plus(self.db_user)
+        password = quote_plus(self.db_password)
         return (
-            f"mssql+pyodbc://{self.db_user}:{self.db_password}"
+            f"mssql+pyodbc://{user}:{password}"
             f"@{self.db_server}:1433/{self.db_name}"
             f"?driver={driver}&Encrypt={encrypt}&TrustServerCertificate=no"
             f"&Connection+Timeout=30"

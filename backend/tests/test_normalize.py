@@ -1,8 +1,10 @@
 """Unit tests for the Health Auto Export normalizer."""
 from app.normalize import (
     as_number,
+    as_source_name,
     distance_to_meters,
     local_date_str,
+    parse_daily_metrics,
     parse_dt,
     parse_payload,
     parse_workout,
@@ -124,6 +126,41 @@ def test_parse_workout_synthesizes_uuid_when_missing():
     w = parse_workout(payload)
     assert w.uuid  # deterministic uuid5
     assert parse_workout(payload).uuid == w.uuid
+
+
+def test_as_source_name_accepts_string_or_object():
+    assert as_source_name("Jim's Apple Watch") == "Jim's Apple Watch"
+    assert as_source_name({"name": "Watch", "identifier": "com.apple.health.X"}) == "Watch"
+    assert as_source_name({"identifier": "com.apple.health.X"}) == "com.apple.health.X"
+    assert as_source_name({}) is None
+    assert as_source_name(None) is None
+    assert len(as_source_name({"name": "x" * 500})) == 120
+
+
+def test_parse_workout_accepts_object_source():
+    """HAE switched workout ``source`` from a string to an object."""
+    payload = _sample_workout()
+    payload["source"] = {"name": "Jim's Apple Watch", "identifier": "com.apple.health.FFCB"}
+    w = parse_workout(payload)
+    assert w.source_name == "Jim's Apple Watch"
+
+
+def test_parse_daily_metrics_accepts_object_source():
+    metrics = [
+        {
+            "name": "active_energy",
+            "units": "kcal",
+            "data": [
+                {
+                    "date": "2026-09-11 10:00:00 -0700",
+                    "qty": 12.5,
+                    "source": {"name": "Jim's Apple Watch", "identifier": "com.apple.health.X"},
+                }
+            ],
+        }
+    ]
+    (m,) = parse_daily_metrics(metrics)
+    assert m.source_name == "Jim's Apple Watch"
 
 
 def test_synth_uuid_matches_across_json_and_xml_import_paths():

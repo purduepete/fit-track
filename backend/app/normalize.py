@@ -53,6 +53,24 @@ def first(d: dict, *keys, default=None):
     return default
 
 
+def as_source_name(value) -> str | None:
+    """Coerce an HAE source field to its display name.
+
+    HAE changed workout ``source`` from a bare string to
+    ``{"name": ..., "identifier": ...}``; the dict then reached pyodbc as a bind
+    parameter and every ingest failed with "Unknown object type dict during
+    describe". Accept either shape, and keep the name short enough for the
+    Unicode(120) column.
+    """
+    if value is None:
+        return None
+    if isinstance(value, dict):
+        value = first(value, "name", "identifier")
+        if value is None:
+            return None
+    return str(value)[:120]
+
+
 def as_number(value) -> float | None:
     """Coerce scalar / {"qty": ..} / numeric-string into a float."""
     if value is None:
@@ -293,8 +311,8 @@ def parse_workout(w: dict) -> ParsedWorkout | None:
         start_utc=start_utc,
         end_utc=end_utc,
         tz_offset_minutes=tz,
-        source_name=first(w, "sourceName", "source"),
-        device_name=first(w, "device", "deviceName"),
+        source_name=as_source_name(first(w, "sourceName", "source")),
+        device_name=as_source_name(first(w, "device", "deviceName")),
         duration_sec=as_number(first(w, "duration", "durationSeconds")),
         distance_m=distance_m,
         active_energy_kcal=as_number(
@@ -392,7 +410,7 @@ def _parse_sleep_metric(points: list) -> list[ParsedDailyMetric]:
         hours = _sleep_hours_for_point(point)
         if local_date is None or hours is None or hours <= 0:
             continue
-        source = first(point, "source", "sourceName") or ""
+        source = as_source_name(first(point, "source", "sourceName")) or ""
         key = (local_date, source)
         totals[key] = totals.get(key, 0.0) + hours
     return [
@@ -463,7 +481,7 @@ def parse_daily_metrics(metrics: list) -> list[ParsedDailyMetric]:
                     metric_type=str(name),
                     value=qty,
                     unit=units,
-                    source_name=first(point, "source", "sourceName") or "",
+                    source_name=as_source_name(first(point, "source", "sourceName")) or "",
                 )
             )
     return out

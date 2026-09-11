@@ -35,10 +35,10 @@ jobs:
       contents: read
       packages: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Log in to ghcr.io
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -62,12 +62,12 @@ jobs:
           echo "IMAGE=${IMAGE_REPO}:${TAG}" >> "$GITHUB_ENV"
 
       - name: Azure login
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Deploy infra + image
-        uses: azure/cli@v2
+        uses: azure/cli@v3
         with:
           inlineScript: |
             # Only pass the athlete params when the repo variables are set, so an

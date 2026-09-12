@@ -24,6 +24,7 @@ from .geo import (
     HrSample,
     RoutePoint,
     compute_splits,
+    filter_route_outliers,
 )
 from .timeutil import utcnow
 
@@ -524,7 +525,7 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
     but does NOT commit, so the caller owns the transaction boundary (the ingest
     route commits the normalized rows and the RawIngestEvent status atomically)."""
     now = utcnow()
-    counts = {"workouts": 0, "daily_metrics": 0, "splits": 0}
+    counts = {"workouts": 0, "daily_metrics": 0, "splits": 0, "route_points_dropped": 0}
 
     # Batch-fetch existing workouts by UUID (avoids a SELECT per workout).
     workout_uuids = [pw.uuid for pw in parsed.workouts]
@@ -546,7 +547,11 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
 
     for pw in parsed.workouts:
         existing = existing_workouts.get(pw.uuid)
-        has_route = len(pw.route) >= 2
+        # Bad GPS fixes would otherwise drive both the map and the stored splits,
+        # which are GPS-derived. `distance_m` comes from the payload and is untouched.
+        route, dropped = filter_route_outliers(pw.route, pw.workout_type)
+        counts["route_points_dropped"] += dropped
+        has_route = len(route) >= 2
         if existing is None:
             existing = models.Workout(uuid=pw.uuid, created_utc=now)
             db.add(existing)
@@ -567,7 +572,7 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
         existing.updated_utc = now
         counts["workouts"] += 1
 
-        for seq, rp in enumerate(sorted(pw.route, key=lambda p: p.ts_utc)):
+        for seq, rp in enumerate(route):
             route_rows.append(
                 {
                     "workout_uuid": pw.uuid,
@@ -591,7 +596,7 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
                 }
             )
         # Build the distance/time + HR axes once and derive both unit systems.
-        splits = compute_splits(pw.route, pw.distance_samples, pw.hr_samples, ("mi", "km"))
+        splits = compute_splits(route, pw.distance_samples, pw.hr_samples, ("mi", "km"))
         for r in splits:
             split_rows.append(
                 {

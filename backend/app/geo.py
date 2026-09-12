@@ -181,6 +181,131 @@ def _axes_from_samples(dist: list[DistanceSample]) -> tuple[list[float], list[fl
     return dist_axis, time_axis, start_dt
 
 
+# --- GPS outlier filtering -------------------------------------------------
+#
+# Health Auto Export carries no horizontal-accuracy field, so a bad fix can only
+# be spotted kinematically. Speed is the ONLY rejection criterion here: a real
+# dead-end out-and-back, U-turn or switchback walked at human pace is never
+# touched, because rejecting on geometry misreads those as spikes.
+
+# The travel budget stops growing after this many seconds, so a long stationary
+# pause cannot make a distant spike look "reachable".
+DT_CLAMP_S = 15.0
+# Stationary GPS jitter is tolerated but never re-anchors, so it cannot chain.
+JITTER_M = 10.0
+# Consecutive rejects that must agree with each other before a relocation is believed.
+CLUSTER_N = 3
+# Caps are set to physical plausibility, not to the pace the activity implies.
+# A walk that ends with a bus ride is still real GPS: measured against 17,671
+# stored points, a 4.5 m/s walk cap deleted 230 points of smooth 12-13 m/s
+# vehicle travel across 3 workouts, while every genuine bad fix ran 20-72 m/s.
+DEFAULT_SPEED_CAP_MPS = 15.0
+_SPEED_CAPS_MPS: tuple[tuple[tuple[str, ...], float], ...] = (
+    (("cycl", "bike", "ride"), 25.0),
+    (("swim",), 3.0),
+)
+
+
+def speed_cap_mps(workout_type: str | None) -> float:
+    """Plausible top speed for a workout type. Matched on a lowercased substring
+    because raw HAE names ("Outdoor Walk") are not in ``WORKOUT_TYPE_MAP``."""
+    name = (workout_type or "").lower()
+    for keys, cap in _SPEED_CAPS_MPS:
+        if any(k in name for k in keys):
+            return cap
+    return DEFAULT_SPEED_CAP_MPS
+
+
+def _reachable(a: RoutePoint, b: RoutePoint, cap: float, *, floor: bool) -> bool:
+    dt = abs((b.ts_utc - a.ts_utc).total_seconds())
+    if dt <= 0:
+        # Two fixes on the same timestamp. HAE emits these regularly, and they
+        # are undecidable kinematically. Rejecting the later one de-duplicates
+        # the track: a zero-duration segment only adds spurious length and makes
+        # the split pace divide by zero. This is most of what the filter removes.
+        return False
+    budget = cap * min(dt, DT_CLAMP_S)
+    if floor:
+        budget = max(JITTER_M, budget)
+    return haversine_m(a.lat, a.lon, b.lat, b.lon) <= budget
+
+
+def _self_consistent(run: list[tuple[int, RoutePoint]], cap: float) -> bool:
+    return all(
+        _reachable(run[i - 1][1], run[i][1], cap, floor=False) for i in range(1, len(run))
+    )
+
+
+def _pass_keep(seq: list[tuple[int, RoutePoint]], cap: float) -> set[int]:
+    """One directional sweep. Keeps indices reachable from the last trusted point."""
+    kept: set[int] = set()
+    if not seq:
+        return kept
+    anchor_i, anchor = seq[0]
+    kept.add(anchor_i)
+    pending: list[tuple[int, RoutePoint]] = []
+    for idx, p in seq[1:]:
+        if _reachable(anchor, p, cap, floor=True):
+            kept.add(idx)
+            pending.clear()
+            # Re-anchor only on a strict pass, so points admitted by the jitter
+            # floor alone keep being measured from the same capped anchor.
+            if _reachable(anchor, p, cap, floor=False):
+                anchor = p
+            continue
+        pending.append((idx, p))
+        if len(pending) > CLUSTER_N:
+            pending.pop(0)
+        if len(pending) == CLUSTER_N and _self_consistent(pending, cap):
+            kept.update(j for j, _ in pending)
+            anchor = pending[-1][1]
+            pending.clear()
+    # A genuine relocation that resumes for only two points before the track ends
+    # would otherwise be thrown away. A single uncorroborated point stays dropped.
+    if len(pending) >= 2 and _self_consistent(pending, cap):
+        kept.update(j for j, _ in pending)
+    return kept
+
+
+def filter_route_outliers(
+    points: list[RoutePoint], workout_type: str | None
+) -> tuple[list[RoutePoint], int]:
+    """Drop GPS fixes that would require an impossible speed.
+
+    Returns the surviving points (time-ordered) and how many were dropped. The
+    sweep runs forward and backward and keeps the intersection, so a cold-start
+    or cold-finish spike is removed instead of being trusted as a seed. A point
+    that only one direction disliked is restored if both surviving neighbours
+    are reachable, which stops one poisoned endpoint from deleting a good run.
+    """
+    ordered = sorted(points, key=lambda p: p.ts_utc)
+    if len(ordered) < 4:
+        return ordered, 0
+
+    cap = speed_cap_mps(workout_type)
+    indexed = list(enumerate(ordered))
+    forward = _pass_keep(indexed, cap)
+    backward = _pass_keep(list(reversed(indexed)), cap)
+    keep = forward & backward
+
+    for i in sorted(forward ^ backward):
+        left = max((j for j in keep if j < i), default=None)
+        right = min((j for j in keep if j > i), default=None)
+        if left is None or right is None:
+            continue
+        if _reachable(ordered[left], ordered[i], cap, floor=True) and _reachable(
+            ordered[i], ordered[right], cap, floor=True
+        ):
+            keep.add(i)
+
+    # Losing half a track means the filter, not the track, is wrong. Bailing out
+    # also keeps the kept length >= 2, so `has_route` and the split source
+    # ("gps" vs "sample") can never flip as a side effect of filtering.
+    if len(keep) < max(2, 0.5 * len(ordered)):
+        return ordered, 0
+    return [p for i, p in indexed if i in keep], len(ordered) - len(keep)
+
+
 def compute_splits(
     points: list[RoutePoint],
     dist_samples: list[DistanceSample],

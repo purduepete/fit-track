@@ -161,7 +161,10 @@ def _walk(n: int) -> list[RoutePoint]:
 
 
 def _cum_m(points: list[RoutePoint]) -> float:
-    return sum(haversine_m(a.lat, a.lon, b.lat, b.lon) for a, b in zip(points, points[1:]))
+    return sum(
+        haversine_m(a.lat, a.lon, b.lat, b.lon)
+        for a, b in zip(points, points[1:], strict=False)
+    )
 
 
 def test_filter_leaves_a_clean_track_alone():
@@ -255,7 +258,7 @@ def test_jitter_is_tolerated_but_cannot_chain():
     # jitter floor is what admits these steps at all. A single floored predicate
     # would draw the whole drift in, because each step is under 10 m.
     pts = [_p(i * 0.2, i * 0.28) for i in range(20)]
-    for i, east in zip(range(8, 12), (9.0, 18.0, 27.0, 36.0)):
+    for i, east in zip(range(8, 12), (9.0, 18.0, 27.0, 36.0), strict=True):
         pts[i] = _p(i * 0.2, i * 0.28, east)
     kept, dropped = filter_route_outliers(pts, WALK)
     assert dropped == 3

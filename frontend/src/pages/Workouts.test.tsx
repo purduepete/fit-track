@@ -60,3 +60,25 @@ describe("Workouts ?date= deep-link", () => {
     expect(workouts).toHaveBeenLastCalledWith(expect.objectContaining({ dateTo: undefined }));
   });
 });
+
+describe("Workouts type dropdown", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  it("refetches with the picked type", async () => {
+    const workouts = vi.spyOn(api, "workouts").mockResolvedValue({ items: [], total: 0 });
+    vi.spyOn(api, "workoutTypes").mockResolvedValue(["Outdoor Walk", "Running"]);
+
+    renderAt("/workouts");
+    await waitFor(() => expect(workouts).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText("Workout type"));
+    fireEvent.click(await screen.findByRole("option", { name: "Running" }));
+
+    await waitFor(() =>
+      expect(workouts).toHaveBeenLastCalledWith(
+        expect.objectContaining({ type: "Running", offset: 0 }),
+      ),
+    );
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+});

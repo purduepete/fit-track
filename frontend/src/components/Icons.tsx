@@ -145,6 +145,22 @@ export function ChevronRightIcon({ size = 18, style }: IconProps) {
   );
 }
 
+export function ChevronDownIcon({ size = 18, style }: IconProps) {
+  return (
+    <svg {...base(size, style)}>
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  );
+}
+
+export function CheckIcon({ size = 18, style }: IconProps) {
+  return (
+    <svg {...base(size, style)}>
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
 export function CrosshairIcon({ size = 18, style }: IconProps) {
   return (
     <svg {...base(size, style)}>

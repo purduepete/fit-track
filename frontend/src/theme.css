@@ -594,23 +594,146 @@ tbody tr:hover {
 .toolbar {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
   margin-bottom: 16px;
 }
 
-.toolbar select,
 .toolbar input {
-  padding: 8px 12px;
+  height: 40px;
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
+  font-family: inherit;
   font-size: 0.9rem;
 }
 
 .toolbar input[type="search"] {
   flex: 1;
   min-width: 160px;
+}
+
+.toolbar .filter-select {
+  flex: 0 1 190px;
+}
+
+/* Custom listbox replacing the native <select> (ported from ferry_tracker). */
+.filter-select {
+  position: relative;
+  min-width: 0;
+}
+
+.filter-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  height: 40px;
+  padding: 0 11px 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9rem;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: color 0.2s ease, background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.filter-select-trigger:hover:not(:disabled),
+.filter-select-trigger[aria-expanded="true"] {
+  background: var(--surface-2);
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
+}
+
+.filter-select-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.filter-select-trigger > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-select-chevron {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  transition: transform 0.2s ease;
+}
+
+.filter-select-chevron.open {
+  transform: rotate(180deg);
+}
+
+/* Below the sticky .app-bar (z-index 100) so a scrolled menu tucks under it. */
+.filter-select-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 50;
+  min-width: 100%;
+  max-height: min(320px, 50vh);
+  padding: 4px 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.filter-select-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 34px;
+  padding: 6px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.filter-select-option:hover {
+  background: var(--surface-2);
+}
+
+.filter-select-option.selected {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  font-weight: 600;
+}
+
+.filter-select-option.highlighted {
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 68%, transparent);
+}
+
+.option-check {
+  display: grid;
+  place-items: center;
+  flex: 0 0 16px;
+  width: 16px;
+}
+
+.option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Active single-day filter banner (Dashboard steps chart -> Workouts deep-link). */
@@ -687,6 +810,11 @@ tbody tr:hover {
 
   .container {
     padding: 18px 14px 48px;
+  }
+
+  /* Sit the two filters side by side and give the search its own full row. */
+  .toolbar .filter-select {
+    flex: 1 1 calc(50% - 5px);
   }
 
   .page-title {

@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { api, ApiError, clearToken } from "../lib/api";
 import type { WorkoutSummary } from "../lib/api";
+import { FilterSelect } from "../components/FilterSelect";
 import {
   avgPaceSecPerUnit,
   formatDistance,
@@ -141,6 +142,12 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
 
   const hasMore = items.length < total && !search;
 
+  const typeOptions = useMemo(
+    () => [{ value: "", label: "All types" }, ...types.map((t) => ({ value: t, label: t }))],
+    [types],
+  );
+  const rangeOptions = useMemo(() => RANGES.map((r) => ({ value: r.key, label: r.label })), []);
+
   function clearDate() {
     const next = new URLSearchParams(searchParams);
     next.delete("date");
@@ -152,27 +159,15 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
       <h1 className="page-title">Workouts</h1>
 
       <div className="toolbar">
-        <select value={type} onChange={(e) => setType(e.target.value)} aria-label="Workout type">
-          <option value="">All types</option>
-          {types.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
-        <select
+        <FilterSelect ariaLabel="Workout type" options={typeOptions} value={type} onChange={setType} />
+        <FilterSelect
+          ariaLabel="Date range"
+          options={rangeOptions}
           value={range}
-          onChange={(e) => setRange(e.target.value)}
-          aria-label="Date range"
+          onChange={setRange}
           disabled={!!dateParam}
           title={dateParam ? "Showing a single day — clear the day filter to use ranges" : undefined}
-        >
-          {RANGES.map((r) => (
-            <option key={r.key} value={r.key}>
-              {r.label}
-            </option>
-          ))}
-        </select>
+        />
         <input
           type="search"
           placeholder="Search loaded…"

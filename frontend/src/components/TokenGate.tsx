@@ -18,7 +18,7 @@ export function TokenGate({ onSaved }: { onSaved: () => void }) {
         <span className="logo">
           <ActivityIcon size={20} />
         </span>
-        fittrack
+        Fit Track
       </div>
       <p className="muted">Enter your read access token to view your workouts.</p>
       <input

@@ -48,7 +48,7 @@ async def lifespan(_app: FastAPI):
 
 
 app = FastAPI(
-    title="fittrack API",
+    title="Fit Track API",
     version="0.1.0",
     description="Apple Watch / Health workout tracker with mileage splits and route maps.",
     lifespan=lifespan,

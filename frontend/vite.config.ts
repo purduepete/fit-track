@@ -14,8 +14,8 @@ export default defineConfig({
       injectRegister: null,
       includeAssets: ["favicon.svg"],
       manifest: {
-        name: "fittrack",
-        short_name: "fittrack",
+        name: "Fit Track",
+        short_name: "Fit Track",
         description: "Apple Watch activity and workout tracker.",
         theme_color: "#0e0f1a",
         background_color: "#0e0f1a",

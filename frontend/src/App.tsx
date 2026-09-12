@@ -35,7 +35,7 @@ export default function App() {
             <span className="logo">
               <ActivityIcon size={18} />
             </span>
-            <span className="brand-name">fittrack</span>
+            <span className="brand-name">Fit Track</span>
           </div>
           <nav className="nav">
             <NavLink to="/" end>

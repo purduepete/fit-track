@@ -10,9 +10,13 @@
     <!-- No apple-mobile-web-app-status-bar-style: iOS then reserves the status bar instead of
          drawing under it, and paints that strip from theme-color. Kept on the active theme by
          the pre-paint script below and by useTheme.ts. -->
-    <meta name="theme-color" content="#0e0f1a" />
+    <meta name="theme-color" content="#020617" />
     <meta name="mobile-web-app-capable" content="yes" />
     <title>fittrack</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap" rel="stylesheet" />
 
     <!-- Pre-paint theme: set data-theme + launch colours before first paint so the
          installed PWA never flashes white before React mounts (FOUC fix). -->
@@ -30,9 +34,9 @@
         } catch (e) {}
         html.setAttribute('data-theme', theme);
         html.style.colorScheme = theme;
-        var bg = theme === 'dark' ? '#0e0f1a' : '#f4f5fb';
+        var bg = theme === 'dark' ? '#020617' : '#f4f5fb';
         html.style.setProperty('--launch-bg', bg);
-        html.style.setProperty('--launch-fg', theme === 'dark' ? '#e8e9f3' : '#1a1b2e');
+        html.style.setProperty('--launch-fg', theme === 'dark' ? '#f8fafc' : '#1a1b2e');
         var themeColor = document.querySelector('meta[name="theme-color"]');
         if (themeColor) themeColor.setAttribute('content', bg);
       })();
@@ -42,8 +46,8 @@
       html {
         -webkit-text-size-adjust: 100%;
         text-size-adjust: 100%;
-        background: var(--launch-bg, #0e0f1a);
-        color: var(--launch-fg, #e8e9f3);
+        background: var(--launch-bg, #020617);
+        color: var(--launch-fg, #f8fafc);
       }
       html,
       body {
@@ -52,7 +56,7 @@
       }
       body {
         min-height: 100dvh;
-        background: var(--launch-bg, #0e0f1a);
+        background: var(--launch-bg, #020617);
       }
 
       /* iOS standalone cold-launch mask: keep #root hidden behind a themed backdrop
@@ -72,7 +76,7 @@
         inset: 0;
         z-index: 2147483647;
         pointer-events: none;
-        background: var(--launch-bg, #0e0f1a);
+        background: var(--launch-bg, #020617);
       }
       html.pwa-launch-mask *,
       html.pwa-no-motion * {

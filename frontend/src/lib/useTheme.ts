@@ -5,7 +5,7 @@ export type Theme = "light" | "dark";
 const KEY = "fittrack_theme";
 
 // iOS paints the reserved status bar strip from theme-color, so it has to track --bg.
-const THEME_COLORS: Record<Theme, string> = { light: "#f4f5fb", dark: "#0e0f1a" };
+const THEME_COLORS: Record<Theme, string> = { light: "#f4f5fb", dark: "#020617" };
 
 function initialTheme(): Theme {
   // index.html sets data-theme before paint; read it so React never re-defaults

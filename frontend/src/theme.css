@@ -1,10 +1,13 @@
-/* fittrack theme — indigo→violet accent, light + dark, squared corners. */
+/* fittrack theme — indigo→violet accent, light + dark, squared corners.
+   The accent is fittrack's identity and is shared by both themes. The dark
+   neutrals come from the midnight baseline (ferry_tracker/webportfolio).
+   --radius and --font are deliberately global: D2 applies them to both themes. */
 :root {
   --accent: #4f46e5;        /* indigo-600 */
   --accent-2: #7c3aed;      /* violet-600 */
   --accent-grad: linear-gradient(135deg, var(--accent), var(--accent-2));
-  --radius: 2px;            /* squared corners */
-  --font: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  --radius: 0;              /* squared corners */
+  --font: "Roboto Flex", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
 :root[data-theme="light"] {
@@ -17,22 +20,49 @@
   --bar-bg: rgba(255, 255, 255, 0.72);
   --shadow: 0 1px 3px rgba(20, 20, 50, 0.08);
   --chip-fg: #15803d;
+  --scrollbar-track: #eef0f3;
+  --scrollbar-thumb: #9ca3af;
+  --scrollbar-thumb-hover: #64748b;
 }
 
 :root[data-theme="dark"] {
-  --bg: #0e0f1a;
-  --surface: #171826;
-  --surface-2: #1e2032;
-  --border: #2a2c40;
-  --text: #e8e9f3;
-  --text-dim: #9a9cb5;
-  --bar-bg: rgba(23, 24, 38, 0.72);
-  --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --chip-fg: #22c55e;
+  --bg: #020617;
+  --surface: #0f172a;
+  --surface-2: #172033;
+  --border: #293548;
+  --text: #f8fafc;
+  --text-dim: #a8b4c6;
+  --bar-bg: rgba(15, 23, 42, 0.72);
+  --shadow: 0 10px 28px rgb(0 0 0 / 36%);
+  --chip-fg: #4ade80;
+  --scrollbar-track: #080f20;
+  --scrollbar-thumb: #3b4962;
+  --scrollbar-thumb-hover: #64748b;
 }
 
 * {
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+*::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 2px solid var(--scrollbar-track);
+  border-radius: 0;
+  background: var(--scrollbar-thumb);
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+*::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
 }
 
 body {

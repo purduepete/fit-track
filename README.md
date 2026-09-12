@@ -381,6 +381,7 @@ nothing real.
 - [Architecture](docs/architecture.md)
 - [Data pipeline & Health Auto Export setup](docs/data-pipeline.md)
 - [Splits algorithm](docs/splits-algorithm.md)
+- [GPS outlier filter](docs/gps-filter.md)
 - [API reference](docs/api.md)
 - [Database schema](docs/schema.md)
 - [Testing](docs/testing.md)

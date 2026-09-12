@@ -7,7 +7,9 @@ Implemented in `backend/app/geo.py` and unit-tested in `backend/tests/test_geo.p
 ## Inputs (in priority order)
 
 1. **GPS route** (`route[]`) — outdoor workouts. Cumulative distance is the sum
-   of haversine distances between consecutive points.
+   of haversine distances between consecutive points. The points have already
+   been through the outlier filter, so implausible fixes are gone before any
+   distance is accumulated. See [GPS outlier filter](gps-filter.md).
 2. **Distance samples** (`walkingAndRunningDistance[]`) — fallback for indoor
    workouts with no GPS. Each per-interval increment is accumulated.
 

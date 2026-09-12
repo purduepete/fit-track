@@ -195,25 +195,43 @@ DT_CLAMP_S = 15.0
 JITTER_M = 10.0
 # Consecutive rejects that must agree with each other before a relocation is believed.
 CLUSTER_N = 3
-# Caps are set to physical plausibility, not to the pace the activity implies.
-# A walk that ends with a bus ride is still real GPS: measured against 17,671
-# stored points, a 4.5 m/s walk cap deleted 230 points of smooth 12-13 m/s
-# vehicle travel across 3 workouts, while every genuine bad fix ran 20-72 m/s.
-DEFAULT_SPEED_CAP_MPS = 15.0
-_SPEED_CAPS_MPS: tuple[tuple[tuple[str, ...], float], ...] = (
-    (("cycl", "bike", "ride"), 25.0),
-    (("swim",), 3.0),
+# Each activity gets a self-powered cap and a ceiling. The ceiling is only
+# reached where the net displacement around a fix shows the ground was really
+# covered, so a walk that ends on a bus keeps its 12-13 m/s leg (230 such points
+# across 3 real walks) while a fix claiming 11 m/s from a standstill does not.
+DEFAULT_SPEED_CAPS_MPS = (15.0, 15.0)
+_SPEED_CAPS_MPS: tuple[tuple[tuple[str, ...], tuple[float, float]], ...] = (
+    (("cycl", "bike", "ride"), (25.0, 25.0)),
+    (("swim",), (3.0, 3.0)),
+    (("run", "jog"), (8.0, 15.0)),
+    (("walk", "hike"), (4.5, 15.0)),
 )
+# Half-width of the window whose net displacement corroborates a fast fix.
+CORRIDOR_WINDOW_S = 10.0
+CORRIDOR_K = 1.6
+# Multipath off a large structure draws a long path that goes nowhere. Only the
+# first step of such a burst is individually impossible, so the rest is invisible
+# to a pairwise test and has to be caught as a window.
+WANDER_WINDOW_S = 30.0
+# A hard ceiling on the fixes one window may span. The time bound alone is set
+# by the payload, so a burst of thousands of sub-second or duplicate timestamps
+# would make the candidate scan quadratic on an authenticated ingest request.
+# 30 s of 8 Hz sampling is already far denser than any watch emits.
+WANDER_WINDOW_MAX_PTS = 240
+WANDER_MIN_PATH_M = 60.0
+WANDER_RATIO = 3.0
+WANDER_DEV_M = 12.0
 
 
-def speed_cap_mps(workout_type: str | None) -> float:
-    """Plausible top speed for a workout type. Matched on a lowercased substring
-    because raw HAE names ("Outdoor Walk") are not in ``WORKOUT_TYPE_MAP``."""
+def speed_caps_mps(workout_type: str | None) -> tuple[float, float]:
+    """``(self-powered cap, corroborated ceiling)`` for a workout type. Matched on
+    a lowercased substring because raw HAE names ("Outdoor Walk") are not in
+    ``WORKOUT_TYPE_MAP``."""
     name = (workout_type or "").lower()
-    for keys, cap in _SPEED_CAPS_MPS:
+    for keys, caps in _SPEED_CAPS_MPS:
         if any(k in name for k in keys):
-            return cap
-    return DEFAULT_SPEED_CAP_MPS
+            return caps
+    return DEFAULT_SPEED_CAPS_MPS
 
 
 def _reachable(a: RoutePoint, b: RoutePoint, cap: float, *, floor: bool) -> bool:
@@ -230,13 +248,136 @@ def _reachable(a: RoutePoint, b: RoutePoint, cap: float, *, floor: bool) -> bool
     return haversine_m(a.lat, a.lon, b.lat, b.lon) <= budget
 
 
-def _self_consistent(run: list[tuple[int, RoutePoint]], cap: float) -> bool:
-    return all(
-        _reachable(run[i - 1][1], run[i][1], cap, floor=False) for i in range(1, len(run))
+def _step_speed(a: RoutePoint, b: RoutePoint) -> float:
+    dt = abs((b.ts_utc - a.ts_utc).total_seconds())
+    if dt <= 0:
+        return 0.0
+    return haversine_m(a.lat, a.lon, b.lat, b.lon) / dt
+
+
+def _corridor_caps(ordered: list[RoutePoint], ped: float, ceiling: float) -> list[float]:
+    """Per-fix speed ceiling, raised only where the surrounding net displacement
+    shows real travel. Net displacement is taken from window edges, so noise
+    inside a window cannot inflate it. The best of the leading, trailing and full
+    window wins, because a centred window averages an acceleration with whatever
+    came before it and would clip the start of a genuine vehicle leg."""
+    caps: list[float] = []
+    lo = hi = 0
+
+    def net_speed(i: int, j: int) -> float:
+        span = (ordered[j].ts_utc - ordered[i].ts_utc).total_seconds()
+        if span <= 0:
+            return 0.0
+        return haversine_m(ordered[i].lat, ordered[i].lon, ordered[j].lat, ordered[j].lon) / span
+
+    for i, p in enumerate(ordered):
+        while (p.ts_utc - ordered[lo].ts_utc).total_seconds() > CORRIDOR_WINDOW_S:
+            lo += 1
+        hi = max(hi, i)
+        while (
+            hi + 1 < len(ordered)
+            and (ordered[hi + 1].ts_utc - p.ts_utc).total_seconds() <= CORRIDOR_WINDOW_S
+        ):
+            hi += 1
+        v = max(net_speed(lo, i), net_speed(i, hi), net_speed(lo, hi))
+        caps.append(min(ceiling, max(ped, CORRIDOR_K * v)))
+    return caps
+
+
+def _local_xy(origin: RoutePoint, p: RoutePoint) -> tuple[float, float]:
+    # Wrap the longitude difference so a step across the antimeridian reads as
+    # the short way round, matching what haversine_m measures.
+    dlon = (p.lon - origin.lon + 180.0) % 360.0 - 180.0
+    east = haversine_m(origin.lat, origin.lon, origin.lat, origin.lon + dlon)
+    north = haversine_m(origin.lat, origin.lon, p.lat, origin.lon)
+    return (
+        east if dlon >= 0 else -east,
+        north if p.lat >= origin.lat else -north,
     )
 
 
-def _pass_keep(seq: list[tuple[int, RoutePoint]], cap: float) -> set[int]:
+def _dev_from_chord(a: RoutePoint, b: RoutePoint, p: RoutePoint) -> float:
+    """Distance from ``p`` to the ``a``-``b`` segment, in metres."""
+    bx, by = _local_xy(a, b)
+    px, py = _local_xy(a, p)
+    span = bx * bx + by * by
+    if span <= 0:
+        return math.hypot(px, py)
+    t = max(0.0, min(1.0, (px * bx + py * by) / span))
+    return math.hypot(px - t * bx, py - t * by)
+
+
+def _wander_drops(ordered: list[RoutePoint], ped: float) -> set[int]:
+    """Fixes inside a multipath burst: a long path with little net displacement,
+    anchored on at least one step that is impossible under the self-powered cap.
+    Without that anchor a genuine out-and-back walk would score the same."""
+    n = len(ordered)
+    path = [0.0]
+    impossible = [0]
+    for i in range(1, n):
+        path.append(
+            path[-1]
+            + haversine_m(ordered[i - 1].lat, ordered[i - 1].lon, ordered[i].lat, ordered[i].lon)
+        )
+        impossible.append(impossible[-1] + (_step_speed(ordered[i - 1], ordered[i]) > ped))
+
+    # Strongest window per start, then settle them best-first. Taking the first
+    # window that qualifies instead lets a chord start on the corridor and end
+    # inside the burst, which deletes good track and spares the excursion.
+    candidates: list[tuple[float, int, int]] = []
+    hi = 0
+    for s in range(n - 2):
+        hi = max(hi, s)
+        limit = min(n - 1, s + WANDER_WINDOW_MAX_PTS)
+        while (
+            hi < limit
+            and (ordered[hi + 1].ts_utc - ordered[s].ts_utc).total_seconds() <= WANDER_WINDOW_S
+        ):
+            hi += 1
+        hi = min(hi, limit)
+        if impossible[hi] == impossible[s] or path[hi] - path[s] < WANDER_MIN_PATH_M:
+            continue
+        best = (0.0, -1)
+        for e in range(s + 2, hi + 1):
+            length = path[e] - path[s]
+            if length < WANDER_MIN_PATH_M or impossible[e] == impossible[s]:
+                continue
+            net = haversine_m(ordered[s].lat, ordered[s].lon, ordered[e].lat, ordered[e].lon)
+            ratio = length / max(net, 1.0)
+            if ratio > best[0]:
+                best = (ratio, e)
+        if best[1] >= 0 and best[0] >= WANDER_RATIO:
+            candidates.append((best[0], s, best[1]))
+
+    drops: set[int] = set()
+    taken: list[tuple[int, int]] = []
+    for _, s, e in sorted(candidates, key=lambda c: (-c[0], c[1])):
+        if any(s < t_e and t_s < e for t_s, t_e in taken):
+            continue
+        # Only the excursion goes: fixes already on the direct line are real
+        # track that the burst happens to span.
+        bad = {
+            i
+            for i in range(s + 1, e)
+            if _dev_from_chord(ordered[s], ordered[e], ordered[i]) >= WANDER_DEV_M
+        }
+        if not bad:
+            continue
+        drops |= bad
+        taken.append((s, e))
+    return drops
+
+
+def _self_consistent(run: list[tuple[int, RoutePoint]], caps: list[float]) -> bool:
+    return all(
+        _reachable(
+            run[i - 1][1], run[i][1], min(caps[run[i - 1][0]], caps[run[i][0]]), floor=False
+        )
+        for i in range(1, len(run))
+    )
+
+
+def _pass_keep(seq: list[tuple[int, RoutePoint]], caps: list[float]) -> set[int]:
     """One directional sweep. Keeps indices reachable from the last trusted point."""
     kept: set[int] = set()
     if not seq:
@@ -245,24 +386,25 @@ def _pass_keep(seq: list[tuple[int, RoutePoint]], cap: float) -> set[int]:
     kept.add(anchor_i)
     pending: list[tuple[int, RoutePoint]] = []
     for idx, p in seq[1:]:
+        cap = min(caps[anchor_i], caps[idx])
         if _reachable(anchor, p, cap, floor=True):
             kept.add(idx)
             pending.clear()
             # Re-anchor only on a strict pass, so points admitted by the jitter
             # floor alone keep being measured from the same capped anchor.
             if _reachable(anchor, p, cap, floor=False):
-                anchor = p
+                anchor_i, anchor = idx, p
             continue
         pending.append((idx, p))
         if len(pending) > CLUSTER_N:
             pending.pop(0)
-        if len(pending) == CLUSTER_N and _self_consistent(pending, cap):
+        if len(pending) == CLUSTER_N and _self_consistent(pending, caps):
             kept.update(j for j, _ in pending)
-            anchor = pending[-1][1]
+            anchor_i, anchor = pending[-1]
             pending.clear()
     # A genuine relocation that resumes for only two points before the track ends
     # would otherwise be thrown away. A single uncorroborated point stays dropped.
-    if len(pending) >= 2 and _self_consistent(pending, cap):
+    if len(pending) >= 2 and _self_consistent(pending, caps):
         kept.update(j for j, _ in pending)
     return kept
 
@@ -282,10 +424,11 @@ def filter_route_outliers(
     if len(ordered) < 4:
         return ordered, 0
 
-    cap = speed_cap_mps(workout_type)
+    ped, ceiling = speed_caps_mps(workout_type)
+    caps = _corridor_caps(ordered, ped, ceiling)
     indexed = list(enumerate(ordered))
-    forward = _pass_keep(indexed, cap)
-    backward = _pass_keep(list(reversed(indexed)), cap)
+    forward = _pass_keep(indexed, caps)
+    backward = _pass_keep(list(reversed(indexed)), caps)
     keep = forward & backward
 
     for i in sorted(forward ^ backward):
@@ -293,10 +436,12 @@ def filter_route_outliers(
         right = min((j for j in keep if j > i), default=None)
         if left is None or right is None:
             continue
-        if _reachable(ordered[left], ordered[i], cap, floor=True) and _reachable(
-            ordered[i], ordered[right], cap, floor=True
-        ):
+        if _reachable(
+            ordered[left], ordered[i], min(caps[left], caps[i]), floor=True
+        ) and _reachable(ordered[i], ordered[right], min(caps[i], caps[right]), floor=True):
             keep.add(i)
+
+    keep -= _wander_drops(ordered, ped)
 
     # Losing half a track means the filter, not the track, is wrong. Bailing out
     # also keeps the kept length >= 2, so `has_route` and the split source

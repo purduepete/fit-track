@@ -9,6 +9,7 @@ handles idempotent upserts and split computation.
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 import uuid as uuidlib
 from dataclasses import dataclass, field
@@ -206,6 +207,12 @@ def _parse_route(raw: list) -> list[RoutePoint]:
         lon = as_number(first(p, "longitude", "lon", "lng"))
         ts, _ = parse_dt(first(p, "timestamp", "date", "time"))
         if lat is None or lon is None or ts is None:
+            continue
+        # json.loads accepts bare NaN and Infinity, and the geo maths has no
+        # defence against either. Coordinates are bounded, so check here.
+        if not (math.isfinite(lat) and math.isfinite(lon)):
+            continue
+        if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
             continue
         pts.append(
             RoutePoint(

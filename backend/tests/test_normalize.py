@@ -1,5 +1,6 @@
 """Unit tests for the Health Auto Export normalizer."""
 from app.normalize import (
+    _parse_route,
     as_number,
     as_source_name,
     distance_to_meters,
@@ -10,6 +11,22 @@ from app.normalize import (
     parse_workout,
     unit_of,
 )
+
+
+def test_parse_route_rejects_non_finite_and_out_of_range_coordinates():
+    # json.loads accepts bare NaN and Infinity, and the geo maths cannot survive
+    # either, so the boundary has to reject them.
+    ts = "2026-07-05 12:00:00 +0000"
+    raw = [
+        {"latitude": 47.6, "longitude": -122.1, "timestamp": ts},
+        {"latitude": float("nan"), "longitude": -122.1, "timestamp": ts},
+        {"latitude": 47.6, "longitude": float("inf"), "timestamp": ts},
+        {"latitude": 91.0, "longitude": -122.1, "timestamp": ts},
+        {"latitude": 47.6, "longitude": 181.0, "timestamp": ts},
+    ]
+    pts = _parse_route(raw)
+    assert len(pts) == 1
+    assert pts[0].lat == 47.6
 
 
 def test_as_number_variants():

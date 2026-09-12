@@ -1,15 +1,18 @@
 """Unit tests for geo helpers and split computation."""
+import time
 from datetime import datetime, timedelta
 
 from app.geo import (
     DistanceSample,
     HrSample,
     RoutePoint,
+    _dev_from_chord,
     compute_splits,
     compute_splits_from_route,
     compute_splits_from_samples,
     filter_route_outliers,
     haversine_m,
+    speed_caps_mps,
 )
 
 BASE = datetime(2026, 7, 5, 12, 0, 0)
@@ -314,6 +317,108 @@ def test_a_vehicle_leg_at_the_end_of_a_walk_survives():
     kept, dropped = filter_route_outliers(pts, WALK)
     assert dropped == 0
     assert kept == pts
+
+
+def test_speed_caps_pair_a_self_powered_cap_with_a_ceiling():
+    assert speed_caps_mps("Outdoor Walk") == (4.5, 15.0)
+    assert speed_caps_mps("Outdoor Run") == (8.0, 15.0)
+    # A bike is already fast under its own power, and a swimmer is never on a bus.
+    assert speed_caps_mps("Cycling") == (25.0, 25.0)
+    assert speed_caps_mps("Open Water Swim") == (3.0, 3.0)
+    assert speed_caps_mps(None) == (15.0, 15.0)
+
+
+def test_a_fast_fix_that_covers_no_ground_is_dropped():
+    # 77 m in 7 s is 11 m/s, under the 15 m/s ceiling that protects vehicle legs.
+    # It is still impossible here, because the walk resumes where it left off.
+    pts = [_p(i, i * 1.4) for i in range(20)]
+    pts.append(_p(26, 26.6, 77.0))
+    pts.extend(_p(27 + i, 28.0 + i * 1.4) for i in range(20))
+    kept, dropped = filter_route_outliers(pts, WALK)
+    assert dropped == 1
+    assert all(p.lon == 0.0 for p in kept)
+
+
+# Measured at Redmond Technology Station: 21 s of multipath in which the GPS
+# path covers 155 m while the walker moves 27.6 m. (seconds, east m, north m).
+_BURST = (
+    (0, -15.5, -8.4),
+    (1, -14.6, -13.9),
+    (2, -14.0, -18.2),
+    (3, -13.4, -22.7),
+    (4, -12.1, -31.0),
+    (11, -24.2, 45.1),
+    (12, -19.0, 40.5),
+    (13, -13.5, 36.6),
+    (14, -10.1, 32.0),
+    (15, -10.4, 30.8),
+    (16, -15.4, 26.8),
+    (17, -21.3, 22.0),
+    (18, -25.1, 18.9),
+    (19, -29.0, 17.2),
+    (20, -32.8, 16.2),
+    (21, -36.2, 14.6),
+    (22, -38.0, 11.6),
+    (23, -37.8, 7.8),
+)
+
+
+def test_filter_drops_a_multipath_burst_that_goes_nowhere():
+    # Every step after the first is small and locally plausible, so only the
+    # window shows it: the walker covered 27.6 m while the track drew 155 m.
+    lead = [_p(i - 20, -8.4, -15.5 + (20 - i) * 1.3) for i in range(20)]
+    burst = [_p(t, north, east) for t, east, north in _BURST]
+    tail = [_p(24 + i, 7.8, -37.8 - (i + 1) * 3.9) for i in range(20)]
+    kept, dropped = filter_route_outliers(lead + burst + tail, WALK)
+
+    assert dropped == 11
+    assert burst[5] not in kept  # the 77 m / 7 s teleport
+    north_m = [p.lat / DEG_PER_M for p in kept]
+    assert max(north_m) < 17.0  # the 45 m northern excursion is gone
+    assert min(north_m) > -20.0  # and the 31 m southern dip
+    # ~263 m of drawn track for ~130 m of travel. What survives is within 12 m
+    # of the direct line, which is not separable from ordinary GPS wobble.
+    assert _cum_m(kept) < 170.0
+    assert lead + [burst[0]] == kept[: len(lead) + 1]
+    assert kept[-len(tail) :] == tail
+
+
+def test_a_brisk_out_and_back_is_not_mistaken_for_a_burst():
+    # Same signature as a burst (66 m of path, ~2 m of net displacement) but
+    # every step is walkable, so nothing here is impossible.
+    out = [_p(i, i * 2.2) for i in range(15)]
+    back = [_p(15 + i, (13 - i) * 2.2) for i in range(15)]
+    kept, dropped = filter_route_outliers(out + back, WALK)
+    assert dropped == 0
+    assert len(kept) == 30
+
+
+def test_a_dense_burst_cannot_make_the_scan_quadratic():
+    # The window is bounded by time, and the payload sets the timestamps. Without
+    # a count bound this shape is O(n^2) haversines on an ingest request thread.
+    n = 4000
+    pts = [_p(i * 0.002, i * 0.02) for i in range(n)]
+    pts[n // 2] = _p(n // 2 * 0.002, 900.0, 900.0)
+    started = time.perf_counter()
+    kept, dropped = filter_route_outliers(pts, WALK)
+    # Bounded runs in ~0.1 s; without the count bound the same input takes ~6 s,
+    # and the cost is quadratic, so 20k fixes would take minutes.
+    assert time.perf_counter() - started < 2.0
+    assert len(kept) + dropped == n
+
+
+def test_duplicate_timestamps_do_not_hang_or_explode():
+    pts = [_p(0, float(i)) for i in range(600)]
+    kept, dropped = filter_route_outliers(pts, WALK)
+    assert len(kept) + dropped == 600
+
+
+def test_a_step_across_the_antimeridian_is_measured_the_short_way():
+    # 179.999 E to 179.999 W is ~220 m apart, not most of the way round the world.
+    a = RoutePoint(ts_utc=BASE, lat=0.0, lon=179.999, elevation_m=None)
+    b = RoutePoint(ts_utc=BASE + timedelta(seconds=60), lat=0.0, lon=-179.999, elevation_m=None)
+    mid = RoutePoint(ts_utc=BASE + timedelta(seconds=30), lat=0.0, lon=180.0, elevation_m=None)
+    assert _dev_from_chord(a, b, mid) < 1.0
 
 
 def test_filtering_shrinks_gps_distance_and_keeps_gps_splits():

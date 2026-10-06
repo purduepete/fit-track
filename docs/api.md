@@ -16,7 +16,7 @@ short-circuits. Concurrent posts of the same payload are safe: if two requests
 race the duplicate check, the loser catches the unique-hash violation and returns
 `{ "status": "ok", "duplicate": true }` instead of erroring.
 
-Payloads larger than `MAX_INGEST_BYTES` (default 25 MiB, see `config.py`) are
+Payloads larger than `MAX_INGEST_BYTES` (default 64 MiB, see `config.py`) are
 rejected with `413 Request Entity Too Large` before parsing.
 
 Response:

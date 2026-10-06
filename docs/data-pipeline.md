@@ -26,14 +26,21 @@ Daily metrics arrive under `data.metrics` as `{name, units, data:[{date, qty}]}`
 
 ## Configure the iOS app
 
-In **Health Auto Export → Automations**, create a daily automation:
+In **Health Auto Export → Automations**, create separate automations for health
+metrics and workouts:
 
 1. **Format:** JSON.
 2. **Include** the workout **Route**, **Heart Rate**, and **Walking + Running
    Distance** data (these are what power the map, HR chart, and splits).
-3. **Destination:** a folder that syncs to your PC — iCloud Drive (with *iCloud
-   for Windows*), Dropbox, or OneDrive — or, for a REST push, the fittrack
-   ingest endpoint directly.
+3. **Destination:** the fittrack ingest endpoint via **REST API** (see
+   [Direct REST push](#direct-rest-push-recommended)), or a folder that syncs to
+   your PC — Google Drive, iCloud Drive (with *iCloud for Windows*), Dropbox, or
+   OneDrive.
+4. **Health metrics:** use a 14-day date range, **Summarize Data:** on, and
+   **Time Grouping:** Days.
+5. **Workouts:** enable **Include Route Data** and **Include Workout Metrics**,
+   with **Time Grouping:** Seconds. Use a 7-day or 14-day date range.
+6. **Batch Requests:** off for both automations.
 
 > The parser is tolerant of field-name and unit variations across app versions,
 > but the three data categories above must be enabled or the corresponding
@@ -59,7 +66,7 @@ cd backend
 Run without `--once` to poll continuously, or register a **Scheduled Task** that
 runs the watcher at logon (see below).
 
-### Google Drive (the wired default)
+### Google Drive (folder fallback)
 
 The phone uploads each export to a `fittrack` folder in Google Drive; **Google
 Drive for Desktop** mirrors it locally (e.g. `G:\My Drive\fittrack`). Point the
@@ -98,12 +105,54 @@ window) and writes output to `backend/logs/upload-watcher.log`. A healthy
 watcher shows as **two** `pythonw` processes (the venv stub spawns a worker
 child).
 
-### Direct REST push (optional, Phase 3)
+### Direct REST push (recommended)
 
-Instead of the folder, point Health Auto Export's REST API destination at
-`https://<container-app>/api/ingest/health-auto-export` with an
-`Authorization: Bearer <ingest token>` header. The route is embedded in the
-JSON, so no separate GPX upload is needed.
+The phone posts straight to the API, so no PC, Google Drive sync or watcher is
+involved.
+
+1. **Create an ingest-scoped token** in your own terminal (outside VS Code, so
+   the printed token never lands in a chat transcript). It writes the token hash
+   to the live database, and the raw token prints once:
+
+   ```powershell
+   cd backend
+   .\scripts\New-IngestToken.ps1 -Name iphone-hae -Scope ingest
+   ```
+
+2. In **Health Auto Export → Automations → New Automation**, choose **REST API**:
+   - **URL:** `https://<container-app>/api/ingest/health-auto-export`
+   - **Header:** `Authorization: Bearer <ingest token>`
+   - **Format:** JSON, **Export Version:** v2.
+   - **Health Metrics automation:** select the metrics you use, turn
+     **Summarize Data** on, and set **Time Grouping** to **Days**.
+   - **Health Metrics date range:** use **14 days** as a workaround. Earlier
+     7-day exports had incomplete steps, while a 14-day export contained all
+     days. The cause of that difference has not been confirmed.
+   - **Workouts automation:** enable **Include Route Data** and
+     **Include Workout Metrics**, including heart rate and walking + running
+     distance. Set **Time Grouping** to **Seconds**, with a 7-day or 14-day range.
+   - **Batch Requests:** off for both. Steps are summed within each request,
+     then replace the stored daily total. Splitting one day's points across
+     requests could leave only the last batch's partial total.
+   - **Sync Frequency:** a few times a day. Schedule reminders are optional.
+   - **Overlap:** identical payloads are deduplicated by hash; normalized rows
+     are upserted per day or workout UUID.
+3. Run it once manually and check the dashboard's "last ingest" time.
+
+The route is embedded in the JSON, so no separate GPX upload is needed.
+
+Things to know:
+
+- **Cold start.** The app runs at `minReplicas 0`, so the first request after
+  idle can take a while while a replica starts. Increase the request timeout
+  if needed. If a request times out, check the export log and run it again;
+  identical payloads are deduplicated.
+- **Size.** Bodies over `MAX_INGEST_BYTES` (64 MiB) are rejected with `413`. A
+  30-day export was estimated at about 35 MiB in the backend configuration.
+  Check actual payload size if a request is rejected.
+- **Failures.** Nothing is quarantined on this path. Check the app's export log
+  on the phone, or the `raw_ingest_events` table for the event status.
+- The folder watcher above stays available as a fallback and for manual drops.
 
 ## One-time historical backfill
 

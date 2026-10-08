@@ -188,6 +188,13 @@ class ParsedPayload:
     daily_metrics: list[ParsedDailyMetric] = field(default_factory=list)
 
 
+EXCLUDED_WORKOUT_SOURCES = frozenset({"rouvy", "strava"})
+
+
+def _excluded_workout_source(source_name: str | None) -> bool:
+    return source_name is not None and source_name.strip().casefold() in EXCLUDED_WORKOUT_SOURCES
+
+
 # --- distance / route parsing ------------------------------------------------
 _DISTANCE_TO_M = {"km": 1000.0, "mi": MILE_M, "m": 1.0, "yd": 0.9144, "ft": 0.3048}
 
@@ -498,7 +505,10 @@ def parse_daily_metrics(metrics: list) -> list[ParsedDailyMetric]:
 def parse_payload(payload: dict) -> ParsedPayload:
     """Parse a full HAE payload. Accepts ``{"data": {...}}`` or a bare data dict."""
     data = payload.get("data", payload) if isinstance(payload, dict) else {}
-    workouts = [pw for w in data.get("workouts", []) if (pw := parse_workout(w))]
+    workouts = [
+        pw for w in data.get("workouts", [])
+        if (pw := parse_workout(w)) and not _excluded_workout_source(pw.source_name)
+    ]
     daily = parse_daily_metrics(data.get("metrics", []))
     return ParsedPayload(workouts=workouts, daily_metrics=daily)
 
@@ -534,8 +544,12 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
     now = utcnow()
     counts = {"workouts": 0, "daily_metrics": 0, "splits": 0, "route_points_dropped": 0}
 
+    # Enforce exclusions here too because historical import paths can construct
+    # ParsedPayload directly without passing through parse_payload.
+    workouts = [pw for pw in parsed.workouts if not _excluded_workout_source(pw.source_name)]
+
     # Batch-fetch existing workouts by UUID (avoids a SELECT per workout).
-    workout_uuids = [pw.uuid for pw in parsed.workouts]
+    workout_uuids = [pw.uuid for pw in workouts]
     existing_workouts: dict[str, models.Workout] = {}
     for batch in _chunked(workout_uuids):
         existing_workouts.update(
@@ -552,7 +566,7 @@ def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
     sample_rows: list[dict] = []
     split_rows: list[dict] = []
 
-    for pw in parsed.workouts:
+    for pw in workouts:
         existing = existing_workouts.get(pw.uuid)
         # Bad GPS fixes would otherwise drive both the map and the stored splits,
         # which are GPS-derived. `distance_m` comes from the payload and is untouched.

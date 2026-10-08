@@ -206,6 +206,23 @@ def test_parse_payload_wraps_data():
     assert len(parsed.workouts) == 1
 
 
+def test_parse_payload_excludes_rouvy_and_strava_workouts():
+    workouts = []
+    for workout_id, source in (
+        ("ROUVY-1", "ROUVY"),
+        ("STRAVA-1", "strava"),
+        ("WATCH-1", "Jim's Apple Watch"),
+    ):
+        workout = _sample_workout()
+        workout["id"] = workout_id
+        workout["sourceName"] = source
+        workouts.append(workout)
+
+    parsed = parse_payload({"data": {"workouts": workouts, "metrics": []}})
+
+    assert [workout.uuid for workout in parsed.workouts] == ["WATCH-1"]
+
+
 def test_parse_daily_metrics():
     payload = {
         "data": {

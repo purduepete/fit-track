@@ -1,7 +1,7 @@
 """Tests for auth token hashing and persistence idempotency."""
 from app.auth import hash_token
 from app.models import DailyMetric, Workout, WorkoutSplit
-from app.normalize import parse_payload, persist_payload
+from app.normalize import ParsedPayload, parse_payload, parse_workout, persist_payload
 
 
 def test_hash_token_deterministic():
@@ -51,6 +51,26 @@ def test_persist_is_idempotent(db_session):
     assert db_session.query(Workout).count() == first == 1
     # Splits are replaced, not duplicated.
     assert db_session.query(WorkoutSplit).count() == splits_first
+
+
+def test_persist_excludes_filtered_workouts_from_direct_imports(db_session):
+    """Import paths that build ParsedPayload directly must apply source exclusions."""
+    workout = parse_workout(
+        {
+            "id": "STRAVA-1",
+            "name": "Indoor Cycling",
+            "sourceName": "Strava",
+            "start": "2026-07-05 11:39:13 -0700",
+            "end": "2026-07-05 12:10:07 -0700",
+            "duration": 1853.6,
+        }
+    )
+    assert workout is not None
+
+    counts = persist_payload(ParsedPayload(workouts=[workout]), db_session)
+
+    assert counts["workouts"] == 0
+    assert db_session.query(Workout).count() == 0
 
 
 def test_persist_batches_multiple_workouts_and_metrics(db_session):

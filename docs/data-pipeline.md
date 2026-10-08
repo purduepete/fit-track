@@ -23,6 +23,10 @@ Each workout object embeds everything fittrack needs:
 | `isIndoor` | context |
 
 Daily metrics arrive under `data.metrics` as `{name, units, data:[{date, qty}]}`.
+Workouts whose source name is `ROUVY` or `Strava` (case-insensitive) are
+excluded during normalization, including historical reprocessing and XML
+backfills. Their raw ingest payloads remain stored, but normalization will
+continue to omit those workouts.
 
 ## Configure the iOS app
 

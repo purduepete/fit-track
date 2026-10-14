@@ -91,8 +91,10 @@ else {
             Cmd     = $_.CommandLine
         }
     } | Format-List
-    if ($procs.Count -gt 1) {
-        Write-Host "$($procs.Count) watchers running; the singleton guard should have prevented this." -ForegroundColor Yellow
+    $procIds = $procs.ProcessId
+    $rootProcs = @($procs | Where-Object { $_.ParentProcessId -notin $procIds })
+    if ($rootProcs.Count -gt 1) {
+        Write-Host "$($rootProcs.Count) watchers running; the singleton guard should have prevented this." -ForegroundColor Yellow
     }
 }
 

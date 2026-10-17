@@ -32,6 +32,12 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   export never duplicates. Raw payloads are stored for safe re-processing.
 - **Simple token auth** — bearer tokens you generate locally; only the hash is
   stored.
+- **SiteDock sign-in handoff**: when FitTrack is embedded in SiteDock, it saves
+  its token with SiteDock and restores it on load, because Safari on iPad erases
+  embedded-frame storage when the app closes. It only talks to a direct parent
+  whose origin is in `VITE_SITEDOCK_ORIGINS` (comma-separated, set at build
+  time; defaults to `https://jimbrownhome.tail8ad282.ts.net:9443`). Firefox
+  doesn't expose `location.ancestorOrigins`, so the handoff is off there.
 
 ## Repository layout
 

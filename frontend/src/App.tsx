@@ -1,6 +1,7 @@
-import { Suspense, lazy, useState } from "react";
+import { Suspense, lazy, useEffect, useState } from "react";
 import { NavLink, Route, HashRouter as Router, Routes } from "react-router-dom";
-import { getToken } from "./lib/api";
+import { getToken, restoreToken } from "./lib/api";
+import { sitedockOrigin } from "./lib/sitedock";
 import { useTheme } from "./lib/useTheme";
 import { ActivityIcon, LogOutIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/Icons";
 import { TokenGate } from "./components/TokenGate";
@@ -18,7 +19,23 @@ const WorkoutDetail = lazy(() =>
 export default function App() {
   const [theme, toggleTheme] = useTheme();
   const [authed, setAuthed] = useState(Boolean(getToken()));
+  // Inside SiteDock, ask for a kept token before showing the gate.
+  const [restoring, setRestoring] = useState(() => !getToken() && sitedockOrigin() !== null);
 
+  useEffect(() => {
+    if (!restoring) return;
+    let live = true;
+    void restoreToken().then((found) => {
+      if (!live) return;
+      if (found) setAuthed(true);
+      setRestoring(false);
+    });
+    return () => {
+      live = false;
+    };
+  }, [restoring]);
+
+  if (restoring) return <p className="muted gate">Loading…</p>;
   if (!authed) return <TokenGate onSaved={() => setAuthed(true)} />;
 
   const onAuthError = () => setAuthed(false);

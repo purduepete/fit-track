@@ -1,4 +1,6 @@
-/** Tiny typed API client. The bearer token is kept in localStorage. */
+/** Tiny typed API client. The bearer token is kept in localStorage (and in SiteDock when embedded there). */
+import { sitedockToken } from "./sitedock";
+
 export interface WorkoutSummary {
   uuid: string;
   workout_type: string;
@@ -117,10 +119,20 @@ export function getToken(): string | null {
 
 export function setToken(token: string): void {
   localStorage.setItem(TOKEN_KEY, token);
+  void sitedockToken.save(token);
 }
 
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
+  void sitedockToken.clear();
+}
+
+/** Restores a token kept by SiteDock when this frame's own storage was erased. */
+export async function restoreToken(): Promise<boolean> {
+  const token = await sitedockToken.get();
+  if (!token || getToken()) return Boolean(getToken());
+  localStorage.setItem(TOKEN_KEY, token);
+  return true;
 }
 
 export class ApiError extends Error {

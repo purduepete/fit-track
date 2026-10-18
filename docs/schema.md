@@ -1,10 +1,13 @@
-# Database schema (`fit` schema)
+# Database schema
 
-All tables live in the `fit` schema of the WebPortfolio Azure SQL database.
-Defined as SQLAlchemy models in `backend/app/models.py`; created by
-`scripts/init_db.py`.
+Production runs on PostgreSQL database `fit_track` on jimbrownhome1, with every
+table in the standard `public` schema (`DB_SCHEMA=public`). The DDL is
+`deploy/postgresql/001_initial.sql`. The retired Azure SQL deployment kept these
+tables in the `fit` schema of the WebPortfolio database, which is why the
+headings below still say `public.`. Defined as SQLAlchemy models in
+`backend/app/models.py`.
 
-## `fit.api_tokens`
+## `public.api_tokens`
 Bearer tokens for the API. Only the hash is stored.
 
 | Column | Type | Notes |
@@ -16,7 +19,7 @@ Bearer tokens for the API. Only the hash is stored.
 | `disabled` | bit | |
 | `created_utc`, `last_used_utc` | datetime2 | |
 
-## `fit.raw_ingest_events`
+## `public.raw_ingest_events`
 Raw payloads, stored before normalization so parsing can be re-run.
 
 | Column | Type | Notes |
@@ -29,7 +32,7 @@ Raw payloads, stored before normalization so parsing can be re-run.
 | `status` | varchar(20) | `received` \| `processed` |
 | `error` | nvarchar(max) | |
 
-## `fit.workouts`
+## `public.workouts`
 One row per workout. `uuid` is the Apple workout id (idempotency key).
 
 | Column | Type | Notes |
@@ -56,26 +59,26 @@ Indexes: `start_utc`; `(workout_type, local_date)`.
 > (plus the mandatory Gemini review for DB changes) for negligible gain. Revisit
 > only if a common filtered-list workload with a measured sort cost emerges.
 
-## `fit.workout_route_points`
+## `public.workout_route_points`
 GPS track. FK → `workouts.uuid` (cascade). Rebuilt on re-ingest.
 
 `id` bigint PK · `workout_uuid` · `seq` · `ts_utc` · `lat` · `lon` ·
 `elevation_m` · `speed_mps`. Index `(workout_uuid, seq)`.
 
-## `fit.workout_samples`
+## `public.workout_samples`
 Interval samples (currently `heart_rate`) tied to a workout.
 
 `id` bigint PK · `workout_uuid` · `metric_type` · `start_utc` · `end_utc` ·
 `value` · `unit`. Index `(workout_uuid, metric_type, start_utc)`.
 
-## `fit.workout_splits`
+## `public.workout_splits`
 Computed per-unit splits (stored for both `mi` and `km`).
 
 `id` bigint PK · `workout_uuid` · `unit_system` (`mi`\|`km`) · `split_index` ·
 `distance_m` · `duration_sec` · `pace_sec_per_unit` · `avg_hr` · `source`
 (`gps`\|`sample`). Unique `(workout_uuid, unit_system, split_index)`.
 
-## `fit.daily_metrics`
+## `public.daily_metrics`
 Per-day aggregate metrics (steps, resting HR, VO₂ max, …).
 
 `id` bigint PK · `local_date` · `metric_type` · `value` · `unit` ·

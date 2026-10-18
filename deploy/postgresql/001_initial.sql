@@ -1,8 +1,7 @@
-CREATE SCHEMA fit;
 CREATE TABLE public.solutiondeploy_schema (app_id text PRIMARY KEY, version integer NOT NULL);
 INSERT INTO public.solutiondeploy_schema VALUES ('fittrack', 1);
 
-CREATE TABLE fit.api_tokens (
+CREATE TABLE public.api_tokens (
 	id SERIAL NOT NULL,
 	name VARCHAR(100) NOT NULL,
 	token_hash VARCHAR(64) NOT NULL,
@@ -16,7 +15,7 @@ CREATE TABLE fit.api_tokens (
 
 ;
 
-CREATE TABLE fit.daily_metrics (
+CREATE TABLE public.daily_metrics (
 	id BIGSERIAL NOT NULL,
 	local_date VARCHAR(10) NOT NULL,
 	metric_type VARCHAR(40) NOT NULL,
@@ -30,7 +29,7 @@ CREATE TABLE fit.daily_metrics (
 
 ;
 
-CREATE TABLE fit.raw_ingest_events (
+CREATE TABLE public.raw_ingest_events (
 	id BIGSERIAL NOT NULL,
 	source VARCHAR(50) NOT NULL,
 	received_utc TIMESTAMP WITHOUT TIME ZONE NOT NULL,
@@ -45,7 +44,7 @@ CREATE TABLE fit.raw_ingest_events (
 
 ;
 
-CREATE TABLE fit.workouts (
+CREATE TABLE public.workouts (
 	uuid VARCHAR(80) NOT NULL,
 	workout_type VARCHAR(60) NOT NULL,
 	source_name VARCHAR(120),
@@ -68,7 +67,7 @@ CREATE TABLE fit.workouts (
 
 ;
 
-CREATE TABLE fit.workout_route_points (
+CREATE TABLE public.workout_route_points (
 	id BIGSERIAL NOT NULL,
 	workout_uuid VARCHAR(80) NOT NULL,
 	seq INTEGER NOT NULL,
@@ -78,12 +77,12 @@ CREATE TABLE fit.workout_route_points (
 	elevation_m FLOAT,
 	speed_mps FLOAT,
 	PRIMARY KEY (id),
-	FOREIGN KEY(workout_uuid) REFERENCES fit.workouts (uuid) ON DELETE CASCADE
+	FOREIGN KEY(workout_uuid) REFERENCES public.workouts (uuid) ON DELETE CASCADE
 )
 
 ;
 
-CREATE TABLE fit.workout_samples (
+CREATE TABLE public.workout_samples (
 	id BIGSERIAL NOT NULL,
 	workout_uuid VARCHAR(80) NOT NULL,
 	metric_type VARCHAR(40) NOT NULL,
@@ -92,12 +91,12 @@ CREATE TABLE fit.workout_samples (
 	value FLOAT NOT NULL,
 	unit VARCHAR(20),
 	PRIMARY KEY (id),
-	FOREIGN KEY(workout_uuid) REFERENCES fit.workouts (uuid) ON DELETE CASCADE
+	FOREIGN KEY(workout_uuid) REFERENCES public.workouts (uuid) ON DELETE CASCADE
 )
 
 ;
 
-CREATE TABLE fit.workout_splits (
+CREATE TABLE public.workout_splits (
 	id BIGSERIAL NOT NULL,
 	workout_uuid VARCHAR(80) NOT NULL,
 	unit_system VARCHAR(4) NOT NULL,
@@ -109,12 +108,12 @@ CREATE TABLE fit.workout_splits (
 	source VARCHAR(10) NOT NULL,
 	PRIMARY KEY (id),
 	CONSTRAINT uq_fit_split UNIQUE (workout_uuid, unit_system, split_index),
-	FOREIGN KEY(workout_uuid) REFERENCES fit.workouts (uuid) ON DELETE CASCADE
+	FOREIGN KEY(workout_uuid) REFERENCES public.workouts (uuid) ON DELETE CASCADE
 )
 
 ;
-CREATE INDEX ix_fit_daily_type_date ON fit.daily_metrics (metric_type, local_date);
-CREATE INDEX ix_fit_workouts_start ON fit.workouts (start_utc);
-CREATE INDEX ix_fit_workouts_type_date ON fit.workouts (workout_type, local_date);
-CREATE INDEX ix_fit_route_workout_seq ON fit.workout_route_points (workout_uuid, seq);
-CREATE INDEX ix_fit_sample_workout_metric ON fit.workout_samples (workout_uuid, metric_type, start_utc);
+CREATE INDEX ix_fit_daily_type_date ON public.daily_metrics (metric_type, local_date);
+CREATE INDEX ix_fit_workouts_start ON public.workouts (start_utc);
+CREATE INDEX ix_fit_workouts_type_date ON public.workouts (workout_type, local_date);
+CREATE INDEX ix_fit_route_workout_seq ON public.workout_route_points (workout_uuid, seq);
+CREATE INDEX ix_fit_sample_workout_metric ON public.workout_samples (workout_uuid, metric_type, start_utc);

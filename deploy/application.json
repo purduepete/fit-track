@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
-  "id": "fittrack",
-  "repository": "https://github.com/purduepete/fittrack",
+  "id": "fit-track",
+  "repository": "https://github.com/purduepete/fit-track",
   "runtime": {"kind": "python", "minimumVersion": "3.12"},
   "database": {
-    "engine": "postgresql", "name": "fittrack",
+    "engine": "postgresql", "name": "fit_track",
     "connectionEnvironment": "DATABASE_URL", "schemaVersion": 1,
     "migrationsDirectory": "deploy\\postgresql", "backupFormat": "custom"
   },
@@ -15,7 +15,7 @@
   "launch": {
     "entrypoint": "deploy\\run.py", "arguments": [], "port": 8791,
     "environment": {
-      "DB_AUTH": "sql", "DB_SCHEMA": "fit", "GATEWAY_READ_AUTH": "true",
+      "DB_AUTH": "sql", "DB_SCHEMA": "public", "GATEWAY_READ_AUTH": "true",
       "STATIC_DIR": "{release}\\frontend\\dist",
       "PYTHONDONTWRITEBYTECODE": "1"
     },
@@ -23,5 +23,5 @@
   },
   "readiness": {"path": "/api/ready", "expected": {"status": "ok"}, "timeoutSeconds": 180},
   "state": [],
-  "routes": [{"hostname": "fittrack.jimlertech.com"}]
+  "routes": [{"hostname": "fit-track.jimlertech.com"}]
 }

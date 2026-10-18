@@ -59,7 +59,7 @@ The home deployment runs on `jimbrownhome1` using the dedicated PostgreSQL
 database `fittrack` and the existing `fit` schema. Azure SQL remains supported
 for development and rollback through the legacy `DB_*` settings.
 
-- Public dashboard: `https://fittrack.jimlertech.com`, protected by Microsoft
+- Public dashboard: `https://fit-track.jimlertech.com`, protected by Microsoft
   sign-in through Cloudflare Access.
 - Private dashboard: `https://jimbrownhome1.tail8ad282.ts.net:8791`.
 - Upload endpoint: append `/api/ingest/health-auto-export` to the private URL.

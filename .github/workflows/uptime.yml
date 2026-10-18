@@ -23,7 +23,7 @@ jobs:
     steps:
       - name: Verify Microsoft sign-in boundary
         env:
-          DEFAULT_URL: https://fittrack.jimlertech.com
+          DEFAULT_URL: https://fit-track.jimlertech.com
           INPUT_URL: ${{ github.event.inputs.base_url }}
         run: |
           set -uo pipefail

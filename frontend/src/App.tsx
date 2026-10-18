@@ -19,8 +19,26 @@ const WorkoutDetail = lazy(() =>
 export default function App() {
   const [theme, toggleTheme] = useTheme();
   const [authed, setAuthed] = useState(Boolean(getToken()));
+  const [gateway, setGateway] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   // Inside SiteDock, ask for a kept token before showing the gate.
   const [restoring, setRestoring] = useState(() => !getToken() && sitedockOrigin() !== null);
+
+  useEffect(() => {
+    let live = true;
+    void fetch("/api/auth-mode")
+      .then((response) => response.ok ? response.json() : { gateway: false })
+      .then((mode: { gateway: boolean }) => {
+        if (live && mode.gateway) {
+          setGateway(true);
+          setAuthed(true);
+          setRestoring(false);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { if (live) setCheckingAuth(false); });
+    return () => { live = false; };
+  }, []);
 
   useEffect(() => {
     if (!restoring) return;
@@ -35,7 +53,7 @@ export default function App() {
     };
   }, [restoring]);
 
-  if (restoring) return <p className="muted gate">Loading…</p>;
+  if (checkingAuth || restoring) return <p className="muted gate">Loading…</p>;
   if (!authed) return <TokenGate onSaved={() => setAuthed(true)} />;
 
   const onAuthError = () => setAuthed(false);
@@ -65,9 +83,9 @@ export default function App() {
           <button className="icon-btn" onClick={toggleTheme} title="Toggle theme">
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
           </button>
-          <button className="icon-btn" onClick={logout} title="Sign out">
+          {!gateway && <button className="icon-btn" onClick={logout} title="Sign out">
             <LogOutIcon />
-          </button>
+          </button>}
         </header>
         <main className="container">
           <Suspense fallback={<p className="muted">Loading…</p>}>

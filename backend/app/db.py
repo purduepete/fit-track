@@ -1,6 +1,6 @@
-"""SQLAlchemy engine / session setup for Azure SQL.
+"""SQLAlchemy sessions for PostgreSQL or Azure SQL.
 
-Supports two auth modes (``DB_AUTH``):
+DATABASE_URL selects PostgreSQL. Legacy Azure SQL supports ``DB_AUTH`` modes:
 
 * ``sql`` (default) — username/password via the SQLAlchemy URL.
 * ``aad`` — Azure AD access token via ``DefaultAzureCredential``, which uses the
@@ -22,6 +22,11 @@ _ENGINE_KW = dict(pool_pre_ping=True, pool_size=5, max_overflow=5, fast_executem
 
 def _build_engine():
     s = get_settings()
+    if s.database_url:
+        return create_engine(
+            s.sqlalchemy_url, pool_pre_ping=True, pool_size=5, max_overflow=5,
+            hide_parameters=True,
+        )
     if s.db_auth.lower() == "aad":
         import struct
 

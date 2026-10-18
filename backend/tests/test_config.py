@@ -57,3 +57,8 @@ def test_sqlalchemy_url_escapes_credentials():
     url = s.sqlalchemy_url
     assert "admin%40srv:p%40ss%2Fw%3Ard%231@" in url
     assert url.count("@") == 1
+
+
+def test_postgresql_url_overrides_legacy_settings():
+    url = "postgresql+psycopg://fittrack_runtime:password@127.0.0.1/fittrack"
+    assert Settings(database_url=url).sqlalchemy_url == url

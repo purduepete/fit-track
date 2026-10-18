@@ -1,8 +1,4 @@
-"""Application configuration loaded from environment variables.
-
-Reuses the existing webportfolio Azure SQL server; all fittrack tables live in
-the ``fit`` schema of the WebPortfolio database.
-"""
+"""Environment configuration for PostgreSQL or the legacy Azure SQL source."""
 from datetime import date
 from functools import lru_cache
 from pathlib import Path
@@ -34,6 +30,9 @@ class Settings(BaseSettings):
     # "sql" = username/password; "aad" = Azure AD token (DefaultAzureCredential:
     # az login locally, managed identity in Azure — no password needed).
     db_auth: str = "sql"
+    database_url: str = ""
+    # Enable only behind Cloudflare Access / private Tailscale with loopback binding.
+    gateway_read_auth: bool = False
 
     # Reject ingest payloads larger than this (bytes) before parsing. A full
     # 30-day Health Auto Export (all intraday step points, HR arrays and routes)
@@ -62,6 +61,8 @@ class Settings(BaseSettings):
 
     @property
     def sqlalchemy_url(self) -> str:
+        if self.database_url:
+            return self.database_url
         encrypt = "yes" if self.db_encrypt else "no"
         driver = self.db_odbc_driver.replace(" ", "+")
         # Credentials go into a URL, so anything with @ : / ? # % in it has to be

@@ -1,20 +1,7 @@
 name: Uptime
 
-# External availability check for the fittrack Container App.
-#
-# Why this exists: the app runs at minReplicas 0, so "zero replicas" is the
-# NORMAL idle state — an Azure metric alert cannot tell idle apart from broken.
-# On 2026-08-03 an expired ghcr PAT made every image pull fail; with no replica
-# able to start, requests simply hung and the outage went unnoticed until the
-# page was opened by hand. Only a real HTTP request from outside catches that.
-#
-# Runs a few times a day ON PURPOSE. Each check wakes the app, so probing every
-# few minutes would keep it permanently warm and undo the scale-to-zero saving
-# that is the whole reason it is on the Consumption plan. Three checks a day
-# surfaces a broken deploy long before it matters for a personal dashboard.
-#
-# A failed run emails the repo owner via GitHub's default notifications, so no
-# Azure action group is required.
+# Checks the public Cloudflare Access boundary. The dedicated host watchdog
+# checks /api/ready, including PostgreSQL, on the protected origin.
 
 on:
   schedule:
@@ -34,42 +21,37 @@ jobs:
   health:
     runs-on: ubuntu-latest
     steps:
-      - name: Probe /api/health (tolerating a cold start)
+      - name: Verify Microsoft sign-in boundary
         env:
-          DEFAULT_URL: https://fittrack-api.graymoss-46d6bacd.eastus2.azurecontainerapps.io
+          DEFAULT_URL: https://fittrack.jimlertech.com
           INPUT_URL: ${{ github.event.inputs.base_url }}
         run: |
           set -uo pipefail
           base="${INPUT_URL:-$DEFAULT_URL}"
           url="$base/api/health"
 
-          # A run started with a base_url override is a test of the check itself,
-          # not a production outage. Say so in the failure annotation, otherwise a
-          # deliberate test is indistinguishable from a real one at a glance.
           if [ -n "$INPUT_URL" ]; then
-            target="MANUAL OVERRIDE ($url) — not production"
+            target="manual override ($url)"
           else
             target="production ($url)"
           fi
           echo "Probing $target"
 
-          # Scale-from-zero can take a while, and the first attempt is the one
-          # that pays the cold start, so retry before calling it an outage.
           for attempt in 1 2 3; do
             echo "Attempt $attempt: GET $url"
-            code=$(curl -sS -o body.txt -w '%{http_code}' --max-time 120 "$url") && rc=0 || rc=$?
+            code=$(curl -sS -D headers.txt -o body.txt -w '%{http_code}' --max-time 30 "$url") && rc=0 || rc=$?
 
             if [ "$rc" -ne 0 ]; then
-              echo "curl failed (exit $rc) — a hang here usually means no replica could start."
-            elif [ "$code" = "200" ]; then
-              echo "OK ($code): $(cat body.txt)"
+              echo "curl failed (exit $rc)."
+            elif [ "$code" = "302" ] && grep -Eiq '^location: https://[^/]+\.cloudflareaccess\.com/' headers.txt; then
+              echo "Cloudflare Access protects the public route."
               exit 0
             else
-              echo "Unexpected status $code: $(cat body.txt)"
+              echo "Expected an Access login redirect; received HTTP $code."
             fi
 
             [ "$attempt" -lt 3 ] && sleep 30
           done
 
-          echo "::error::No 200 after 3 attempts from $target. If this is production, check for image-pull failures: az containerapp logs show -n fittrack-api -g jimbpersonal-rg --type system --tail 30"
+          echo "::error::Access boundary check failed for $target. Check the FitTrack Access application, DNS, and tunnel route."
           exit 1

@@ -36,6 +36,16 @@ def test_ingest_requires_token(client):
     assert r.status_code == 401
 
 
+def test_gateway_read_access_keeps_ingest_protected(client, monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "gateway_read_auth", True)
+    assert client.get("/api/auth-mode").json() == {"gateway": True}
+    assert client.get("/api/workouts").status_code == 200
+    assert client.get("/api/dashboard").status_code == 200
+    assert client.post("/api/ingest/health-auto-export", json=WORKOUT_PAYLOAD).status_code == 401
+
+
 def test_ingest_rejects_bad_token(client):
     r = client.post(
         "/api/ingest/health-auto-export",

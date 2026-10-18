@@ -53,6 +53,39 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
 
 ## Quickstart (local)
 
+### Windows PostgreSQL deployment
+
+The home deployment runs on `jimbrownhome1` using the dedicated PostgreSQL
+database `fittrack` and the existing `fit` schema. Azure SQL remains supported
+for development and rollback through the legacy `DB_*` settings.
+
+- Public dashboard: `https://fittrack.jimlertech.com`, protected by Microsoft
+  sign-in through Cloudflare Access.
+- Private dashboard: `https://jimbrownhome1.tail8ad282.ts.net:8791`.
+- Upload endpoint: append `/api/ingest/health-auto-export` to the private URL.
+  Uploads still require an existing ingest-scoped bearer token.
+- `DATABASE_URL=postgresql+psycopg://.../fittrack` selects PostgreSQL.
+  Credentials belong in the protected SolutionDeploy `shared\secrets\app.env`,
+  never in this repository.
+- `GATEWAY_READ_AUTH=true` removes the dashboard's second token prompt. Enable
+  it only with a loopback listener and protected Cloudflare Access / private
+  Tailscale routes. Its default is false; ingest authentication stays enabled.
+- `deploy\application.json` binds the API to `127.0.0.1:8791` and uses the
+  framework's restricted account, startup task, and watchdog.
+- `backend\scripts\migrate_postgresql.py` exports the source's complete rows,
+  imports only into an empty dedicated PostgreSQL database, and compares
+  SHA-256 digests of every column in primary-key order. Raw JSON is compressed
+  by SQL Server during export and decoded before comparison.
+
+The migration archive and `pg_dump` backup are private under
+`C:\ProgramData\SolutionDeploy\archives\fittrack-migration-20261018`.
+Provisioning and imports require an independent review before execution.
+The Azure `fittrack-api--0000060` revision is inactive; its resources and the
+shared WebPortfolio database remain intact. The Google Drive upload client
+continues on `jimbrownhome`, where its synced folder is mounted, and sends to
+the target's private HTTPS URL. The scheduled GitHub check verifies the public
+Access sign-in boundary; the host watchdog checks the app's database readiness.
+
 Prerequisites: Python 3.12+, Node 20+, the
 [ODBC Driver 18 for SQL Server](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server),
 and access to the WebPortfolio Azure SQL server.

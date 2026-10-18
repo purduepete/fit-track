@@ -11,10 +11,11 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import text
+from sqlalchemy import select, text
 
 from .config import get_settings
 from .db import SessionLocal
+from .models import ApiToken
 from .routers import dashboard, ingest, workouts
 
 logger = logging.getLogger("fittrack")
@@ -82,6 +83,18 @@ async def _revalidate_app_shell(request, call_next):
 @app.get("/api/health", tags=["meta"])
 def health() -> dict:
     """Unauthenticated liveness probe used by Azure Container Apps."""
+    return {"status": "ok"}
+
+
+@app.get("/api/auth-mode", tags=["meta"])
+def auth_mode() -> dict:
+    return {"gateway": settings.gateway_read_auth}
+
+
+@app.get("/api/ready", tags=["meta"])
+def ready() -> dict:
+    with SessionLocal() as db:
+        db.execute(select(ApiToken.id).limit(1))
     return {"status": "ok"}
 
 

@@ -11,6 +11,7 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy import false, select
 from sqlalchemy.orm import Session
 
+from .config import get_settings
 from .db import get_db
 from .models import ApiToken
 from .timeutil import utcnow
@@ -62,5 +63,7 @@ def require_ingest(
 def require_read(
     authorization: str | None = Header(default=None),
     db: Session = Depends(get_db),
-) -> ApiToken:
+) -> ApiToken | None:
+    if get_settings().gateway_read_auth:
+        return None
     return _validate(_extract_bearer(authorization), db, "read")

@@ -4,7 +4,7 @@ import { getToken, restoreToken } from "./lib/api";
 import { sitedockOrigin } from "./lib/sitedock";
 import { useTheme } from "./lib/useTheme";
 import { ActivityIcon, LogOutIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/Icons";
-import { TokenGate } from "./components/TokenGate";
+import { AccessGate, TokenGate } from "./components/TokenGate";
 import { RefreshProvider, useRefreshBar } from "./lib/refresh";
 import { Dashboard } from "./pages/Dashboard";
 import { Workouts } from "./pages/Workouts";
@@ -21,23 +21,38 @@ export default function App() {
   const [authed, setAuthed] = useState(Boolean(getToken()));
   const [gateway, setGateway] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
+  // Behind Cloudflare Access, a missing Access session turns /api/auth-mode into a redirect to the
+  // Access login page. That needs a Cloudflare sign-in, not this app's token.
+  const [needsAccess, setNeedsAccess] = useState(false);
   // Inside SiteDock, ask for a kept token before showing the gate.
   const [restoring, setRestoring] = useState(() => !getToken() && sitedockOrigin() !== null);
 
   useEffect(() => {
     let live = true;
-    void fetch("/api/auth-mode")
-      .then((response) => response.ok ? response.json() : { gateway: false })
-      .then((mode: { gateway: boolean }) => {
-        if (live && mode.gateway) {
+    const check = () => fetch("/api/auth-mode", { redirect: "manual", cache: "no-store" })
+      .then(async (response) => {
+        if (!live) return;
+        if (!response.ok) { setNeedsAccess(true); return; }
+        const mode = (await response.json()) as { gateway: boolean };
+        if (!live) return;
+        setNeedsAccess(false);
+        if (mode.gateway) {
           setGateway(true);
           setAuthed(true);
           setRestoring(false);
         }
       })
-      .catch(() => {})
+      .catch(() => { if (live) setNeedsAccess(true); })
       .finally(() => { if (live) setCheckingAuth(false); });
-    return () => { live = false; };
+    void check();
+    const returned = () => { if (document.visibilityState !== "hidden") void check(); };
+    window.addEventListener("focus", returned);
+    document.addEventListener("visibilitychange", returned);
+    return () => {
+      live = false;
+      window.removeEventListener("focus", returned);
+      document.removeEventListener("visibilitychange", returned);
+    };
   }, []);
 
   useEffect(() => {
@@ -54,9 +69,10 @@ export default function App() {
   }, [restoring]);
 
   if (checkingAuth || restoring) return <p className="muted gate">Loading…</p>;
+  if (needsAccess) return <AccessGate />;
   if (!authed) return <TokenGate onSaved={() => setAuthed(true)} />;
 
-  const onAuthError = () => setAuthed(false);
+  const onAuthError = () => { if (gateway) setNeedsAccess(true); else setAuthed(false); };
   const logout = () => {
     clearToken();
     setAuthed(false);

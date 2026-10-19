@@ -4,7 +4,7 @@
  * SiteDock (first-party, persistent) and asks for it back on load. Only allow-listed SiteDock
  * origins that are FitTrack's direct parent are ever contacted.
  */
-const DEFAULT_ORIGINS = "https://jimbrownhome.tail8ad282.ts.net:9443,https://site-dock.jimlertech.com";
+const DEFAULT_ORIGINS = "https://jimbrownhome1.tail8ad282.ts.net:8790,https://site-dock.jimlertech.com";
 const TIMEOUT_MS = 1500;
 
 function allowedOrigins(): string[] {

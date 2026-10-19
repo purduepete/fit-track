@@ -36,7 +36,7 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   its token with SiteDock and restores it on load, because Safari on iPad erases
   embedded-frame storage when the app closes. It only talks to a direct parent
   whose origin is in `VITE_SITEDOCK_ORIGINS` (comma-separated, set at build
-  time; defaults to `https://jimbrownhome.tail8ad282.ts.net:9443` and
+  time; defaults to `https://jimbrownhome1.tail8ad282.ts.net:8790` and
   `https://site-dock.jimlertech.com`). The Docker build uses the same defaults;
   override them with `--build-arg VITE_SITEDOCK_ORIGINS=...` when needed. Firefox
   doesn't expose `location.ancestorOrigins`, so the handoff is off there.

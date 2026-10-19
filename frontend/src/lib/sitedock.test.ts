@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { clearToken, getToken, restoreToken, setToken } from "./api";
 import { sitedockOrigin } from "./sitedock";
 
-const DOCK = "https://jimbrownhome.tail8ad282.ts.net:9443";
+const DOCK = "https://jimbrownhome1.tail8ad282.ts.net:8790";
 
 function embed(parent: string | null) {
   Object.defineProperty(window, "top", { configurable: true, get: () => (parent ? {} : window) });

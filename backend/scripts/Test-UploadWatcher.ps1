@@ -3,7 +3,7 @@
     One-shot health check for the FitTrack upload watcher and its ingest path.
 
 .DESCRIPTION
-    Run this on the machine that hosts the watcher (jimbrownhome) when exports
+    Run this on the machine that hosts the watcher (jimbrownhome1) when exports
     stop landing in the dashboard. It reports, in order:
 
       1. Scheduled task state, last run time and last result.
@@ -34,7 +34,8 @@ param(
 $ErrorActionPreference = 'Continue'
 $backend = Split-Path $PSScriptRoot -Parent
 $repo = Split-Path $backend -Parent
-$taskName = 'FitTrack Upload Watcher'
+$taskPath = '\JimlerTech\'
+$taskName = 'SolutionDeploy-fit-track-upload-watcher'
 
 function Write-Section {
     param([string]$Title)
@@ -62,12 +63,12 @@ $archiveName = if ($env:FITTRACK_ARCHIVE_NAME) { $env:FITTRACK_ARCHIVE_NAME } el
 $interval = 300
 
 Write-Section 'Scheduled task'
-$task = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+$task = Get-ScheduledTask -TaskPath $taskPath -TaskName $taskName -ErrorAction SilentlyContinue
 if (-not $task) {
     Write-Host "Task '$taskName' is NOT registered. Run Register-UploadWatcherTask.ps1." -ForegroundColor Red
 }
 else {
-    $info = Get-ScheduledTaskInfo -TaskName $taskName
+    $info = Get-ScheduledTaskInfo -TaskPath $taskPath -TaskName $taskName
     [pscustomobject]@{
         State          = $task.State
         LastRunTime    = $info.LastRunTime
@@ -172,7 +173,7 @@ Write-Host @'
  - Files in _failed means a 4xx or a corrupt archive. Fix the cause, then move
    them back into the watch folder to retry.
  - "HUNG" above: Get-Process python* | Stop-Process, then
-   Start-ScheduledTask -TaskName 'FitTrack Upload Watcher'
+   Start-ScheduledTask -TaskPath '\JimlerTech\' -TaskName 'SolutionDeploy-fit-track-upload-watcher'
  - Force one immediate pass without the task:
    cd backend; python -m scripts.upload_folder --dir "<watch dir>" --archive-name processed --once
 '@

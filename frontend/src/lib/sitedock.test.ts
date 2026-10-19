@@ -23,8 +23,32 @@ function answer(origin: string, store: Map<string, string>) {
 describe("SiteDock token handoff", () => {
   beforeEach(() => localStorage.clear());
   afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
     embed(null);
+  });
+
+  it.each([DOCK, "https://site-dock.jimlertech.com"])("allows the exact SiteDock origin %s", async (origin) => {
+    embed(origin);
+    expect(sitedockOrigin()).toBe(origin);
+    answer(origin, new Map([["t", "restored"]]));
+    await expect(restoreToken()).resolves.toBe(true);
+    expect(getToken()).toBe("restored");
+  });
+
+  it.each(["http://site-dock.jimlertech.com", "https://site-dock.jimlertech.com.evil.example", "https://other.jimlertech.com"])(
+    "rejects a similar origin %s", (origin) => {
+      embed(origin);
+      expect(sitedockOrigin()).toBeNull();
+    },
+  );
+
+  it("keeps an explicit build allowlist authoritative", () => {
+    vi.stubEnv("VITE_SITEDOCK_ORIGINS", DOCK);
+    embed("https://site-dock.jimlertech.com");
+    expect(sitedockOrigin()).toBeNull();
+    embed(DOCK);
+    expect(sitedockOrigin()).toBe(DOCK);
   });
 
   it("is inactive unless framed directly by an allowed SiteDock origin", () => {

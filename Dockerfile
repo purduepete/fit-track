@@ -4,6 +4,8 @@ WORKDIR /fe
 COPY frontend/package*.json ./
 RUN npm ci
 COPY frontend/ ./
+ARG VITE_SITEDOCK_ORIGINS=https://jimbrownhome.tail8ad282.ts.net:9443,https://site-dock.jimlertech.com
+ENV VITE_SITEDOCK_ORIGINS=$VITE_SITEDOCK_ORIGINS
 RUN npm run build
 
 FROM python:3.12-slim AS runtime

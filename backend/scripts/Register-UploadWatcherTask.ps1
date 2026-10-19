@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    (Re)register the "FitTrack Upload Watcher" scheduled task with self-healing
+    (Re)register the \JimlerTech\SolutionDeploy-fit-track-upload-watcher scheduled task with self-healing
     keep-alive settings.
 
 .DESCRIPTION
@@ -33,7 +33,8 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$taskName = 'FitTrack Upload Watcher'
+$taskPath = '\JimlerTech\'
+$taskName = 'SolutionDeploy-fit-track-upload-watcher'
 $script   = Join-Path $PSScriptRoot 'Watch-Upload.ps1'
 $launcher = Join-Path $PSScriptRoot 'run-watcher-hidden.vbs'
 $wscript  = Join-Path $env:SystemRoot 'System32\wscript.exe'
@@ -68,7 +69,11 @@ $settings = New-ScheduledTaskSettingsSet `
 
 $principal = New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited
 
-Register-ScheduledTask -TaskName $taskName `
+# Remove the pre-migration task so two watchers never scan the same folder.
+Get-ScheduledTask -TaskPath '\' -TaskName 'FitTrack Upload Watcher' -ErrorAction SilentlyContinue |
+    Unregister-ScheduledTask -Confirm:$false
+
+Register-ScheduledTask -TaskPath $taskPath -TaskName $taskName `
     -Action $action `
     -Trigger @($logon, $timed) `
     -Settings $settings `
@@ -76,6 +81,6 @@ Register-ScheduledTask -TaskName $taskName `
     -Description "Watches the Google Drive fittrack folder and ingests Health Auto Export archives into the fittrack API. Self-healing: relaunches every $RepeatMinutes min if not running." `
     -Force | Out-Null
 
-Write-Host "Registered '$taskName' (keep-alive every $RepeatMinutes min)."
-Start-ScheduledTask -TaskName $taskName
-Write-Host "Started. State:" (Get-ScheduledTask -TaskName $taskName).State
+Write-Host "Registered '$taskPath$taskName' (keep-alive every $RepeatMinutes min)."
+Start-ScheduledTask -TaskPath $taskPath -TaskName $taskName
+Write-Host "Started. State:" (Get-ScheduledTask -TaskPath $taskPath -TaskName $taskName).State

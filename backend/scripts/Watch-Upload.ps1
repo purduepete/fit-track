@@ -24,7 +24,7 @@
 
 .PARAMETER Background
     Run with output redirected to backend/logs/upload-watcher.log instead of
-    the console. Used by the "FitTrack Upload Watcher" scheduled task; the
+    the console. Used by the "SolutionDeploy-fit-track-upload-watcher" scheduled task; the
     wscript wrapper (run-watcher-hidden.vbs) already launches pwsh hidden, so
     the inherited console stays hidden and no terminal window appears.
 

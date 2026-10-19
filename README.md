@@ -36,7 +36,9 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   its token with SiteDock and restores it on load, because Safari on iPad erases
   embedded-frame storage when the app closes. It only talks to a direct parent
   whose origin is in `VITE_SITEDOCK_ORIGINS` (comma-separated, set at build
-  time; defaults to `https://jimbrownhome.tail8ad282.ts.net:9443`). Firefox
+  time; defaults to `https://jimbrownhome.tail8ad282.ts.net:9443` and
+  `https://site-dock.jimlertech.com`). The Docker build uses the same defaults;
+  override them with `--build-arg VITE_SITEDOCK_ORIGINS=...` when needed. Firefox
   doesn't expose `location.ancestorOrigins`, so the handoff is off there.
 
 ## Repository layout
@@ -82,8 +84,8 @@ The migration archive and `pg_dump` backup are private under
 Provisioning and imports require an independent review before execution.
 The Azure `fittrack-api--0000060` revision is inactive; its resources and the
 shared WebPortfolio database remain intact. The Google Drive upload client
-continues on `jimbrownhome`, where its synced folder is mounted, and sends to
-the target's private HTTPS URL. The scheduled GitHub check verifies the public
+runs on `jimbrownhome1` in JimBrown's signed-in session, where Google Drive
+mounts `G:`, and posts to `http://127.0.0.1:8791`. It stops while nobody is signed in. The scheduled GitHub check verifies the public
 Access sign-in boundary; the host watchdog checks the app's database readiness.
 
 Prerequisites: Python 3.12+, Node 20+, the
@@ -154,7 +156,7 @@ Check with `python -m scripts.token_admin list`.
 ### Two healthy states that look like failures
 
 **`Last Run Result` of `0x800710E0`** ("the operator or administrator has
-refused the request") on the `FitTrack Upload Watcher` task is the design
+refused the request") on the `\JimlerTech\SolutionDeploy-fit-track-upload-watcher` task is the design
 working. The task is registered `MultipleInstances IgnoreNew` with a keep-alive
 trigger every 10 minutes, so each repeat is refused while the watcher is alive
 and only relaunches it if it died. Read the `Status` column instead: `Running`

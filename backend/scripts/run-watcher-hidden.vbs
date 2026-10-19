@@ -1,6 +1,6 @@
 ' Launches the FitTrack upload watcher with NO visible window.
 '
-' The "FitTrack Upload Watcher" scheduled task points at this file via
+' The "SolutionDeploy-fit-track-upload-watcher" scheduled task points at this file via
 ' wscript.exe. Because wscript.exe is not a console app and we start pwsh
 ' with an intWindowStyle of 0 (hidden), no console window ever flashes on
 ' screen -- unlike launching pwsh.exe directly, which briefly shows a window

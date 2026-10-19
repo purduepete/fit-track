@@ -83,7 +83,7 @@ stays in Drive:
 
 The `Watch-Upload.ps1` launcher reads `FITTRACK_WATCH_DIR`,
 `FITTRACK_ARCHIVE_NAME` and `FITTRACK_RETENTION_DAYS` from `backend/.env.local`,
-so the same setup runs unattended via the **`FitTrack Upload Watcher`** Scheduled
+so the same setup runs unattended via the **`\JimlerTech\SolutionDeploy-fit-track-upload-watcher`** Scheduled
 Task. Any other provider (iCloud Drive / OneDrive / Dropbox) works identically —
 just point `FITTRACK_WATCH_DIR` at its local folder.
 

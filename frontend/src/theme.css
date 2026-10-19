@@ -1,16 +1,18 @@
-/* fittrack theme — indigo→violet accent, light + dark, squared corners.
-   The accent is fittrack's identity and is shared by both themes. The dark
+/* fittrack theme — standard highlight (Steel Blue dark, Midnight Blue light), squared corners.
+   The accent is set per theme below. The dark
    neutrals come from the midnight baseline (ferry_tracker/webportfolio).
    --radius and --font are deliberately global: D2 applies them to both themes. */
 :root {
-  --accent: #4f46e5;        /* indigo-600 */
-  --accent-2: #7c3aed;      /* violet-600 */
-  --accent-grad: linear-gradient(135deg, var(--accent), var(--accent-2));
+  --accent: #6b8cae;
+  --on-accent: #0f172a;
+  --accent-grad: var(--accent);
   --radius: 0;              /* squared corners */
   --font: "Roboto Flex", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
 }
 
 :root[data-theme="light"] {
+  --accent: #2f477b;
+  --on-accent: #f8fafc;
   --bg: #f4f5fb;
   --surface: #ffffff;
   --surface-2: #f0f1f8;
@@ -26,6 +28,8 @@
 }
 
 :root[data-theme="dark"] {
+  --accent: #6b8cae;
+  --on-accent: #0f172a;
   --bg: #020617;
   --surface: #0f172a;
   --surface-2: #172033;
@@ -109,7 +113,7 @@ a {
   display: grid;
   place-items: center;
   background: var(--accent-grad);
-  color: #fff;
+  color: var(--on-accent);
   border-radius: var(--radius);
 }
 
@@ -402,7 +406,7 @@ tbody tr:hover {
 
 .toggle-group button.active {
   background: var(--accent-grad);
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .linklike {
@@ -469,7 +473,7 @@ tbody tr:hover {
   border: none;
   border-radius: var(--radius);
   background: var(--accent-grad);
-  color: #fff;
+  color: var(--on-accent);
   font-weight: 600;
   cursor: pointer;
   font-size: 0.95rem;

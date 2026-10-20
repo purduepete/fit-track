@@ -81,54 +81,17 @@ if ($existing.Count -gt 0) {
 # appears because run-watcher-hidden.vbs already starts pwsh hidden and the
 # child console inherits that hidden console.
 function Resolve-BasePython {
-    # Prefer Python 3.12 because newer Python versions (3.14/3.15) can lack binary wheels
-    # for C-extensions like pyodbc and Scoop's 'python' package floats to latest.
-    $scoop312Junction = "C:\Files\ScoopApps\apps\python312\current"
-    if (Test-Path $scoop312Junction) {
-        $item = Get-Item $scoop312Junction -ErrorAction SilentlyContinue
-        if ($item -and $item.Target) {
-            $exe = Join-Path $item.Target[0] 'python.exe'
-            if (Test-Path $exe) { return $exe }
-        }
+    $exe = 'C:\Files\ScoopApps\apps\python314\3.14.8\python.exe'
+    if (-not (Test-Path -LiteralPath $exe)) {
+        throw "Required Python 3.14.8 interpreter not found: $exe"
     }
-    $scoopDirect = Get-ChildItem "C:\Files\ScoopApps\apps\python312\*\python.exe" -ErrorAction SilentlyContinue |
-        Where-Object { $_.DirectoryName -notlike "*current*" } | Select-Object -First 1 -ExpandProperty FullName
-    if ($scoopDirect -and (Test-Path $scoopDirect)) { return $scoopDirect }
-
-    $cmd = Get-Command python3.12, python312 -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Source
-    if ($cmd) { return $cmd }
-
-    return 'python'
+    return $exe
 }
 
-$venvPython = Join-Path $backend '.venv\Scripts\python.exe'
-$basePython = Resolve-BasePython
-
-# Auto-heal pyvenv.cfg if it points to Scoop's junction 'apps\python312\current'
-$pyvenvCfg = Join-Path $backend '.venv\pyvenv.cfg'
-if (Test-Path $pyvenvCfg) {
-    $cfgContent = Get-Content $pyvenvCfg -Raw
-    if ($cfgContent -match 'apps\\python312\\current') {
-        $realHome = Split-Path -Parent $basePython
-        $cfgContent = $cfgContent -replace 'apps\\python312\\current', $realHome
-        Set-Content -Path $pyvenvCfg -Value $cfgContent
-    }
-}
-
-$pythonWorks = $false
-if (Test-Path $venvPython) {
-    try {
-        & $venvPython -c "import sys" 2>$null
-        if ($LASTEXITCODE -eq 0) {
-            $pythonWorks = $true
-        }
-    } catch {}
-}
-
-if ($pythonWorks) {
-    $python = $venvPython
-} else {
-    $python = $basePython
+$python = Resolve-BasePython
+& $python -c "import sys; assert sys.version_info[:3] == (3, 14, 8)"
+if ($LASTEXITCODE -ne 0) {
+    throw 'The upload watcher requires Python 3.14.8.'
 }
 
 # Watch folder + archive subfolder are configurable via .env.local

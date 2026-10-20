@@ -57,6 +57,12 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
 
 ### Windows PostgreSQL deployment
 
+The home runtime uses Python 3.14.8. The backend dependency pins were tested on
+that interpreter with all 132 offline tests passing. Python updates are held
+on the host; runtime upgrades require rebuilding the release's `.venv`.
+The separate upload watcher also uses Python 3.14.8, selected explicitly by
+`backend\scripts\Watch-Upload.ps1`. Its upload module uses only the standard library.
+
 The home deployment runs on `jimbrownhome1` using the dedicated PostgreSQL
 database `fittrack` and the existing `fit` schema. Azure SQL remains supported
 for development and rollback through the legacy `DB_*` settings.

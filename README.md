@@ -426,3 +426,8 @@ nothing real.
 - [API reference](docs/api.md)
 - [Database schema](docs/schema.md)
 - [Testing](docs/testing.md)
+## Theme preferences
+
+The header theme selector offers System, Light and Midnight, with Midnight as the default.
+System follows OS changes live. The icon button switches between Light and Midnight.
+The `fittrack_theme` storage key accepts `system`, `light` and `midnight`; legacy `dark` values migrate to Midnight.

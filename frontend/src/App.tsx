@@ -2,7 +2,7 @@ import { Suspense, lazy, useEffect, useState } from "react";
 import { NavLink, Route, HashRouter as Router, Routes } from "react-router-dom";
 import { getToken, restoreToken } from "./lib/api";
 import { sitedockOrigin } from "./lib/sitedock";
-import { useTheme } from "./lib/useTheme";
+import { useTheme, type Theme } from "./lib/useTheme";
 import { ActivityIcon, LogOutIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/Icons";
 import { AccessGate, TokenGate } from "./components/TokenGate";
 import { RefreshProvider, useRefreshBar } from "./lib/refresh";
@@ -17,7 +17,7 @@ const WorkoutDetail = lazy(() =>
 );
 
 export default function App() {
-  const [theme, toggleTheme] = useTheme();
+  const [theme, toggleTheme, preference, setPreference] = useTheme();
   const [authed, setAuthed] = useState(Boolean(getToken()));
   const [gateway, setGateway] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
@@ -96,6 +96,11 @@ export default function App() {
           </nav>
           <div className="spacer" />
           <RefreshButton />
+          <select aria-label="Theme" value={preference} onChange={(event) => setPreference(event.target.value as Theme)}>
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="midnight">Midnight</option>
+          </select>
           <button className="icon-btn" onClick={toggleTheme} title="Toggle theme">
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
           </button>

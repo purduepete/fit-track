@@ -1,31 +1,42 @@
 import { useEffect, useState } from "react";
 
-export type Theme = "light" | "dark";
-
+export type Theme = "light" | "midnight" | "system";
 const KEY = "fittrack_theme";
 
-// iOS paints the reserved status bar strip from theme-color, so it has to track --bg.
-const THEME_COLORS: Record<Theme, string> = { light: "#f4f5fb", dark: "#020617" };
-
 function initialTheme(): Theme {
-  // index.html sets data-theme before paint; read it so React never re-defaults
-  // to a different theme and causes a flash.
-  const applied = document.documentElement.dataset.theme;
-  if (applied === "light" || applied === "dark") return applied;
-  const stored = localStorage.getItem(KEY) as Theme | null;
-  if (stored) return stored;
-  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  try {
+    const saved = localStorage.getItem(KEY);
+    if (saved === "light" || saved === "system") return saved;
+  } catch { /* Storage can be unavailable in private browsing. */ }
+  return "midnight";
 }
 
-/** Applies the theme to <html data-theme> and persists the choice. */
-export function useTheme(): [Theme, () => void] {
-  const [theme, setTheme] = useState<Theme>(initialTheme);
+export function useTheme() {
+  const [preference, setPreference] = useState<Theme>(initialTheme);
+  const [systemDark, setSystemDark] = useState(() => window.matchMedia("(prefers-color-scheme: dark)").matches);
+  const theme = preference === "system" ? systemDark ? "dark" : "light" : preference === "midnight" ? "dark" : "light";
 
   useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", THEME_COLORS[theme]);
-    localStorage.setItem(KEY, theme);
-  }, [theme]);
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setSystemDark(media.matches);
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
 
-  return [theme, () => setTheme((t) => (t === "dark" ? "light" : "dark"))];
+  useEffect(() => {
+    const root = document.documentElement;
+    const bg = theme === "dark" ? "#020617" : "#ffffff";
+    root.dataset.theme = theme;
+    root.classList.toggle("light", theme === "light");
+    root.classList.toggle("dark", theme === "dark");
+    root.classList.toggle("theme-midnight", theme === "dark");
+    root.style.colorScheme = theme;
+    root.style.setProperty("--launch-bg", bg);
+    root.style.setProperty("--launch-fg", theme === "dark" ? "#f8fafc" : "#1a1b2e");
+    document.querySelector('meta[name="theme-color"]')?.setAttribute("content", bg);
+    try { localStorage.setItem(KEY, preference); } catch { /* Keep the theme usable without storage. */ }
+  }, [preference, theme]);
+
+  return [theme, () => setPreference(theme === "dark" ? "light" : "midnight"), preference, setPreference] as const;
 }

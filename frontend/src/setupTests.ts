@@ -1,5 +1,13 @@
 import "@testing-library/jest-dom";
 
+if (!window.matchMedia) {
+  window.matchMedia = (query) => ({
+    matches: false, media: query, onchange: null,
+    addEventListener() {}, removeEventListener() {},
+    addListener() {}, removeListener() {}, dispatchEvent: () => true,
+  });
+}
+
 // jsdom in this setup does not provide Web Storage, so give tests a minimal
 // in-memory localStorage. This lets code paths that persist the auth token
 // (api.ts / useApiResource) run under test the same way they do in a browser.

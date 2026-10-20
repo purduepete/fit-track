@@ -17,8 +17,8 @@ export default defineConfig({
         name: "Fit Track",
         short_name: "Fit Track",
         description: "Apple Watch activity and workout tracker.",
-        theme_color: "#0e0f1a",
-        background_color: "#0e0f1a",
+        theme_color: "#020617",
+        background_color: "#020617",
         display: "standalone",
         start_url: "/",
         icons: [

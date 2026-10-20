@@ -26,15 +26,18 @@
         var theme = 'dark';
         try {
           var stored = localStorage.getItem('fittrack_theme');
-          if (stored === 'light' || stored === 'dark') {
-            theme = stored;
-          } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+          if (stored === 'light') {
+            theme = 'light';
+          } else if (stored === 'system' && window.matchMedia && !window.matchMedia('(prefers-color-scheme: dark)').matches) {
             theme = 'light';
           }
         } catch (e) {}
         html.setAttribute('data-theme', theme);
+        html.classList.toggle('light', theme === 'light');
+        html.classList.toggle('dark', theme === 'dark');
+        html.classList.toggle('theme-midnight', theme === 'dark');
         html.style.colorScheme = theme;
-        var bg = theme === 'dark' ? '#020617' : '#f4f5fb';
+        var bg = theme === 'dark' ? '#020617' : '#ffffff';
         html.style.setProperty('--launch-bg', bg);
         html.style.setProperty('--launch-fg', theme === 'dark' ? '#f8fafc' : '#1a1b2e');
         var themeColor = document.querySelector('meta[name="theme-color"]');

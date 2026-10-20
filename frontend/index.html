@@ -1,173 +1,180 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <!-- iOS ignores an SVG favicon when adding to the home screen and needs this PNG. -->
-    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
-    <meta name="apple-mobile-web-app-title" content="Fit Track" />
-    <!-- No apple-mobile-web-app-status-bar-style: iOS then reserves the status bar instead of
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+        <!-- iOS ignores an SVG favicon when adding to the home screen and needs this PNG. -->
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+        <meta name="apple-mobile-web-app-title" content="Fit Track" />
+        <!-- No apple-mobile-web-app-status-bar-style: iOS then reserves the status bar instead of
          drawing under it, and paints that strip from theme-color. Kept on the active theme by
          the pre-paint script below and by useTheme.ts. -->
-    <meta name="theme-color" content="#020617" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <title>Fit Track</title>
+        <meta name="theme-color" content="#020617" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <title>Fit Track</title>
 
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap" rel="stylesheet" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap"
+            rel="stylesheet"
+        />
 
-    <!-- Pre-paint theme: set data-theme + launch colours before first paint so the
+        <!-- Pre-paint theme: set data-theme + launch colours before first paint so the
          installed PWA never flashes white before React mounts (FOUC fix). -->
-    <script>
-      (function () {
-        var html = document.documentElement;
-        var theme = 'dark';
-        try {
-          var stored = localStorage.getItem('fittrack_theme');
-          if (stored === 'light') {
-            theme = 'light';
-          } else if (stored === 'system' && window.matchMedia && !window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            theme = 'light';
-          }
-        } catch (e) {}
-        html.setAttribute('data-theme', theme);
-        html.classList.toggle('light', theme === 'light');
-        html.classList.toggle('dark', theme === 'dark');
-        html.classList.toggle('theme-midnight', theme === 'dark');
-        html.style.colorScheme = theme;
-        var bg = theme === 'dark' ? '#020617' : '#ffffff';
-        html.style.setProperty('--launch-bg', bg);
-        html.style.setProperty('--launch-fg', theme === 'dark' ? '#f8fafc' : '#1a1b2e');
-        var themeColor = document.querySelector('meta[name="theme-color"]');
-        if (themeColor) themeColor.setAttribute('content', bg);
-      })();
-    </script>
+        <script>
+            (function () {
+                var html = document.documentElement;
+                var theme = 'dark';
+                try {
+                    var stored = localStorage.getItem('fittrack_theme');
+                    if (stored === 'light') {
+                        theme = 'light';
+                    } else if (
+                        stored === 'system' &&
+                        window.matchMedia &&
+                        !window.matchMedia('(prefers-color-scheme: dark)').matches
+                    ) {
+                        theme = 'light';
+                    }
+                } catch (e) {}
+                html.setAttribute('data-theme', theme);
+                html.classList.toggle('light', theme === 'light');
+                html.classList.toggle('dark', theme === 'dark');
+                html.classList.toggle('theme-midnight', theme === 'dark');
+                html.style.colorScheme = theme;
+                var bg = theme === 'dark' ? '#020617' : '#ffffff';
+                html.style.setProperty('--launch-bg', bg);
+                html.style.setProperty('--launch-fg', theme === 'dark' ? '#f8fafc' : '#1a1b2e');
+                var themeColor = document.querySelector('meta[name="theme-color"]');
+                if (themeColor) themeColor.setAttribute('content', bg);
+            })();
+        </script>
 
-    <style>
-      html {
-        -webkit-text-size-adjust: 100%;
-        text-size-adjust: 100%;
-        background: var(--launch-bg, #020617);
-        color: var(--launch-fg, #f8fafc);
-      }
-      html,
-      body {
-        margin: 0;
-        min-height: 100%;
-      }
-      body {
-        min-height: 100dvh;
-        background: var(--launch-bg, #020617);
-      }
+        <style>
+            html {
+                -webkit-text-size-adjust: 100%;
+                text-size-adjust: 100%;
+                background: var(--launch-bg, #020617);
+                color: var(--launch-fg, #f8fafc);
+            }
+            html,
+            body {
+                margin: 0;
+                min-height: 100%;
+            }
+            body {
+                min-height: 100dvh;
+                background: var(--launch-bg, #020617);
+            }
 
-      /* iOS standalone cold-launch mask: keep #root hidden behind a themed backdrop
+            /* iOS standalone cold-launch mask: keep #root hidden behind a themed backdrop
          until the launch viewport settles, so the whole-page rescale ("font shrink")
          is never visible. Applied only on iOS home-screen launch; the class lives on
          <html> and is never re-added, so routing/desktop are unaffected. */
-      #root {
-        transition: opacity 0.35s ease-out;
-      }
-      html.pwa-launch-mask #root {
-        visibility: hidden !important;
-        opacity: 0 !important;
-      }
-      html.pwa-launch-mask::before {
-        content: '';
-        position: fixed;
-        inset: 0;
-        z-index: 2147483647;
-        pointer-events: none;
-        background: var(--launch-bg, #020617);
-      }
-      html.pwa-launch-mask *,
-      html.pwa-no-motion * {
-        transition: none !important;
-        animation: none !important;
-      }
-    </style>
+            #root {
+                transition: opacity 0.35s ease-out;
+            }
+            html.pwa-launch-mask #root {
+                visibility: hidden !important;
+                opacity: 0 !important;
+            }
+            html.pwa-launch-mask::before {
+                content: '';
+                position: fixed;
+                inset: 0;
+                z-index: 2147483647;
+                pointer-events: none;
+                background: var(--launch-bg, #020617);
+            }
+            html.pwa-launch-mask *,
+            html.pwa-no-motion * {
+                transition: none !important;
+                animation: none !important;
+            }
+        </style>
 
-    <script>
-      // iOS standalone cold-launch mask. On iPad, the OS launches the PWA using the
-      // device PORTRAIT width and stretches that layout onto the (landscape) screen,
-      // then runs a ~500ms rotation animation that re-lays-out at the true width -
-      // seen as a "font shrink" a beat after content appears. viewport-fit=cover does
-      // NOT fix this (confirmed on-device: innerWidth goes 1024->1366 while vvScale
-      // and rootFS never change). So we hold #root behind a themed backdrop until the
-      // layout viewport settles. Adaptive: if no launch resize happens (already in the
-      // correct orientation) we reveal as soon as React paints; if the portrait->
-      // landscape flip is detected we hold past the ~500ms rotation. iOS home-screen
-      // launches only; the class lives on <html> and is never re-added.
-      (function () {
-        var html = document.documentElement;
-        var isIOS =
-          /iPad|iPhone|iPod/.test(navigator.platform) ||
-          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        var isStandalone =
-          navigator.standalone === true ||
-          (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
-        if (!isIOS || !isStandalone) return;
+        <script>
+            // iOS standalone cold-launch mask. On iPad, the OS launches the PWA using the
+            // device PORTRAIT width and stretches that layout onto the (landscape) screen,
+            // then runs a ~500ms rotation animation that re-lays-out at the true width -
+            // seen as a "font shrink" a beat after content appears. viewport-fit=cover does
+            // NOT fix this (confirmed on-device: innerWidth goes 1024->1366 while vvScale
+            // and rootFS never change). So we hold #root behind a themed backdrop until the
+            // layout viewport settles. Adaptive: if no launch resize happens (already in the
+            // correct orientation) we reveal as soon as React paints; if the portrait->
+            // landscape flip is detected we hold past the ~500ms rotation. iOS home-screen
+            // launches only; the class lives on <html> and is never re-added.
+            (function () {
+                var html = document.documentElement;
+                var isIOS =
+                    /iPad|iPhone|iPod/.test(navigator.platform) ||
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+                var isStandalone =
+                    navigator.standalone === true ||
+                    (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+                if (!isIOS || !isStandalone) return;
 
-        html.classList.add('pwa-launch-mask', 'pwa-no-motion');
+                html.classList.add('pwa-launch-mask', 'pwa-no-motion');
 
-        var start = performance.now();
-        var lastChange = start;
-        var lastW = window.innerWidth,
-          lastH = window.innerHeight;
-        var hadChange = false;
-        var done = false,
-          fallback = 0;
-        var HOLD_AFTER_FLIP = 560, // clear the ~500ms iOS rotation animation
-          QUIET = 140, // dims must be stable this long before revealing
-          MAX_HOLD = 950; // absolute safety cap
+                var start = performance.now();
+                var lastChange = start;
+                var lastW = window.innerWidth,
+                    lastH = window.innerHeight;
+                var hadChange = false;
+                var done = false,
+                    fallback = 0;
+                var HOLD_AFTER_FLIP = 560, // clear the ~500ms iOS rotation animation
+                    QUIET = 140, // dims must be stable this long before revealing
+                    MAX_HOLD = 950; // absolute safety cap
 
-        function painted() {
-          var r = document.getElementById('root');
-          return r && r.childElementCount > 0;
-        }
-        function onChange() {
-          var w = window.innerWidth,
-            h = window.innerHeight;
-          if (w !== lastW || h !== lastH) {
-            lastW = w;
-            lastH = h;
-            lastChange = performance.now();
-            hadChange = true;
-          }
-        }
-        function reveal() {
-          if (done) return;
-          done = true;
-          clearTimeout(fallback);
-          window.removeEventListener('resize', onChange);
-          if (window.visualViewport) window.visualViewport.removeEventListener('resize', onChange);
-          // Re-enable transitions first, then drop the mask one frame later so
-          // #root animates opacity 0 -> 1 (a gentle fade) instead of snapping in.
-          html.classList.remove('pwa-no-motion');
-          requestAnimationFrame(function () {
-            html.classList.remove('pwa-launch-mask');
-          });
-        }
-        function check() {
-          if (done) return;
-          var now = performance.now();
-          if (now - start >= MAX_HOLD) return reveal();
-          var minHold = hadChange ? HOLD_AFTER_FLIP : 0;
-          var settled = now - start >= minHold && now - lastChange >= QUIET;
-          if (settled && painted()) return reveal();
-          requestAnimationFrame(check);
-        }
-        window.addEventListener('resize', onChange, { passive: true });
-        if (window.visualViewport)
-          window.visualViewport.addEventListener('resize', onChange, { passive: true });
-        fallback = setTimeout(reveal, MAX_HOLD);
-        requestAnimationFrame(check);
-      })();
-    </script>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
-  </body>
+                function painted() {
+                    var r = document.getElementById('root');
+                    return r && r.childElementCount > 0;
+                }
+                function onChange() {
+                    var w = window.innerWidth,
+                        h = window.innerHeight;
+                    if (w !== lastW || h !== lastH) {
+                        lastW = w;
+                        lastH = h;
+                        lastChange = performance.now();
+                        hadChange = true;
+                    }
+                }
+                function reveal() {
+                    if (done) return;
+                    done = true;
+                    clearTimeout(fallback);
+                    window.removeEventListener('resize', onChange);
+                    if (window.visualViewport) window.visualViewport.removeEventListener('resize', onChange);
+                    // Re-enable transitions first, then drop the mask one frame later so
+                    // #root animates opacity 0 -> 1 (a gentle fade) instead of snapping in.
+                    html.classList.remove('pwa-no-motion');
+                    requestAnimationFrame(function () {
+                        html.classList.remove('pwa-launch-mask');
+                    });
+                }
+                function check() {
+                    if (done) return;
+                    var now = performance.now();
+                    if (now - start >= MAX_HOLD) return reveal();
+                    var minHold = hadChange ? HOLD_AFTER_FLIP : 0;
+                    var settled = now - start >= minHold && now - lastChange >= QUIET;
+                    if (settled && painted()) return reveal();
+                    requestAnimationFrame(check);
+                }
+                window.addEventListener('resize', onChange, { passive: true });
+                if (window.visualViewport)
+                    window.visualViewport.addEventListener('resize', onChange, { passive: true });
+                fallback = setTimeout(reveal, MAX_HOLD);
+                requestAnimationFrame(check);
+            })();
+        </script>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.tsx"></script>
+    </body>
 </html>

@@ -5,6 +5,7 @@ import { sitedockOrigin } from "./lib/sitedock";
 import { useTheme, type Theme } from "./lib/useTheme";
 import { ActivityIcon, LogOutIcon, MoonIcon, RefreshIcon, SunIcon } from "./components/Icons";
 import { AccessGate, TokenGate } from "./components/TokenGate";
+import { FilterSelect } from "./components/FilterSelect";
 import { RefreshProvider, useRefreshBar } from "./lib/refresh";
 import { Dashboard } from "./pages/Dashboard";
 import { Workouts } from "./pages/Workouts";
@@ -96,11 +97,16 @@ export default function App() {
           </nav>
           <div className="spacer" />
           <RefreshButton />
-          <select aria-label="Theme" value={preference} onChange={(event) => setPreference(event.target.value as Theme)}>
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="midnight">Midnight</option>
-          </select>
+          <FilterSelect<Theme>
+            ariaLabel="Theme"
+            value={preference}
+            onChange={setPreference}
+            options={[
+              { value: "system", label: "System" },
+              { value: "light", label: "Light" },
+              { value: "midnight", label: "Midnight" },
+            ]}
+          />
           <button className="icon-btn" onClick={toggleTheme} title="Toggle theme">
             {theme === "dark" ? <SunIcon /> : <MoonIcon />}
           </button>

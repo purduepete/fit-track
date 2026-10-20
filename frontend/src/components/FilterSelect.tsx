@@ -38,6 +38,7 @@ export function FilterSelect<T extends string | number>({
   const [open, setOpen] = useState(false);
   const [highlightIndex, setHighlightIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const touchStart = useRef<{ x: number; y: number; index: number } | null>(null);
   const listboxId = useId();
   const selected = options.find((option) => option.value === value);
@@ -51,6 +52,11 @@ export function FilterSelect<T extends string | number>({
     document.addEventListener("pointerdown", closeOutside);
     return () => document.removeEventListener("pointerdown", closeOutside);
   }, [open]);
+
+  useEffect(() => {
+    if (open && highlightIndex >= 0)
+      document.getElementById(optionId(highlightIndex))?.scrollIntoView?.({ block: "nearest" });
+  }, [open, highlightIndex, listboxId]);
 
   // A menu left open when the control is disabled (e.g. a day deep-link arrives)
   // would float over the page with no way to commit a choice.
@@ -69,6 +75,7 @@ export function FilterSelect<T extends string | number>({
     if (!option) return;
     onChange(option.value);
     setOpen(false);
+    triggerRef.current?.focus();
   };
 
   // iOS throws the click away when a finger drifts a pixel, so a touch commits on pointerup.
@@ -89,7 +96,7 @@ export function FilterSelect<T extends string | number>({
 
   const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
     if (!open) {
-      if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp" || event.key === "Enter" || event.key === " ") {
         event.preventDefault();
         openMenu();
       }
@@ -97,6 +104,7 @@ export function FilterSelect<T extends string | number>({
     }
 
     if (event.key === "Escape" || event.key === "Tab") {
+      if (event.key === "Escape") event.preventDefault();
       setOpen(false);
       return;
     }
@@ -119,9 +127,14 @@ export function FilterSelect<T extends string | number>({
   };
 
   return (
-    <div className="filter-select" ref={containerRef}>
+    <div className="filter-select" ref={containerRef} onBlur={(event) => {
+      if (!event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false);
+    }}>
       <button
+        ref={triggerRef}
         type="button"
+        role="combobox"
+        tabIndex={-1}
         className="filter-select-trigger"
         aria-label={ariaLabel}
         aria-haspopup="listbox"
@@ -156,7 +169,8 @@ export function FilterSelect<T extends string | number>({
                   if (event.pointerType === "mouse") setHighlightIndex(index);
                 }}
                 onPointerDown={(event) => {
-                  if (event.pointerType !== "mouse")
+                  if (event.pointerType === "mouse") event.preventDefault();
+                  else
                     touchStart.current = { x: event.clientX, y: event.clientY, index };
                 }}
                 onPointerUp={(event) => selectOnTouch(event, index)}

@@ -12,6 +12,8 @@ export default defineConfig({
             // periodic update checks; disable the auto-injected registration to avoid
             // registering twice.
             injectRegister: null,
+            // Cloudflare Access needs the session cookie on the manifest request.
+            useCredentials: true,
             includeAssets: ['favicon.svg'],
             manifest: {
                 name: 'Fit Track',

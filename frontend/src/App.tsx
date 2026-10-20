@@ -3,7 +3,7 @@ import { NavLink, Route, HashRouter as Router, Routes } from 'react-router-dom';
 import { getToken, restoreToken } from './lib/api';
 import { sitedockOrigin } from './lib/sitedock';
 import { useTheme, type Theme } from './lib/useTheme';
-import { ActivityIcon, LogOutIcon, MoonIcon, RefreshIcon, SunIcon } from './components/Icons';
+import { ActivityIcon, LogOutIcon, RefreshIcon } from './components/Icons';
 import { AccessGate, TokenGate } from './components/TokenGate';
 import { FilterSelect } from './components/FilterSelect';
 import { RefreshProvider, useRefreshBar } from './lib/refresh';
@@ -16,7 +16,7 @@ import { clearToken } from './lib/api';
 const WorkoutDetail = lazy(() => import('./pages/WorkoutDetail').then((m) => ({ default: m.WorkoutDetail })));
 
 export default function App() {
-    const [theme, toggleTheme, preference, setPreference] = useTheme();
+    const [, , preference, setPreference] = useTheme();
     const [authed, setAuthed] = useState(Boolean(getToken()));
     const [gateway, setGateway] = useState(false);
     const [checkingAuth, setCheckingAuth] = useState(true);
@@ -118,9 +118,6 @@ export default function App() {
                             { value: 'midnight', label: 'Midnight' },
                         ]}
                     />
-                    <button className="icon-btn" onClick={toggleTheme} title="Toggle theme">
-                        {theme === 'dark' ? <SunIcon /> : <MoonIcon />}
-                    </button>
                     {!gateway && (
                         <button className="icon-btn" onClick={logout} title="Sign out">
                             <LogOutIcon />

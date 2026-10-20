@@ -118,6 +118,11 @@ textarea {
     background: var(--surface);
 }
 
+/* Header dropdowns match the 38px icon buttons beside them. */
+.app-bar .filter-select-trigger {
+    height: 38px;
+}
+
 .brand {
     display: flex;
     align-items: center;
@@ -975,9 +980,13 @@ tbody tr:hover {
         display: none;
     }
 
+    .icon-btn,
+    .app-bar .filter-select-trigger {
+        height: 34px;
+    }
+
     .icon-btn {
         width: 34px;
-        height: 34px;
     }
 
     .nav {

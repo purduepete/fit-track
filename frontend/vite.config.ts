@@ -39,7 +39,7 @@ export default defineConfig({
                 cleanupOutdatedCaches: true,
                 // The FastAPI backend is served under /api on the same origin; never let
                 // the SW navigation fallback serve the cached app shell for API requests.
-                navigateFallbackDenylist: [/^\/api/],
+                navigateFallbackDenylist: [/^\/api/, /^\/oauth\//],
                 runtimeCaching: [
                     {
                         urlPattern: ({ url }) => url.pathname.startsWith('/api'),

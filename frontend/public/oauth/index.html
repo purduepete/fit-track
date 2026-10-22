@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+        <meta name="theme-color" content="#020617" />
+        <meta name="description" content="Fit Track's personal Google Drive health-export importer." />
+        <title>Fit Track | Google Drive importer</title>
+        <script src="./theme.js"></script>
+        <link rel="stylesheet" href="./style.css" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+        <link
+            href="https://fonts.googleapis.com/css2?family=Roboto+Flex:opsz,wght@8..144,100..1000&display=swap"
+            rel="stylesheet"
+        />
+    </head>
+    <body>
+        <header>
+            <a class="brand" href="./">Fit Track</a>
+            <div class="theme-control">
+                <button id="theme" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="themes">
+                    Theme
+                </button>
+                <div id="themes" role="menu" aria-label="Theme" hidden>
+                    <button type="button" role="menuitemradio" data-theme="system">System</button>
+                    <button type="button" role="menuitemradio" data-theme="light">Light</button>
+                    <button type="button" role="menuitemradio" data-theme="midnight">Midnight</button>
+                </div>
+            </div>
+        </header>
+        <main>
+            <p class="eyebrow">Personal Google Drive importer</p>
+            <h1>Your health exports, in your private tracker.</h1>
+            <p>Fit Track is Jim Brown's personal application for viewing Apple Health metrics and workouts.</p>
+            <section>
+                <h2>Why Google Drive access?</h2>
+                <p>
+                    The dedicated importer is intended to retrieve health-export files from Jim's Google Drive and send
+                    them to his private Fit Track installation. This connection supports unattended imports without
+                    requiring the Google Drive desktop application to be signed in.
+                </p>
+                <p>
+                    Google authorization is for the owner's account. This application is for personal use and does not
+                    accept public registrations.
+                </p>
+            </section>
+            <section>
+                <h2>Private application</h2>
+                <p>
+                    This page contains public information only. The health dashboard and its data remain behind access
+                    controls.
+                </p>
+                <a class="action" href="/">Open private Fit Track</a>
+            </section>
+            <footer>
+                <a href="./privacy.html">Privacy policy</a>
+                <a href="mailto:jim.brown1@gmail.com">jim.brown1@gmail.com</a>
+            </footer>
+        </main>
+    </body>
+</html>

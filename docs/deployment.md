@@ -13,6 +13,14 @@ sign-in through Cloudflare Access. The Google Drive uploader runs on the same ho
 http://127.0.0.1:8791. It runs only while JimBrown is signed in, because `G:` is a
 per-user Google Drive mount.
 
+Public OAuth information is at `/oauth/` and `/oauth/privacy.html`, served from
+`frontend/public/oauth`. These pages describe the planned personal Drive importer;
+publishing them does not enable that importer or change the watcher's logon requirement.
+Only `/oauth/*` bypasses Cloudflare Access, through a separate path-specific application
+managed by `solution-deploy\scripts\Set-CloudflareHostnames.ps1 -PublishFitTrackOAuthPages`.
+The dashboard and APIs remain protected. The authorized Google app domain is
+`jimlertech.com`; its homepage and privacy URLs use the public paths above.
+
 The watcher's `backend\scripts\run-watcher-hidden.vbs` launches
 `C:\ProgramData\SolutionDeploy\runtime\powershell\7\pwsh.exe` explicitly.
 This dedicated runtime is independent of desktop PowerShell updates. Update it

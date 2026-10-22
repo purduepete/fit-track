@@ -12,14 +12,16 @@
 ' correctly suppresses the every-10-min keep-alive relaunches while the watcher
 ' is healthy (a fire-and-forget launch would let duplicate watchers pile up).
 '
-' The watcher itself still runs windowless via pythonw with output redirected
+' The watcher itself still runs windowless via python.exe with output redirected
 ' to backend/logs/upload-watcher.log (see Watch-Upload.ps1 -Background).
 
 Set sh = CreateObject("WScript.Shell")
 
 scriptDir = Left(WScript.ScriptFullName, InStrRev(WScript.ScriptFullName, "\"))
-cmd = "pwsh.exe -NoProfile -ExecutionPolicy Bypass -File """ & scriptDir & "Watch-Upload.ps1"" -Background"
+' Use the deployment runtime, independently of desktop PowerShell updates.
+pwsh = sh.ExpandEnvironmentStrings("%ProgramData%") & "\SolutionDeploy\runtime\powershell\7\pwsh.exe"
+cmd = """" & pwsh & """ -NoProfile -ExecutionPolicy Bypass -File """ & scriptDir & "Watch-Upload.ps1"" -Background"
 
 ' 0 = hidden window, True = wait for the process to exit (keeps the task
 ' instance alive so IgnoreNew dedup works).
-sh.Run cmd, 0, True
+WScript.Quit sh.Run(cmd, 0, True)

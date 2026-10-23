@@ -9,7 +9,7 @@
       1. Scheduled task state, last run time and last result.
       2. Live watcher processes (the singleton guard keys off these).
       3. Watcher log freshness -- a stale log with a live process means a HUNG
-         watcher, which the task's keep-alive cannot detect on its own.
+         watcher, which restart-on-failure cannot detect on its own.
       4. Pending / processed / quarantined file counts in the watch folder.
       5. API reachability and whether the ingest token still authenticates.
 

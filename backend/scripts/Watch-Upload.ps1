@@ -58,7 +58,7 @@ if (-not $env:FITTRACK_API_URL -or -not $env:FITTRACK_TOKEN) {
 }
 
 # Singleton guard: if a watcher is already running, this launch is a no-op.
-# The scheduled task's keep-alive re-checks and restart-on-failure can fire
+# A manual launch or restart-on-failure can fire
 # while a healthy watcher already exists; without this guard duplicate watchers
 # accumulate (each poll re-scans the same folder). We treat any live
 # scripts.upload_folder process as the running watcher and exit early.
@@ -127,3 +127,6 @@ try {
 finally {
     Pop-Location
 }
+# Pass the watcher's exit code through so a crash counts as a task failure and
+# triggers the scheduled task's restart-on-failure.
+exit $LASTEXITCODE

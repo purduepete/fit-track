@@ -161,13 +161,13 @@ Check with `python -m scripts.token_admin list`.
 
 ### Two healthy states that look like failures
 
-**`Last Run Result` of `0x800710E0`** ("the operator or administrator has
-refused the request") on the `\JimlerTech\SolutionDeploy-fit-track-upload-watcher` task is the design
-working. The task is registered `MultipleInstances IgnoreNew` with a keep-alive
-trigger every 10 minutes, so each repeat is refused while the watcher is alive
-and only relaunches it if it died. Read the `Status` column instead: `Running`
-plus recent `OK ...` lines in `backend/logs/upload-watcher.log` is healthy.
-`Ready` with a stale log is the real failure.
+**`Last Run Result` of `0x41301`** ("the task is currently running") on the
+`\JimlerTech\SolutionDeploy-fit-track-upload-watcher` task is healthy. The task
+instance stays running for the watcher's whole lifetime. `Running` plus recent
+`OK ...` lines in `backend/logs/upload-watcher.log` is healthy. `Ready` with a
+stale log is the real failure. Older registrations repeated every 10 minutes and
+showed `0x800710E0` ("refused the request"); re-run
+`Register-UploadWatcherTask.ps1` to remove that repeat.
 
 **Two `python.exe` processes** for `scripts.upload_folder` is one watcher, not
 two. `.venv\Scripts\python.exe` is a launcher stub that re-execs the base

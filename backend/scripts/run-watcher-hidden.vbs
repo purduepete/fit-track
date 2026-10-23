@@ -4,13 +4,11 @@
 ' wscript.exe. Because wscript.exe is not a console app and we start pwsh
 ' with an intWindowStyle of 0 (hidden), no console window ever flashes on
 ' screen -- unlike launching pwsh.exe directly, which briefly shows a window
-' before -WindowStyle Hidden takes effect (every keep-alive re-check).
+' before -WindowStyle Hidden takes effect.
 '
 ' We WAIT for pwsh to exit (bWaitOnReturn = True) so this wscript process
-' stays alive for the whole lifetime of the watcher. That keeps the scheduled
-' task instance "running", so the task's MultipleInstances=IgnoreNew setting
-' correctly suppresses the every-10-min keep-alive relaunches while the watcher
-' is healthy (a fire-and-forget launch would let duplicate watchers pile up).
+' stays alive for the whole lifetime of the watcher, and its exit code (the
+' watcher's) reaches Task Scheduler so restart-on-failure fires on a crash.
 '
 ' The watcher itself still runs windowless via python.exe with output redirected
 ' to backend/logs/upload-watcher.log (see Watch-Upload.ps1 -Background).

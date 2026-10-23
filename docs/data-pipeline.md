@@ -100,10 +100,9 @@ Register (or re-register) the task with:
 ```
 
 Because the watcher reads the interactive Google Drive mount (`G:`), the task
-runs **as the current user, only while logged on**. It is **self-healing**: it
-starts at logon and a keep-alive trigger re-checks every 10 minutes — with
-`MultipleInstances=IgnoreNew`, each check is a no-op while the watcher is alive
-and relaunches it if it has died (plus restart-on-failure). The task passes
+runs **as the current user, only while logged on**. It starts at logon and stays
+running for the watcher's lifetime. If the watcher exits with an error, Task
+Scheduler restarts it up to 3 times, 1 minute apart. The task passes
 `-Background`, so the watcher runs **windowless** via `pythonw.exe` (no terminal
 window) and writes output to `backend/logs/upload-watcher.log`. A healthy
 watcher shows as **two** `pythonw` processes (the venv stub spawns a worker

@@ -10,17 +10,17 @@ Health Auto Export produces a dated `.zip` containing:
 
 Each workout object embeds everything fittrack needs:
 
-| JSON field | Used for |
-| --- | --- |
-| `id` | workout UUID (idempotency key) |
-| `name` | workout type (e.g. `Outdoor Walk`) |
-| `start`, `end`, `duration` | timing (offset-aware timestamps) |
-| `distance` `{qty, units}` | total distance (units may be `mi` or `km`) |
-| `activeEnergyBurned`, `avgHeartRate`, `maxHeartRate` | summary stats |
-| `route` `[{latitude, longitude, altitude, speed, timestamp}]` | map + GPS splits |
-| `heartRateData` `[{date, Avg, Min, Max}]` | HR chart + per-split HR |
-| `walkingAndRunningDistance` `[{date, qty, units}]` | indoor (sample) splits |
-| `isIndoor` | context |
+| JSON field                                                    | Used for                                   |
+| ------------------------------------------------------------- | ------------------------------------------ |
+| `id`                                                          | workout UUID (idempotency key)             |
+| `name`                                                        | workout type (e.g. `Outdoor Walk`)         |
+| `start`, `end`, `duration`                                    | timing (offset-aware timestamps)           |
+| `distance` `{qty, units}`                                     | total distance (units may be `mi` or `km`) |
+| `activeEnergyBurned`, `avgHeartRate`, `maxHeartRate`          | summary stats                              |
+| `route` `[{latitude, longitude, altitude, speed, timestamp}]` | map + GPS splits                           |
+| `heartRateData` `[{date, Avg, Min, Max}]`                     | HR chart + per-split HR                    |
+| `walkingAndRunningDistance` `[{date, qty, units}]`            | indoor (sample) splits                     |
+| `isIndoor`                                                    | context                                    |
 
 Daily metrics arrive under `data.metrics` as `{name, units, data:[{date, qty}]}`.
 Workouts whose source name is `ROUVY` or `Strava` (case-insensitive) are
@@ -44,7 +44,7 @@ Do not paste secrets or tokens into chat or pass them on a command line.
 
 ```powershell
 cd C:\Files\Dev\main\fit-track\backend
-.\scripts\Connect-Strava.ps1 -Days 90
+.\scripts\Connect-Strava.ps1
 ```
 
 The default credential file is `%LOCALAPPDATA%\FitTrack\strava\tokens.json`.
@@ -64,10 +64,21 @@ Run one app worker; do not share a credential file between multiple sync process
 
 Behavior:
 
-- Initial history starts 90 days before authorization when `-Days 90` is used.
+- By default, imports begin at local midnight on the authorization day and keep
+  that fixed boundary on future days. The live personal connection starts on
+  10/23/2026. No earlier Strava history is imported. `-Days` can explicitly request
+  historical data for a different setup.
   Later polls reread a rolling 7-day overlap, never before the initial boundary.
 - All activity-list pages are read. Only `VirtualRide` activities whose detailed
   `device_name` contains `Zwift` are imported. ROUVY and ordinary rides are skipped.
+- **Pull Strava data** in the app header starts an immediate pull using the same
+  saved boundary as the automatic 15-minute sync. It shows progress, the number
+  of imported rides (or an up-to-date message), and actionable errors. The active
+  dashboard, workout list or detail refreshes after success.
+- Manual and scheduled pulls share a process lock. Overlapping manual requests
+  get HTTP 409; scheduled polls skip if a pull is already running. Keep one app
+  worker. Manual pulls require gateway authentication or an ingest-scoped token,
+  plus the custom `X-FitTrack-Sync: 1` header to prevent cross-origin browser posts.
 - Strava IDs become `strava:<id>` workout IDs. Unchanged activity summaries avoid
   repeat detail/stream downloads; changed summaries within the overlap update
   the same workout. Changes to older activities require explicit reimport work.
@@ -103,7 +114,7 @@ metrics and workouts:
    Distance** data (these are what power the map, HR chart, and splits).
 3. **Destination:** the fittrack ingest endpoint via **REST API** (see
    [Direct REST push](#direct-rest-push-recommended)), or a folder that syncs to
-   your PC — Google Drive, iCloud Drive (with *iCloud for Windows*), Dropbox, or
+   your PC — Google Drive, iCloud Drive (with _iCloud for Windows_), Dropbox, or
    OneDrive.
 4. **Health metrics:** use a 14-day date range, **Summarize Data:** on, and
    **Time Grouping:** Days.

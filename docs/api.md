@@ -7,9 +7,23 @@ Auth: all endpoints except `/api/health` require `Authorization: Bearer <token>`
 Tokens are scoped `ingest`, `read`, or `all` (see `scripts/token_admin.py`).
 
 ## `GET /api/health`
+
 Unauthenticated liveness probe. → `{"status": "ok"}`
 
-## `POST /api/ingest/health-auto-export`  *(ingest scope)*
+## `POST /api/strava/pull`
+
+Pulls Zwift rides immediately using the saved Strava authorization and fixed
+import boundary. No body. Requires `X-FitTrack-Sync: 1` and either the configured
+Cloudflare/Tailscale gateway or an `ingest`/`all` bearer token.
+
+Response: `{"workouts": 1}` (inserted or updated rides; zero means up to date).
+The request waits for the pull to finish. Concurrent manual or automatic pulls
+return `409`. An unconfigured connection returns `503`; Strava authorization,
+rate-limit and network failures return `502` with a safe `detail` message.
+Previously committed rides remain imported if a later ride fails.
+
+## `POST /api/ingest/health-auto-export` _(ingest scope)_
+
 Body: a raw Health Auto Export JSON payload (`{"data": {...}}`). The raw body is
 stored and deduplicated by SHA-256 hash; re-posting an identical payload
 short-circuits. Concurrent posts of the same payload are safe: if two requests
@@ -20,30 +34,54 @@ Payloads larger than `MAX_INGEST_BYTES` (default 64 MiB, see `config.py`) are
 rejected with `413 Request Entity Too Large` before parsing.
 
 Response:
+
 ```json
-{ "status": "ok", "duplicate": false, "workouts": 1, "daily_metrics": 0, "splits": 6 }
+{
+  "status": "ok",
+  "duplicate": false,
+  "workouts": 1,
+  "daily_metrics": 0,
+  "splits": 6
+}
 ```
 
-## `GET /api/workouts`  *(read scope)*
+## `GET /api/workouts` _(read scope)_
+
 Query: `limit` (≤500, default 50), `offset`, `workout_type`, `date_from`,
 `date_to` (inclusive local `YYYY-MM-DD` bounds). Returns a page of workout
 summaries (newest first) plus the total matching count for pagination:
+
 ```json
-{ "total": 137,
-  "items": [{ "uuid": "…", "workout_type": "Outdoor Walk", "local_date": "2026-07-05",
-     "start_utc": "2026-07-05T18:39:13", "duration_sec": 1853.6,
-     "distance_m": 3705.0, "active_energy_kcal": 286.6,
-     "avg_hr": 117.8, "max_hr": 143.0, "has_route": true }] }
+{
+  "total": 137,
+  "items": [
+    {
+      "uuid": "…",
+      "workout_type": "Outdoor Walk",
+      "local_date": "2026-07-05",
+      "start_utc": "2026-07-05T18:39:13",
+      "duration_sec": 1853.6,
+      "distance_m": 3705.0,
+      "active_energy_kcal": 286.6,
+      "avg_hr": 117.8,
+      "max_hr": 143.0,
+      "has_route": true
+    }
+  ]
+}
 ```
 
-## `GET /api/workouts/types`  *(read scope)*
+## `GET /api/workouts/types` _(read scope)_
+
 Distinct `workout_type` values present in the data (sorted), for the filter
 dropdown. → `["Outdoor Run", "Outdoor Walk", …]`
 
-## `GET /api/workouts/{uuid}`  *(read scope)*
+## `GET /api/workouts/{uuid}` _(read scope)_
+
 Query: `unit` = `mi` (default) or `km`; `full` = `true` for the full-resolution
 series (default `false`).
 Returns the summary plus:
+
 - `splits[]` — `{split_index, distance_m, duration_sec, pace_sec_per_unit, avg_hr, source}`
 - `route[]` — `{seq, lat, lon, ts_utc}`
 - `hr_series[]` — `{ts_utc, bpm}`
@@ -57,7 +95,8 @@ By default long GPS workouts are **downsampled** (deterministically, endpoints
 preserved) to keep responses and client rendering bounded; pass `full=true` to
 retrieve every point. `404` if the workout does not exist.
 
-## `GET /api/dashboard`  *(read scope)*
+## `GET /api/dashboard` _(read scope)_
+
 7-day rollup and trend series. `weekly_workouts`/`weekly_minutes` cover the last
 7 days; `resting_hr_trend` covers the last 90 days; `vo2max_trend` covers the last
 365 days; `sleep_trend` covers the last 30 days. `vo2max_band` interprets the latest
@@ -81,24 +120,42 @@ the distinct `local_date`s within the window that have at least one logged
 workout, so the steps chart can flag them. In the UI, tapping a flagged (green)
 steps bar deep-links to `GET /api/workouts?date_from=<day>&date_to=<day>` (the
 Workouts page at `#/workouts?date=<day>`), scoped to that single day.
+
 ```json
-{ "workouts_7d": 3, "minutes_7d": 92.4, "active_kcal_7d": 810,
-  "latest_resting_hr": 55, "latest_vo2max": 38.8,
-  "vo2max_band": { "category":"Good", "category_index":3, "range_low":35.8,
-    "range_high":41.0, "next_category":"Excellent", "next_at":41.0,
-    "age":55, "sex":"male" },
+{
+  "workouts_7d": 3,
+  "minutes_7d": 92.4,
+  "active_kcal_7d": 810,
+  "latest_resting_hr": 55,
+  "latest_vo2max": 38.8,
+  "vo2max_band": {
+    "category": "Good",
+    "category_index": 3,
+    "range_low": 35.8,
+    "range_high": 41.0,
+    "next_category": "Excellent",
+    "next_at": 41.0,
+    "age": 55,
+    "sex": "male"
+  },
   "latest_sleep_hours": 7.5,
-  "sleep_band": { "category":"Excellent", "category_index":3,
-    "target_low":7.0, "target_high":9.0 },
-  "latest_steps": 8200, "latest_steps_date": "2026-07-05",
-  "weekly_workouts": [{"local_date":"2026-07-05","value":1}],
-  "weekly_minutes":  [{"local_date":"2026-07-05","value":30.9}],
-  "resting_hr_trend":[{"local_date":"2026-07-05","value":55}],
-  "vo2max_trend":    [{"local_date":"2026-07-05","value":38.8}],
-  "sleep_trend":     [{"local_date":"2026-07-05","value":7.5}],
-  "steps_trend":     [{"local_date":"2026-07-05","value":8200}],
-  "steps_avg7_trend":[{"local_date":"2026-07-05","value":7600}],
-  "workout_days":    ["2026-07-05"] }
+  "sleep_band": {
+    "category": "Excellent",
+    "category_index": 3,
+    "target_low": 7.0,
+    "target_high": 9.0
+  },
+  "latest_steps": 8200,
+  "latest_steps_date": "2026-07-05",
+  "weekly_workouts": [{ "local_date": "2026-07-05", "value": 1 }],
+  "weekly_minutes": [{ "local_date": "2026-07-05", "value": 30.9 }],
+  "resting_hr_trend": [{ "local_date": "2026-07-05", "value": 55 }],
+  "vo2max_trend": [{ "local_date": "2026-07-05", "value": 38.8 }],
+  "sleep_trend": [{ "local_date": "2026-07-05", "value": 7.5 }],
+  "steps_trend": [{ "local_date": "2026-07-05", "value": 8200 }],
+  "steps_avg7_trend": [{ "local_date": "2026-07-05", "value": 7600 }],
+  "workout_days": ["2026-07-05"]
+}
 ```
 
 > Timestamps returned by the API are naive UTC. The frontend converts them to

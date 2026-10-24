@@ -8,6 +8,7 @@ import { ActivityIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, FlameIcon, 
 import { formatDistance, formatHms, formatLocalDateTime, formatLocalTime, formatPace, round } from '../lib/format';
 import type { Unit } from '../lib/format';
 import { tooltipProps } from '../lib/chart';
+import { usePageRefresh } from '../lib/refresh';
 
 // Leaflet is heavy and only needed when a workout has a GPS route, so keep it
 // out of the initial bundle and load it lazily on demand.
@@ -48,7 +49,12 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
     };
     // Unit is a pure client-side view choice: the detail response carries splits
     // for both unit systems, so switching mi/km must not refetch the workout.
-    const { data, error } = useApiResource(() => api.workout(uuid, full), [uuid, full, onAuthError], onAuthError);
+    const { data, error, loading, refresh } = useApiResource(
+        () => api.workout(uuid, full),
+        [uuid, full, onAuthError],
+        onAuthError
+    );
+    usePageRefresh(refresh, loading);
 
     // Left/right arrow keys move between workouts (ignoring when typing in a field).
     const prevUuid = data?.prev_uuid ?? null;

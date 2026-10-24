@@ -178,6 +178,36 @@ textarea {
     border-color: var(--accent);
 }
 
+.strava-pull {
+    position: relative;
+}
+
+.strava-pull-button {
+    display: flex;
+    gap: 8px;
+    width: auto;
+    padding: 0 10px;
+    white-space: nowrap;
+}
+
+.strava-pull-button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.strava-pull-message {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    width: max-content;
+    max-width: min(300px, 80vw);
+    padding: 10px;
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+}
+
 /* Plain variant (e.g. the refresh button): keep the icon its normal color on
    hover — no purple/accent tint — and dim it when disabled. */
 .icon-btn--plain,
@@ -362,6 +392,15 @@ textarea {
 }
 
 @media (max-width: 640px) {
+    .strava-pull-button span {
+        display: none;
+    }
+
+    .strava-pull-button {
+        width: 38px;
+        padding: 0;
+        justify-content: center;
+    }
     .steps-headline .steps-value {
         font-size: 1.5rem;
     }

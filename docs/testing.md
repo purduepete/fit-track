@@ -15,15 +15,17 @@ cd backend
 importing app modules, so models render schemaless on SQLite. API tests override
 `get_db` with an in-memory `StaticPool` SQLite session.
 
-| File | Covers |
-| --- | --- |
-| `test_geo.py` | haversine distance; GPS and sample split computation; interpolation across multiple boundaries; partial trailing split; monotonicity. |
-| `test_normalize.py` | parsing real Health Auto Export field shapes; unit conversion; timezone → UTC + `local_date`; payload hashing; **synthetic uuid parity across the JSON and XML import paths** (shared `synth_workout_uuid`). |
-| `test_persist.py` | idempotent upsert (re-ingest replaces child rows, no duplicates); split persistence for both units; daily-metric uniqueness; **regression: duplicate null-source daily metrics dedupe to one row** (SQL Server allows only one NULL per UNIQUE index — SQLite does not). |
-| `test_api.py` | auth (401 without/with bad token, scope enforcement); `last_used_utc` debounce (no rewrite within window, refresh when stale); ingest + dedup; concurrent-duplicate ingest stays idempotent; workout list/detail; dashboard aggregates; `unit=mi\|km`. |
-| `test_strava.py` | Zwift-only parsing, local dates, optional data, virtual GPS omission, stream validation, repeat imports and updates, raw replay, cross-source duplicates in both arrival orders, token rotation, safe errors, pagination and sync checkpoints. |
+| File                 | Covers                                                                                                                                                                                                                                                                   |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `test_geo.py`        | haversine distance; GPS and sample split computation; interpolation across multiple boundaries; partial trailing split; monotonicity.                                                                                                                                    |
+| `test_normalize.py`  | parsing real Health Auto Export field shapes; unit conversion; timezone → UTC + `local_date`; payload hashing; **synthetic uuid parity across the JSON and XML import paths** (shared `synth_workout_uuid`).                                                             |
+| `test_persist.py`    | idempotent upsert (re-ingest replaces child rows, no duplicates); split persistence for both units; daily-metric uniqueness; **regression: duplicate null-source daily metrics dedupe to one row** (SQL Server allows only one NULL per UNIQUE index — SQLite does not). |
+| `test_api.py`        | auth (401 without/with bad token, scope enforcement); `last_used_utc` debounce (no rewrite within window, refresh when stale); ingest + dedup; concurrent-duplicate ingest stays idempotent; workout list/detail; dashboard aggregates; `unit=mi\|km`.                   |
+| `test_strava.py`     | Zwift-only parsing, local dates, optional data, virtual GPS omission, stream validation, repeat imports and updates, raw replay, cross-source duplicates in both arrival orders, token rotation, safe errors, pagination and sync checkpoints.                           |
+| `test_strava_api.py` | Manual pull authorization, cross-origin header requirement, saved connection use, concurrent-pull rejection and safe Strava errors.                                                                                                                                      |
 
 ### Schema-portability notes for tests
+
 Models use `SCHEMA = get_settings().db_schema or None` and a `_fk()` helper so
 foreign keys render without the `fit.` prefix on SQLite. BigInteger PKs use
 `.with_variant(Integer, "sqlite")` because SQLite only auto-increments

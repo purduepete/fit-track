@@ -23,6 +23,35 @@ describe('api.workouts query building', () => {
         expect(url).toContain('date_to=2026-07-16');
     });
 
+    describe('Strava pull request', () => {
+        afterEach(() => vi.unstubAllGlobals());
+
+        it('uses POST with the required same-origin header', async () => {
+            const spy = mockFetchOnce({ workouts: 1 });
+            await expect(api.pullStrava()).resolves.toEqual({ workouts: 1 });
+            expect(spy).toHaveBeenCalledWith(
+                '/api/strava/pull',
+                expect.objectContaining({
+                    method: 'POST',
+                    headers: expect.objectContaining({ 'X-FitTrack-Sync': '1' }),
+                })
+            );
+        });
+
+        it('preserves a safe server error for the button', async () => {
+            vi.stubGlobal(
+                'fetch',
+                vi.fn().mockResolvedValue({
+                    ok: false,
+                    status: 502,
+                    statusText: 'Bad Gateway',
+                    json: () => Promise.resolve({ detail: 'Strava rate limit reached.' }),
+                })
+            );
+            await expect(api.pullStrava()).rejects.toThrow('Strava rate limit reached.');
+        });
+    });
+
     it('omits date_to when not provided', async () => {
         const spy = mockFetchOnce({ items: [], total: 0 });
         await api.workouts({ dateFrom: '2026-06-01' });

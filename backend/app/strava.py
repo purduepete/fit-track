@@ -7,7 +7,7 @@ import math
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from threading import Event
+from threading import Event, Lock
 from typing import Any
 
 import httpx
@@ -23,10 +23,15 @@ from .timeutil import utcnow
 logger = logging.getLogger("fittrack.strava")
 API_URL = "https://www.strava.com/api/v3"
 OAUTH_URL = "https://www.strava.com/oauth/token"
+_sync_lock = Lock()
 
 
 class StravaError(RuntimeError):
     """Safe to log: never contains credentials or response bodies."""
+
+
+class StravaBusy(StravaError):
+    """Another scheduled or manual pull is already running."""
 
 
 class Credentials(BaseModel):
@@ -230,6 +235,15 @@ def summary_digest(summary: dict) -> str:
 
 
 def sync_once(path: Path, session_factory, *, http: httpx.Client, stop: Event | None = None) -> int:
+    if not _sync_lock.acquire(blocking=False):
+        raise StravaBusy("A Strava pull is already running. Please try again shortly.")
+    try:
+        return _sync_once(path, session_factory, http=http, stop=stop)
+    finally:
+        _sync_lock.release()
+
+
+def _sync_once(path: Path, session_factory, *, http: httpx.Client, stop: Event | None = None) -> int:
     logger.info("Strava sync starting")
     client = StravaClient(path, http)
     started = int(datetime.now(UTC).timestamp())
@@ -242,7 +256,7 @@ def sync_once(path: Path, session_factory, *, http: httpx.Client, stop: Event | 
     while True:
         if stop is not None and stop.is_set():
             return imported
-        activities = client.get("athlete/activities", after=after, before=started, per_page=100, page=page)
+        activities = client.get("athlete/activities", after=after - 1, before=started, per_page=100, page=page)
         if not isinstance(activities, list):
             raise StravaError("Strava returned an invalid activity list.")
         if not activities:
@@ -280,6 +294,11 @@ def sync_once(path: Path, session_factory, *, http: httpx.Client, stop: Event | 
             if not is_zwift_ride(activity):
                 logger.info("Skipping non-Zwift virtual ride %s", activity_id)
                 continue
+            parsed = parse_strava_payload({"summary": summary, "activity": activity})
+            ride_start = parsed.workouts[0].start_utc.replace(tzinfo=UTC).timestamp()
+            if ride_start < client.credentials.import_after:
+                logger.info("Skipping Strava activity %s before the configured import boundary", activity_id)
+                continue
             streams = client.get(
                 f"activities/{activity_id}/streams", keys="time,distance,heartrate", key_by_type="true",
             )
@@ -302,6 +321,8 @@ def run_sync(stop: Event, path: Path, poll_seconds: int, session_factory) -> Non
         while not stop.is_set():
             try:
                 sync_once(path, session_factory, http=http, stop=stop)
+            except StravaBusy:
+                logger.info("Scheduled Strava pull skipped; another pull is running.")
             except Exception as exc:  # worker must retry; never log tokens or health payloads
                 logger.error(
                     "Strava sync failed (%s). %s", type(exc).__name__,

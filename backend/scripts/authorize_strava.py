@@ -77,24 +77,29 @@ def authorize(token_file: Path, days: int) -> None:
             "client_id": client_id, "client_secret": client_secret,
             "code": result["code"], "grant_type": "authorization_code", "redirect_uri": redirect,
         })
+    boundary = (
+        int(datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+        if days == 0 else int(datetime.now(UTC).timestamp()) - days * 86400
+    )
     try:
         credentials = Credentials(
             client_id=client_id, client_secret=client_secret,
             access_token=token["access_token"], refresh_token=token["refresh_token"],
             expires_at=token["expires_at"], athlete_id=token["athlete"]["id"],
-            import_after=int(datetime.now(UTC).timestamp()) - days * 86400,
+            import_after=boundary,
         )
     except (KeyError, TypeError, ValidationError) as exc:
         raise StravaError("Strava returned an invalid authorization response.") from exc
     save_credentials(token_file, credentials)
-    print(f"Authorization saved privately. Initial import window: {days} days.", flush=True)
+    print(f"Authorization saved privately. Import history: {'from today onward' if days == 0 else f'{days} days'}.",
+          flush=True)
     print("No workouts have been imported yet.", flush=True)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--token-file", type=Path, required=True)
-    parser.add_argument("--days", type=int, choices=range(1, 366), default=90, metavar="1-365")
+    parser.add_argument("--days", type=int, choices=range(0, 366), default=0, metavar="0-365")
     args = parser.parse_args()
     if not args.token_file.parent.is_dir():
         parser.error("Use Connect-Strava.ps1 first to create a protected credential directory.")

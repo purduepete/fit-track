@@ -144,18 +144,27 @@ export class ApiError extends Error {
     }
 }
 
-async function apiGet<T>(path: string): Promise<T> {
+async function apiGet<T>(path: string, options: RequestInit = {}): Promise<T> {
     const token = getToken();
     const res = await fetch(path, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        ...options,
+        headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...options.headers },
     });
     if (!res.ok) {
+        if (options.method === 'POST') {
+            const body: unknown = await res.json().catch(() => null);
+            if (body && typeof body === 'object' && 'detail' in body && typeof body.detail === 'string') {
+                throw new ApiError(res.status, body.detail);
+            }
+        }
         throw new ApiError(res.status, `${res.status} ${res.statusText}`);
     }
     return res.json() as Promise<T>;
 }
 
 export const api = {
+    pullStrava: () =>
+        apiGet<{ workouts: number }>('/api/strava/pull', { method: 'POST', headers: { 'X-FitTrack-Sync': '1' } }),
     dashboard: () => apiGet<DashboardSummary>('/api/dashboard'),
     workouts: (q: WorkoutQuery = {}) => {
         const p = new URLSearchParams();

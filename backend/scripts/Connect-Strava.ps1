@@ -2,7 +2,7 @@
 param(
     [string]$TokenFile = (Join-Path $env:LOCALAPPDATA 'FitTrack\strava\tokens.json'),
     [string]$RuntimeSid,
-    [ValidateRange(1, 365)][int]$Days = 90,
+    [ValidateRange(0, 365)][int]$Days = 0,
     [switch]$Replace
 )
 

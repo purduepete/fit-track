@@ -19,7 +19,7 @@ from sqlalchemy import select, text
 from .config import get_settings
 from .db import SessionLocal
 from .models import ApiToken
-from .routers import dashboard, ingest, workouts
+from .routers import dashboard, ingest, strava, workouts
 from .strava import run_sync
 
 logger = logging.getLogger("fittrack")
@@ -85,6 +85,7 @@ app.add_middleware(
 app.include_router(ingest.router)
 app.include_router(workouts.router)
 app.include_router(dashboard.router)
+app.include_router(strava.router)
 
 
 @app.middleware("http")

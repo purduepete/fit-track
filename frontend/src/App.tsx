@@ -10,6 +10,7 @@ import { RefreshProvider, useRefreshBar } from './lib/refresh';
 import { Dashboard } from './pages/Dashboard';
 import { Workouts } from './pages/Workouts';
 import { clearToken } from './lib/api';
+import { StravaPullButton } from './components/StravaPullButton';
 
 // The detail page pulls in Leaflet (map) + extra charts; code-split it so the
 // initial bundle (dashboard + list) stays lean.
@@ -107,6 +108,7 @@ export default function App() {
                         <NavLink to="/workouts">Workouts</NavLink>
                     </nav>
                     <div className="spacer" />
+                    <StravaPullButton onAuthError={onAuthError} />
                     <RefreshButton />
                     <FilterSelect<Theme>
                         ariaLabel="Theme"

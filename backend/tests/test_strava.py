@@ -10,6 +10,7 @@ from app.models import RawIngestEvent, Workout, WorkoutSample, WorkoutSplit
 from app.normalize import ParsedPayload, parse_workout, persist_payload
 from app.strava import (
     Credentials,
+    StravaBusy,
     StravaClient,
     StravaError,
     load_credentials,
@@ -221,7 +222,7 @@ def test_sync_pagination_filter_and_repeat_skip(token_file, db_session):
         if request.url.path.endswith("/athlete"):
             return httpx.Response(200, json={"id": 77})
         if request.url.path.endswith("/athlete/activities"):
-            assert int(request.url.params["after"]) >= load_credentials(token_file).import_after
+            assert int(request.url.params["after"]) >= load_credentials(token_file).import_after - 1
             page = int(request.url.params["page"])
             return httpx.Response(200, json={
                 1: [payload["summary"], {"id": 999, "sport_type": "Run"}],
@@ -257,6 +258,34 @@ def test_failed_sync_keeps_watermark(token_file, db_session):
     assert load_credentials(token_file).last_sync == 0
 
 
+@pytest.mark.parametrize("start,expected", [("2026-10-23T06:59:59Z", 0), ("2026-10-23T07:00:00Z", 1)])
+def test_fixed_cutoff_excludes_older_ride_and_includes_exact_midnight(token_file, db_session, start, expected):
+    from contextlib import nullcontext
+
+    credentials = load_credentials(token_file)
+    credentials.import_after = int(datetime(2026, 10, 23, 7, tzinfo=UTC).timestamp())
+    save_credentials(token_file, credentials)
+    payload = ride()
+    payload["activity"]["start_date"] = start
+    payload["activity"]["start_date_local"] = (
+        "2026-10-22T23:59:59Z" if expected == 0 else "2026-10-23T00:00:00Z"
+    )
+
+    def handler(request):
+        if request.url.path.endswith("/athlete"):
+            return httpx.Response(200, json={"id": 77})
+        if request.url.path.endswith("/athlete/activities"):
+            assert int(request.url.params["after"]) == credentials.import_after - 1
+            return httpx.Response(200, json=[payload["summary"]] if request.url.params["page"] == "1" else [])
+        if request.url.path.endswith("/streams"):
+            return httpx.Response(200, json=payload["streams"])
+        return httpx.Response(200, json=payload["activity"])
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        assert sync_once(token_file, lambda: nullcontext(db_session), http=http) == expected
+    assert db_session.query(Workout).count() == expected
+
+
 def test_worker_logs_failure_without_secrets(token_file, monkeypatch, caplog):
     from app import strava
 
@@ -272,8 +301,21 @@ def test_worker_logs_failure_without_secrets(token_file, monkeypatch, caplog):
     assert "fake-secret" not in caplog.text
 
 
+def test_simultaneous_pull_is_rejected(token_file):
+    from app import strava
+
+    assert strava._sync_lock.acquire(blocking=False)
+    try:
+        with httpx.Client() as http:
+            with pytest.raises(StravaBusy, match="already running"):
+                sync_once(token_file, None, http=http)
+    finally:
+        strava._sync_lock.release()
+
+
 @pytest.mark.parametrize("scope", ["read,activity:read_all", "read"])
-def test_authorization_callback_state_and_scope(tmp_path, monkeypatch, scope):
+@pytest.mark.parametrize("days", [0, 90])
+def test_authorization_callback_state_and_scope(tmp_path, monkeypatch, scope, days):
     from threading import Thread
     from urllib.parse import parse_qs, urlencode, urlsplit
 
@@ -305,14 +347,18 @@ def test_authorization_callback_state_and_scope(tmp_path, monkeypatch, scope):
 
     monkeypatch.setattr(authorize_strava.webbrowser, "open", open_browser)
     if "activity:read_all" in scope:
-        authorize_strava.authorize(path, 90)
+        authorize_strava.authorize(path, days)
         credentials = load_credentials(path)
         assert credentials.athlete_id == 77
         assert credentials.refresh_token == "new-refresh"
-        assert abs(credentials.import_after - (int(datetime.now(UTC).timestamp()) - 90 * 86400)) < 5
+        expected = (
+            int(datetime.now().astimezone().replace(hour=0, minute=0, second=0, microsecond=0).timestamp())
+            if days == 0 else int(datetime.now(UTC).timestamp()) - days * 86400
+        )
+        assert abs(credentials.import_after - expected) < 5
     else:
         with pytest.raises(StravaError, match="permission missing"):
-            authorize_strava.authorize(path, 90)
+            authorize_strava.authorize(path, days)
         assert not path.exists()
     for thread in threads:
         thread.join(timeout=10)

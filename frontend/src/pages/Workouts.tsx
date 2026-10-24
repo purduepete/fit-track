@@ -1,8 +1,9 @@
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError, clearToken } from '../lib/api';
 import type { WorkoutSummary } from '../lib/api';
 import { FilterSelect } from '../components/FilterSelect';
+import { usePageRefresh } from '../lib/refresh';
 import {
     avgPaceSecPerUnit,
     formatDistance,
@@ -51,6 +52,9 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [revision, setRevision] = useState(0);
+    const refresh = useCallback(() => setRevision((value) => value + 1), []);
+    usePageRefresh(refresh, loading);
 
     // When a specific day is deep-linked, filter to exactly that day
     // (dateFrom == dateTo); otherwise use the range preset's lower bound.
@@ -66,7 +70,7 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
         api.workoutTypes()
             .then(setTypes)
             .catch(() => setTypes([]));
-    }, []);
+    }, [revision]);
 
     // (Re)load from the start whenever a server-side filter (type/range/day) changes.
     useEffect(() => {
@@ -95,7 +99,7 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
             active = false;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [type, dateFrom, dateTo]);
+    }, [type, dateFrom, dateTo, revision]);
 
     function loadMore() {
         setLoading(true);

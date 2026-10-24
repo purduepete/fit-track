@@ -24,6 +24,11 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   route (with a distance-sample fallback for indoor workouts). mi/km toggle.
 - **Route map** — the GPS track drawn on OpenStreetMap (no API key).
 - **Heart-rate chart** — HR over the course of the workout.
+- **Workout totals**: the bottom row totals the visible, loaded workouts after
+  searching: count, duration, distance and active calories. Overall pace uses
+  workouts with both distance and duration; average HR is duration-weighted
+  across workouts with HR and positive duration. Max HR is the highest available
+  value. Missing measurements stay empty; loading more updates the totals.
 - **Dashboard** — 7-day workout count / minutes / active energy, resting-HR,
   VO₂ max and sleep trends, plus a 30-day daily-steps chart with a 10k goal line,
   a stepped 7-day block-average line, and green bars on days with a logged

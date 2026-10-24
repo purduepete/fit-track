@@ -182,6 +182,12 @@ textarea {
     position: relative;
 }
 
+.summary-row td {
+    background: var(--surface-2);
+    border-top: 2px solid var(--border);
+    font-weight: 700;
+}
+
 .strava-pull-button {
     display: flex;
     gap: 8px;
@@ -945,6 +951,7 @@ tbody tr:hover {
 
     .stack-table,
     .stack-table tbody,
+    .stack-table tfoot,
     .stack-table tr,
     .stack-table td {
         display: block;

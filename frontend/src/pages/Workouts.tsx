@@ -128,6 +128,40 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
         );
     }, [items, search]);
 
+    const summary = useMemo(() => {
+        let duration: number | null = null;
+        let distance: number | null = null;
+        let calories: number | null = null;
+        let maxHr: number | null = null;
+        let paceDuration = 0;
+        let paceDistance = 0;
+        let hrDuration = 0;
+        let hrTotal = 0;
+        for (const workout of filtered) {
+            if (workout.duration_sec != null) duration = (duration ?? 0) + workout.duration_sec;
+            if (workout.distance_m != null) distance = (distance ?? 0) + workout.distance_m;
+            if (workout.active_energy_kcal != null) calories = (calories ?? 0) + workout.active_energy_kcal;
+            if (workout.max_hr != null) maxHr = Math.max(maxHr ?? workout.max_hr, workout.max_hr);
+            // Only pair known distance/duration values when deriving pace.
+            if (workout.distance_m != null && workout.distance_m > 0 && workout.duration_sec != null) {
+                paceDuration += workout.duration_sec;
+                paceDistance += workout.distance_m;
+            }
+            if (workout.avg_hr != null && workout.duration_sec != null && workout.duration_sec > 0) {
+                hrTotal += workout.avg_hr * workout.duration_sec;
+                hrDuration += workout.duration_sec;
+            }
+        }
+        return {
+            duration,
+            distance,
+            calories,
+            pace: avgPaceSecPerUnit(paceDistance, paceDuration, 'mi'),
+            avgHr: hrDuration > 0 ? hrTotal / hrDuration : null,
+            maxHr,
+        };
+    }, [filtered]);
+
     // Group consecutive rows by day (the list is already newest-first).
     const groups = useMemo(() => {
         const out: { date: string; rows: WorkoutSummary[] }[] = [];
@@ -242,6 +276,29 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
                             </tr>
                         )}
                     </tbody>
+                    {filtered.length > 0 && (
+                        <tfoot>
+                            <tr className="summary-row">
+                                <td data-label="Summary">Visible totals</td>
+                                <td data-label="Workouts">
+                                    {filtered.length} {filtered.length === 1 ? 'workout' : 'workouts'}
+                                </td>
+                                <td data-label="Duration">{formatHms(summary.duration)}</td>
+                                <td data-label="Distance">{formatDistance(summary.distance, 'mi')}</td>
+                                <td data-label="Avg pace" title="Total duration / distance for rides with both values">
+                                    {formatPace(summary.pace, 'mi')}
+                                </td>
+                                <td data-label="Active kcal">{round(summary.calories)}</td>
+                                <td
+                                    data-label="Avg HR"
+                                    title="Duration-weighted average of available workout heart rates"
+                                >
+                                    {round(summary.avgHr)}
+                                </td>
+                                <td data-label="Max HR">{round(summary.maxHr)}</td>
+                            </tr>
+                        </tfoot>
+                    )}
                 </table>
             </div>
 

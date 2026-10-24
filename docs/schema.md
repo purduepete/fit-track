@@ -27,7 +27,7 @@ Raw payloads, stored before normalization so parsing can be re-run.
 | `id` | bigint PK | |
 | `source` | varchar(50) | `health_auto_export` or `strava` |
 | `received_utc`, `processed_utc` | datetime2 | |
-| `payload_hash` | char(64) unique | payload hash for Health; source-prefixed summary hash for Strava |
+| `payload_hash` | char(64) unique | payload hash for Health; source- and import-version-prefixed summary hash for Strava |
 | `payload_json` | nvarchar(max) | original body |
 | `status` | varchar(20) | `received` \| `processed` |
 | `error` | nvarchar(max) | |

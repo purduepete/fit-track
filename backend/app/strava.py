@@ -1,4 +1,4 @@
-"""Personal Strava sync. Virtual routes are omitted; distance streams drive splits."""
+"""Personal Strava sync. Virtual routes drive maps; distance streams drive splits."""
 from __future__ import annotations
 
 import json
@@ -15,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .geo import DistanceSample, HrSample
+from .geo import DistanceSample, HrSample, RoutePoint
 from .models import RawIngestEvent, Workout
 from .normalize import ParsedPayload, build_workout, payload_hash, persist_payload
 from .timeutil import utcnow
@@ -169,7 +169,8 @@ def parse_strava_payload(payload: dict) -> ParsedPayload:
     times = streams.get("time", {}).get("data", [])
     hr = streams.get("heartrate", {}).get("data", [])
     distances = streams.get("distance", {}).get("data", [])
-    if (hr and len(hr) != len(times)) or (distances and len(distances) != len(times)):
+    coordinates = streams.get("latlng", {}).get("data", [])
+    if any(values and len(values) != len(times) for values in (hr, distances, coordinates)):
         raise StravaError("Strava ride streams have mismatched lengths.")
     seconds = [_number(t, "stream time") for t in times]
     if any(t < 0 or t > duration for t in seconds) or any(
@@ -193,6 +194,14 @@ def parse_strava_payload(payload: dict) -> ParsedPayload:
         )
         for i in range(1, len(distance_values))
     ]
+    route = []
+    for t, coordinate in zip(seconds, coordinates, strict=False):
+        if not isinstance(coordinate, list) or len(coordinate) != 2:
+            raise StravaError("Strava returned an invalid route coordinate.")
+        lat, lon = (_number(value, "route coordinate") for value in coordinate)
+        if not -90 <= lat <= 90 or not -180 <= lon <= 180:
+            raise StravaError("Strava returned an out-of-range route coordinate.")
+        route.append(RoutePoint(start_utc + timedelta(seconds=t), lat, lon))
     workout = build_workout(
         raw_type="Indoor Cycling", workout_id=f"strava:{activity_id}",
         start_utc=start_utc, end_utc=start_utc + timedelta(seconds=duration),
@@ -201,7 +210,7 @@ def parse_strava_payload(payload: dict) -> ParsedPayload:
         active_energy_kcal=_optional_number(activity, "calories"),
         avg_hr=_optional_number(activity, "average_heartrate"),
         max_hr=_optional_number(activity, "max_heartrate"), min_hr=None,
-        hr_samples=hr_samples, distance_samples=samples,
+        hr_samples=hr_samples, distance_samples=samples, route=route,
     )
     return ParsedPayload(workouts=[workout])
 
@@ -231,7 +240,8 @@ def persist_strava_event(payload: dict, db: Session) -> dict[str, int]:
 
 
 def summary_digest(summary: dict) -> str:
-    return payload_hash("strava:" + json.dumps(summary, sort_keys=True, separators=(",", ":")))
+    # Refresh pre-route imports once, even when Strava's summary is unchanged.
+    return payload_hash("strava:routes-v1:" + json.dumps(summary, sort_keys=True, separators=(",", ":")))
 
 
 def sync_once(path: Path, session_factory, *, http: httpx.Client, stop: Event | None = None) -> int:
@@ -300,7 +310,7 @@ def _sync_once(path: Path, session_factory, *, http: httpx.Client, stop: Event |
                 logger.info("Skipping Strava activity %s before the configured import boundary", activity_id)
                 continue
             streams = client.get(
-                f"activities/{activity_id}/streams", keys="time,distance,heartrate", key_by_type="true",
+                f"activities/{activity_id}/streams", keys="time,distance,heartrate,latlng", key_by_type="true",
             )
             if not isinstance(streams, dict):
                 raise StravaError("Strava returned invalid ride streams.")

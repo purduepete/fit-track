@@ -6,8 +6,8 @@ from threading import Event
 
 import httpx
 import pytest
-from app.models import RawIngestEvent, Workout, WorkoutSample, WorkoutSplit
-from app.normalize import ParsedPayload, parse_workout, persist_payload
+from app.models import RawIngestEvent, Workout, WorkoutRoutePoint, WorkoutSample, WorkoutSplit
+from app.normalize import ParsedPayload, parse_workout, payload_hash, persist_payload
 from app.strava import (
     Credentials,
     StravaBusy,
@@ -68,7 +68,8 @@ def test_parse_ride_local_date_streams_and_elapsed_time():
     assert workout.avg_hr == 130
     assert len(workout.hr_samples) == 3
     assert sum(s.meters for s in workout.distance_samples) == 2000
-    assert workout.route == []  # Zwift's virtual coordinates are not real GPS.
+    assert [(p.lat, p.lon) for p in workout.route] == [(1, 2), (3, 4), (5, 6)]
+    assert [p.ts_utc for p in workout.route] == [p.ts_utc for p in workout.hr_samples]
 
 
 def test_optional_data_can_be_absent():
@@ -80,6 +81,7 @@ def test_optional_data_can_be_absent():
     assert workout.avg_hr is None
     assert workout.active_energy_kcal is None
     assert workout.hr_samples == []
+    assert workout.route == []
 
 
 @pytest.mark.parametrize("field,value", [
@@ -97,6 +99,10 @@ def test_reject_invalid_or_non_zwift_activities(field, value):
 @pytest.mark.parametrize("key,data", [
     ("time", [0, 300, 299]), ("time", [0, 300, 601]),
     ("heartrate", [120]), ("distance", [0, 1200, 1000]),
+    ("latlng", [[1, 2]]), ("latlng", [[91, 2]] * 3),
+    ("latlng", [[1, -181]] * 3), ("latlng", [[True, 2]] * 3),
+    ("latlng", [[1, float("nan")]] * 3), ("latlng", [[1]] * 3),
+    ("latlng", [None] * 3),
 ])
 def test_reject_malformed_streams(key, data):
     payload = ride()
@@ -111,6 +117,11 @@ def test_persist_dedup_update_and_replay(db_session):
     assert counts["workouts"] == 1
     assert db_session.query(WorkoutSample).count() == 3
     assert db_session.query(WorkoutSplit).count() > 0
+    assert db_session.query(WorkoutRoutePoint).count() == 3
+    assert db_session.get(Workout, "strava:123").has_route
+    splits = db_session.query(WorkoutSplit).filter_by(unit_system="km").all()
+    assert sum(s.distance_m for s in splits) == 2000
+    assert {s.source for s in splits} == {"sample"}
     assert persist_strava_event(payload, db_session)["workouts"] == 0
     changed = deepcopy(payload)
     changed["summary"]["distance"] = 2100
@@ -118,6 +129,7 @@ def test_persist_dedup_update_and_replay(db_session):
     assert persist_strava_event(changed, db_session)["workouts"] == 1
     assert db_session.query(Workout).count() == 1
     assert db_session.query(WorkoutSample).count() == 3
+    assert db_session.query(WorkoutRoutePoint).count() == 3
     assert db_session.get(Workout, "strava:123").distance_m == 2100
     event = db_session.query(RawIngestEvent).order_by(RawIngestEvent.id.desc()).first()
     assert event.source == "strava"
@@ -231,6 +243,7 @@ def test_sync_pagination_filter_and_repeat_skip(token_file, db_session):
         if request.url.path.endswith("/124"):
             return httpx.Response(200, json={**payload["activity"], "id": 124, "device_name": "ROUVY"})
         if request.url.path.endswith("/streams"):
+            assert request.url.params["keys"] == "time,distance,heartrate,latlng"
             return httpx.Response(200, json=payload["streams"])
         return httpx.Response(200, json=payload["activity"])
 
@@ -242,6 +255,38 @@ def test_sync_pagination_filter_and_repeat_skip(token_file, db_session):
     assert calls.count("/api/v3/activities/123") == 1
     assert calls.count("/api/v3/activities/123/streams") == 1
     assert db_session.query(Workout).count() == 1
+
+
+def test_sync_refreshes_pre_route_import_once(token_file, db_session):
+    from contextlib import nullcontext
+
+    payload = ride()
+    old = deepcopy(payload)
+    old["streams"].pop("latlng")
+    persist_strava_event(old, db_session)
+    event = db_session.query(RawIngestEvent).one()
+    event.payload_hash = payload_hash(
+        "strava:" + json.dumps(payload["summary"], sort_keys=True, separators=(",", ":"))
+    )
+    db_session.commit()
+    stream_calls = []
+
+    def handler(request):
+        if request.url.path.endswith("/athlete"):
+            return httpx.Response(200, json={"id": 77})
+        if request.url.path.endswith("/athlete/activities"):
+            return httpx.Response(200, json=[payload["summary"]] if request.url.params["page"] == "1" else [])
+        if request.url.path.endswith("/streams"):
+            stream_calls.append(request.url.path)
+            return httpx.Response(200, json=payload["streams"])
+        return httpx.Response(200, json=payload["activity"])
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        assert sync_once(token_file, lambda: nullcontext(db_session), http=http) == 1
+        assert sync_once(token_file, lambda: nullcontext(db_session), http=http) == 0
+    assert len(stream_calls) == 1
+    assert db_session.query(Workout).count() == 1
+    assert db_session.query(WorkoutRoutePoint).count() == 3
 
 
 def test_failed_sync_keeps_watermark(token_file, db_session):

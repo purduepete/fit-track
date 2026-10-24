@@ -185,7 +185,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
 
             {data.route.length > 0 && (
                 <div className="section">
-                    <h2>Route</h2>
+                    <h2>{data.source_name === 'Strava' ? 'Virtual Zwift route' : 'Route'}</h2>
                     <Suspense fallback={<div className="map muted">Loading map…</div>}>
                         <RouteMap route={data.route} />
                     </Suspense>

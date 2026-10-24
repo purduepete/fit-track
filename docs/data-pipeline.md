@@ -85,7 +85,13 @@ Behavior:
 - Distance, elapsed duration, calories and summary heart rate are imported when
   available. Heart-rate samples and cumulative-distance streams supply the
   chart and splits. Missing optional measurements stay empty.
-- Zwift's virtual GPS coordinates are omitted. Power and cadence are not imported.
+- Timestamped latitude/longitude streams supply the map, labeled **Virtual Zwift
+  route**. Coordinates describe Zwift's virtual geography, not the rider's physical
+  location. Missing coordinates leave the map hidden. Real-world GPS outlier
+  filtering is skipped for these points; splits still use the distance stream.
+  Power and cadence are not imported.
+- The route-import format version refreshes pre-route imports once within the
+  existing overlap and fixed start boundary, updating the same workout IDs.
 - A Zwift-sourced Apple Health cycling workout and a direct Strava ride are
   considered duplicates when starts differ by at most 60 seconds and ends by
   at most 120 seconds. The first stored copy is kept. Apple Watch recordings

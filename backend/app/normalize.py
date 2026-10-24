@@ -609,7 +609,10 @@ def persist_payload(
         existing = existing_workouts.get(pw.uuid)
         # Bad GPS fixes would otherwise drive both the map and the stored splits,
         # which are GPS-derived. `distance_m` comes from the payload and is untouched.
-        route, dropped = filter_route_outliers(pw.route, pw.workout_type)
+        # Zwift coordinates describe virtual geography; real-world speed limits
+        # and GPS-derived distances do not apply to these routes.
+        virtual_route = ingest_source == "strava"
+        route, dropped = (pw.route, 0) if virtual_route else filter_route_outliers(pw.route, pw.workout_type)
         counts["route_points_dropped"] += dropped
         has_route = len(route) >= 2
         if existing is None:
@@ -656,7 +659,7 @@ def persist_payload(
                 }
             )
         # Build the distance/time + HR axes once and derive both unit systems.
-        splits = compute_splits(route, pw.distance_samples, pw.hr_samples, ("mi", "km"))
+        splits = compute_splits([] if virtual_route else route, pw.distance_samples, pw.hr_samples, ("mi", "km"))
         for r in splits:
             split_rows.append(
                 {

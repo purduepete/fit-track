@@ -3,6 +3,7 @@
 SolutionDeploy asks the app to stop by creating the file named in
 SOLUTIONDEPLOY_STOP_FILE; uvicorn then shuts down gracefully.
 """
+import logging
 import os
 import sys
 import threading
@@ -10,6 +11,8 @@ import time
 from pathlib import Path
 
 import uvicorn
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(root / "backend"))

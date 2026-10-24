@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import quote_plus
 
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Anchor the env file to the backend directory rather than the process working
@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     database_url: str = ""
     # Enable only behind Cloudflare Access / private Tailscale with loopback binding.
     gateway_read_auth: bool = False
+    strava_token_file: str = ""
+    strava_poll_seconds: int = Field(default=900, ge=300)
 
     # Reject ingest payloads larger than this (bytes) before parsing. A full
     # 30-day Health Auto Export (all intraday step points, HR arrays and routes)

@@ -9,14 +9,16 @@ handles idempotent upserts and split computation.
 from __future__ import annotations
 
 import hashlib
+import logging
 import math
 import re
 import uuid as uuidlib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from typing import Literal
 
 from dateutil import parser as dtparser
-from sqlalchemy import delete, insert, select
+from sqlalchemy import delete, insert, select, text
 from sqlalchemy.orm import Session
 
 from . import models
@@ -537,16 +539,53 @@ def _bulk_insert(db: Session, model: type, rows: list[dict], chunk: int | None =
         db.execute(insert(model), batch)
 
 
-def persist_payload(parsed: ParsedPayload, db: Session) -> dict[str, int]:
+def _cross_source_zwift_duplicate(pw: ParsedWorkout, db: Session) -> bool:
+    is_direct = pw.uuid.startswith("strava:") and pw.source_name == "Strava"
+    is_health = (pw.source_name or "").strip().casefold() == "zwift"
+    if not (is_direct or is_health) or "cycl" not in pw.workout_type.casefold():
+        return False
+    candidates = db.scalars(
+        select(models.Workout).where(
+            models.Workout.start_utc >= pw.start_utc - timedelta(seconds=60),
+            models.Workout.start_utc <= pw.start_utc + timedelta(seconds=60),
+            models.Workout.uuid != pw.uuid,
+        )
+    )
+    for existing in candidates:
+        other_direct = existing.uuid.startswith("strava:") and existing.source_name == "Strava"
+        other_health = (existing.source_name or "").strip().casefold() == "zwift"
+        if (
+            ((is_direct and other_health) or (is_health and other_direct))
+            and "cycl" in existing.workout_type.casefold()
+            and abs((existing.end_utc - pw.end_utc).total_seconds()) <= 120
+        ):
+            logging.getLogger("fittrack").info(
+                "Skipping duplicate Zwift workout %s; already stored as %s", pw.uuid, existing.uuid,
+            )
+            return True
+    return False
+
+
+def persist_payload(
+    parsed: ParsedPayload, db: Session, *,
+    ingest_source: Literal["health_auto_export", "strava"] = "health_auto_export",
+) -> dict[str, int]:
     """Idempotently upsert a parsed payload. Transaction-neutral: this flushes
     but does NOT commit, so the caller owns the transaction boundary (the ingest
     route commits the normalized rows and the RawIngestEvent status atomically)."""
+    if db.get_bind().dialect.name == "postgresql":
+        # Keep Health and Strava duplicate checks serialized through commit.
+        db.execute(text("SELECT pg_advisory_xact_lock(8791, 1)"))
     now = utcnow()
     counts = {"workouts": 0, "daily_metrics": 0, "splits": 0, "route_points_dropped": 0}
 
     # Enforce exclusions here too because historical import paths can construct
     # ParsedPayload directly without passing through parse_payload.
-    workouts = [pw for pw in parsed.workouts if not _excluded_workout_source(pw.source_name)]
+    workouts = [
+        pw for pw in parsed.workouts
+        if (ingest_source == "strava" or not _excluded_workout_source(pw.source_name))
+        and not _cross_source_zwift_duplicate(pw, db)
+    ]
 
     # Batch-fetch existing workouts by UUID (avoids a SELECT per workout).
     workout_uuids = [pw.uuid for pw in workouts]

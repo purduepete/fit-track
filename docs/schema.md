@@ -25,19 +25,20 @@ Raw payloads, stored before normalization so parsing can be re-run.
 | Column | Type | Notes |
 | --- | --- | --- |
 | `id` | bigint PK | |
-| `source` | varchar(50) | `health_auto_export` |
+| `source` | varchar(50) | `health_auto_export` or `strava` |
 | `received_utc`, `processed_utc` | datetime2 | |
-| `payload_hash` | char(64) unique | dedup key |
+| `payload_hash` | char(64) unique | payload hash for Health; source-prefixed summary hash for Strava |
 | `payload_json` | nvarchar(max) | original body |
 | `status` | varchar(20) | `received` \| `processed` |
 | `error` | nvarchar(max) | |
 
 ## `public.workouts`
-One row per workout. `uuid` is the Apple workout id (idempotency key).
+One row per workout. `uuid` is the Apple workout id or `strava:<activity_id>`
+(idempotency key).
 
 | Column | Type | Notes |
 | --- | --- | --- |
-| `uuid` | nvarchar(80) PK | Apple UUID (or deterministic uuid5 fallback) |
+| `uuid` | nvarchar(80) PK | Apple UUID, deterministic uuid5 fallback, or `strava:<activity_id>` |
 | `workout_type` | nvarchar(60) | friendly name |
 | `source_name`, `device_name` | nvarchar(120) | |
 | `start_utc`, `end_utc` | datetime2 | canonical UTC |

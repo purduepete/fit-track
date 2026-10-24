@@ -13,6 +13,15 @@ sign-in through Cloudflare Access. The Google Drive uploader runs on the same ho
 http://127.0.0.1:8791. It runs only while JimBrown is signed in, because `G:` is a
 per-user Google Drive mount.
 
+The optional Strava sync runs in the existing app process, including after a
+startup with nobody signed in. It needs no extra task or Cloudflare route.
+Keep its mutable OAuth credentials at
+`C:\ProgramData\SolutionDeploy\apps\fit-track\shared\secrets\strava\tokens.json`,
+with Modify access for the `sd-fittrack` account and no access for ordinary
+users. Set `STRAVA_TOKEN_FILE` to that path in the protected `app.env`, then
+restart the app. See [Strava authorization and import behavior](data-pipeline.md#direct-zwift-import-through-strava).
+Do not enable it until the independent database-write review passes.
+
 Public OAuth information is at `/oauth/` and `/oauth/privacy.html`, served from
 `frontend/public/oauth`. These pages describe the planned personal Drive importer;
 publishing them does not enable that importer or change the watcher's logon requirement.

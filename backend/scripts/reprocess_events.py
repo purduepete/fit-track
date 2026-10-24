@@ -27,6 +27,7 @@ from app.db import SessionLocal  # noqa: E402
 from app.geo import filter_route_outliers  # noqa: E402
 from app.models import RawIngestEvent  # noqa: E402
 from app.normalize import parse_payload, persist_payload  # noqa: E402
+from app.strava import parse_strava_payload  # noqa: E402
 from sqlalchemy import desc, select  # noqa: E402
 
 
@@ -64,9 +65,9 @@ def main() -> int:
         processed = 0
         failed = 0
         for ev_id, received_utc in events:
-            payload_json = db.execute(
-                select(RawIngestEvent.payload_json).where(RawIngestEvent.id == ev_id)
-            ).scalar_one()
+            source, payload_json = db.execute(
+                select(RawIngestEvent.source, RawIngestEvent.payload_json).where(RawIngestEvent.id == ev_id)
+            ).one()
             if args.contains and args.contains not in payload_json:
                 continue
             try:
@@ -77,7 +78,12 @@ def main() -> int:
             # Each event is its own transaction, so one bad payload cannot leave an
             # earlier workout with its child rows deleted and not reinserted.
             try:
-                parsed = parse_payload(payload)
+                if source == "strava":
+                    parsed = parse_strava_payload(payload)
+                elif source == "health_auto_export":
+                    parsed = parse_payload(payload)
+                else:
+                    raise ValueError(f"Unsupported ingest source: {source}")
                 for pw in parsed.workouts:
                     kept, dropped = filter_route_outliers(pw.route, pw.workout_type)
                     if dropped:
@@ -85,7 +91,7 @@ def main() -> int:
                             f"    {pw.uuid} ({pw.workout_type}): "
                             f"route {len(pw.route)} -> {len(kept)} ({dropped} dropped)"
                         )
-                counts = persist_payload(parsed, db)
+                counts = persist_payload(parsed, db, ingest_source=source)
                 if args.dry_run:
                     db.rollback()
                 else:

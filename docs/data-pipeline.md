@@ -24,9 +24,74 @@ Each workout object embeds everything fittrack needs:
 
 Daily metrics arrive under `data.metrics` as `{name, units, data:[{date, qty}]}`.
 Workouts whose source name is `ROUVY` or `Strava` (case-insensitive) are
-excluded during normalization, including historical reprocessing and XML
+excluded from Apple Health normalization, including historical reprocessing and XML
 backfills. Their raw ingest payloads remain stored, but normalization will
-continue to omit those workouts.
+continue to omit those workouts. The direct Strava importer below is separate
+and accepts only Zwift virtual rides.
+
+## Direct Zwift import through Strava
+
+Zwift uploads to Strava; FitTrack reads those rides directly without Apple
+Health. Apple Health remains the source for steps, sleep and other workouts.
+Create a personal application at https://www.strava.com/settings/api with
+Authorization Callback Domain `localhost`. Strava currently requires a
+subscription to create an application.
+
+Run the authorization helper in a separate terminal, outside the chat terminal.
+It prompts for the Client ID and a hidden Client Secret, opens Strava for
+`read,activity:read_all` consent, and saves the resulting tokens privately.
+Do not paste secrets or tokens into chat or pass them on a command line.
+
+```powershell
+cd C:\Files\Dev\main\fit-track\backend
+.\scripts\Connect-Strava.ps1 -Days 90
+```
+
+The default credential file is `%LOCALAPPDATA%\FitTrack\strava\tokens.json`.
+For the hosted app, use `-TokenFile` pointing at a dedicated `strava` directory
+under the app's protected `shared\secrets` folder and pass the app account's SID
+as `-RuntimeSid`. That account needs Modify access because refresh tokens rotate.
+The helper restricts the directory to the current user, administrators, SYSTEM,
+and the specified runtime account. Existing credentials require `-Replace`;
+stop the sync first to avoid concurrent token replacement.
+
+Set `STRAVA_TOKEN_FILE` to the credential file's path **on the runtime host**.
+`STRAVA_POLL_SECONDS` defaults to 900 (15 minutes), with a minimum of 300.
+Restart the app after configuring it. An unset token path disables Strava sync.
+The sync runs inside the existing app process and its startup task, so it
+does not need a new scheduled task, a logged-in user, or an inbound webhook.
+Run one app worker; do not share a credential file between multiple sync processes.
+
+Behavior:
+
+- Initial history starts 90 days before authorization when `-Days 90` is used.
+  Later polls reread a rolling 7-day overlap, never before the initial boundary.
+- All activity-list pages are read. Only `VirtualRide` activities whose detailed
+  `device_name` contains `Zwift` are imported. ROUVY and ordinary rides are skipped.
+- Strava IDs become `strava:<id>` workout IDs. Unchanged activity summaries avoid
+  repeat detail/stream downloads; changed summaries within the overlap update
+  the same workout. Changes to older activities require explicit reimport work.
+- Distance, elapsed duration, calories and summary heart rate are imported when
+  available. Heart-rate samples and cumulative-distance streams supply the
+  chart and splits. Missing optional measurements stay empty.
+- Zwift's virtual GPS coordinates are omitted. Power and cadence are not imported.
+- A Zwift-sourced Apple Health cycling workout and a direct Strava ride are
+  considered duplicates when starts differ by at most 60 seconds and ends by
+  at most 120 seconds. The first stored copy is kept. Apple Watch recordings
+  remain separate.
+- Each ride and its raw event commit together. Failures leave that ride
+  uncommitted; earlier committed rides are safe to retry. The sync watermark
+  advances only after every page succeeds. Rate-limit, authorization and other
+  failures are logged explicitly and retried on the next poll.
+- PostgreSQL imports share a transaction-scoped advisory lock so simultaneous
+  Health and Strava imports cannot both pass the cross-source duplicate check.
+- Raw events use source `strava` and contain the summary, detailed activity and
+  requested streams. Reprocessing dispatches by source and preserves the Apple
+  Health source exclusions.
+
+Get the required independent database-write review before enabling the live
+import. Check the app log for `Strava activity ... committed` and
+`Strava sync complete`, then verify the imported rides in FitTrack.
 
 ## Configure the iOS app
 

@@ -6,7 +6,10 @@ static files. Interactive API docs are available at ``/docs`` (Swagger) and
 """
 import logging
 import os
+from asyncio import to_thread
 from contextlib import asynccontextmanager
+from pathlib import Path
+from threading import Event, Thread
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +20,7 @@ from .config import get_settings
 from .db import SessionLocal
 from .models import ApiToken
 from .routers import dashboard, ingest, workouts
+from .strava import run_sync
 
 logger = logging.getLogger("fittrack")
 
@@ -45,7 +49,22 @@ def _prewarm_db() -> None:
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     _prewarm_db()
-    yield
+    stop = Event()
+    worker = None
+    if settings.strava_token_file:
+        worker = Thread(
+            target=run_sync,
+            args=(stop, Path(settings.strava_token_file), settings.strava_poll_seconds, SessionLocal),
+            name="strava-sync", daemon=True,
+        )
+        worker.start()
+        logger.info("Strava sync enabled; interval %s seconds", settings.strava_poll_seconds)
+    try:
+        yield
+    finally:
+        stop.set()
+        if worker is not None:
+            await to_thread(worker.join)
 
 
 app = FastAPI(

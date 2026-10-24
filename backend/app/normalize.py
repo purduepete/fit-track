@@ -48,6 +48,21 @@ WORKOUT_TYPE_MAP = {
 
 MILE_M = 1609.344
 
+# User-requested removals on 10/07/2026. Keep these blocked during replay too.
+EXCLUDED_WORKOUT_IDS = frozenset({
+    "0dc36660-8341-4840-8662-6b630b304a5c",
+    "abc5cbc8-e72f-468c-86e6-ebd9eabbb646",
+    "feab8c12-3ddf-4239-8371-a1dda5591c91",
+    "c7a16d18-b7c9-409f-847e-576a6ef0db93",
+})
+
+
+def _excluded_workout_id(workout_id: str) -> bool:
+    if workout_id.casefold() not in EXCLUDED_WORKOUT_IDS:
+        return False
+    logging.getLogger("fittrack").info("Skipping permanently excluded workout %s", workout_id)
+    return True
+
 
 # --- tolerant field helpers --------------------------------------------------
 def first(d: dict, *keys, default=None):
@@ -583,7 +598,8 @@ def persist_payload(
     # ParsedPayload directly without passing through parse_payload.
     workouts = [
         pw for pw in parsed.workouts
-        if (ingest_source == "strava" or not _excluded_workout_source(pw.source_name))
+        if not _excluded_workout_id(pw.uuid)
+        and (ingest_source == "strava" or not _excluded_workout_source(pw.source_name))
         and not _cross_source_zwift_duplicate(pw, db)
     ]
 

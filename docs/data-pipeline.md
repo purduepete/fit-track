@@ -31,6 +31,19 @@ and accepts only Zwift virtual rides.
 
 ## Direct Zwift import through Strava
 
+### Permanent workout exclusions
+
+The 4 user-marked Indoor Cycling entries on 10/07/2026 at 17:34 (6.80 mi),
+15:42, 14:11 and 13:53 are excluded by exact workout ID in
+`app.normalize.EXCLUDED_WORKOUT_IDS`. Shared persistence rejects those IDs,
+including case variants, during uploads, historical imports and raw-event replay.
+The other 17:34 ride (6.81 mi), 07:39 and 07:03 remain. Raw events and daily
+health metrics are retained. The reviewed cleanup command is
+`python -m scripts.remove_excluded_workouts --apply` from `backend`;
+omit `--apply` to inspect matching rows without deletion.
+
+### Connection and sync
+
 Zwift uploads to Strava; FitTrack reads those rides directly without Apple
 Health. Apple Health remains the source for steps, sleep and other workouts.
 Create a personal application at https://www.strava.com/settings/api with

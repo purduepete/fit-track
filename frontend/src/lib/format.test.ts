@@ -25,8 +25,21 @@ describe('metersToUnit', () => {
 });
 
 describe('formatDistance', () => {
+    it('groups thousands while preserving distance precision', () => {
+        expect(formatDistance(1234560, 'km')).toBe('1,234.56 km');
+        expect(formatDistance(1609344, 'mi')).toBe('1,000.00 mi');
+    });
     it('formats miles', () => {
         expect(formatDistance(3218.688, 'mi')).toBe('2.00 mi');
+    });
+
+    describe('grouped numbers', () => {
+        it('uses commas for calories and preserves requested decimal places', () => {
+            expect(round(1396)).toBe('1,396');
+            expect(round(1234.56, 2)).toBe('1,234.56');
+            expect(round(0)).toBe('0');
+            expect(round(null)).toBe('—');
+        });
     });
     it('handles null', () => {
         expect(formatDistance(null, 'mi')).toBe('—');

@@ -29,6 +29,7 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   workouts with both distance and duration; average HR is duration-weighted
   across workouts with HR and positive duration. Max HR is the highest available
   value. Missing measurements stay empty; loading more updates the totals.
+  Distances and calories use comma thousands separators; distances retain 2 decimal places.
 - **Dashboard** — 7-day workout count / minutes / active energy, resting-HR,
   VO₂ max and sleep trends, plus a 30-day daily-steps chart with a 10k goal line,
   a stepped 7-day block-average line, and green bars on days with a logged

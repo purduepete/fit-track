@@ -101,6 +101,14 @@ describe('Workouts type dropdown', () => {
             return vi.spyOn(api, 'workouts').mockResolvedValue({ items, total });
         }
 
+        it('groups thousands in row and total distances and calories', async () => {
+            setup([workout({ distance_m: 1609344, active_energy_kcal: 1396 })]);
+            renderAt('/workouts');
+            await screen.findByText('Visible totals');
+            expect(screen.getAllByText('1,000.00 mi')).toHaveLength(2);
+            expect(screen.getAllByText('1,396')).toHaveLength(2);
+        });
+
         it('sums totals and calculates overall pace, duration-weighted HR and highest HR', async () => {
             setup([
                 workout(),

@@ -10,7 +10,7 @@ export function metersToUnit(meters: number, unit: Unit): number {
 
 export function formatDistance(meters: number | null, unit: Unit, digits = 2): string {
     if (meters == null) return '—';
-    return `${metersToUnit(meters, unit).toFixed(digits)} ${unit}`;
+    return `${round(metersToUnit(meters, unit), digits)} ${unit}`;
 }
 
 /** Seconds -> "H:MM:SS" (or "M:SS" when under an hour). */
@@ -97,7 +97,7 @@ export function formatLocalTime(value: string | number): string {
 
 export function round(n: number | null, digits = 0): string {
     if (n == null) return '—';
-    return n.toFixed(digits);
+    return n.toLocaleString('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
 /** Whole-number step count with thousands separators (e.g. 12500 -> "12,500"). */

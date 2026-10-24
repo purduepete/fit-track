@@ -14,46 +14,13 @@ import { usePageRefresh } from '../lib/refresh';
 // out of the initial bundle and load it lazily on demand.
 const RouteMap = lazy(() => import('../components/RouteMap').then((m) => ({ default: m.RouteMap })));
 
-// Mirrors MAX_ROUTE_POINTS / MAX_HR_POINTS in backend/app/routers/workouts.py:
-// the point count above which the detail endpoint downsamples a series.
-const RES_CAP = 500;
-const FULL_RES_KEY = 'fittrack:full-res';
-
-function readFullPref(): boolean {
-    try {
-        return localStorage.getItem(FULL_RES_KEY) === '1';
-    } catch {
-        return false;
-    }
-}
-
-function writeFullPref(value: boolean): void {
-    try {
-        localStorage.setItem(FULL_RES_KEY, value ? '1' : '0');
-    } catch {
-        /* storage unavailable (private mode / disabled) - preference just won't persist */
-    }
-}
-
 export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
     const { uuid = '' } = useParams();
     const navigate = useNavigate();
     const [unit, setUnit] = useState<Unit>('mi');
-    // Remember the user's resolution choice across workouts: once they opt into
-    // full resolution it sticks (and vice-versa) instead of re-downsampling every
-    // time they open a workout.
-    const [full, setFull] = useState(readFullPref);
-    const updateFull = (value: boolean) => {
-        setFull(value);
-        writeFullPref(value);
-    };
     // Unit is a pure client-side view choice: the detail response carries splits
     // for both unit systems, so switching mi/km must not refetch the workout.
-    const { data, error, loading, refresh } = useApiResource(
-        () => api.workout(uuid, full),
-        [uuid, full, onAuthError],
-        onAuthError
-    );
+    const { data, error, loading, refresh } = useApiResource(() => api.workout(uuid), [uuid, onAuthError], onAuthError);
     usePageRefresh(refresh, loading);
 
     // Left/right arrow keys move between workouts (ignoring when typing in a field).
@@ -75,12 +42,6 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
 
     if (error) return <p className="error">{error}</p>;
     if (!data) return <p className="muted">Loading…</p>;
-
-    const downsampled = !full && (data.route_downsampled || data.hr_downsampled);
-    // A workout is "large" when either series exceeded the server-side cap, i.e.
-    // full vs. simplified actually differ. When full=true the *_downsampled flags
-    // are false, so derive largeness from the untruncated totals instead.
-    const isLarge = data.route_total > RES_CAP || data.hr_total > RES_CAP;
 
     const splits = data.splits.filter((s) => s.unit_system === unit);
 
@@ -164,24 +125,6 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                     </button>
                 </div>
             </div>
-
-            {downsampled && (
-                <p className="muted" style={{ marginTop: -4, marginBottom: 12 }}>
-                    Showing a simplified view of {data.route_total} route points and {data.hr_total} heart-rate samples.{' '}
-                    <button className="linklike" onClick={() => updateFull(true)}>
-                        Load full resolution
-                    </button>
-                </p>
-            )}
-
-            {full && isLarge && (
-                <p className="muted" style={{ marginTop: -4, marginBottom: 12 }}>
-                    Showing full resolution ({data.route_total} route points, {data.hr_total} heart-rate samples).{' '}
-                    <button className="linklike" onClick={() => updateFull(false)}>
-                        Use simplified view
-                    </button>
-                </p>
-            )}
 
             {data.route.length > 0 && (
                 <div className="section">

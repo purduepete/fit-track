@@ -95,6 +95,9 @@ By default long GPS workouts are **downsampled** (deterministically, endpoints
 preserved) to keep responses and client rendering bounded; pass `full=true` to
 retrieve every point. `404` if the workout does not exist.
 
+The workout detail page always uses the default automatic sampling. It has no
+resolution notice or toggle; all original points remain stored.
+
 ## `GET /api/dashboard` _(read scope)_
 
 7-day rollup and trend series. `weekly_workouts`/`weekly_minutes` cover the last

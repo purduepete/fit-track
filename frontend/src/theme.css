@@ -373,6 +373,12 @@ textarea {
 }
 
 @media (min-width: 1024px) {
+    html {
+        scrollbar-width: auto;
+    }
+    html::-webkit-scrollbar {
+        width: auto;
+    }
     .app-bar {
         padding-left: max(20px, calc((100% - 1400px) / 2), env(safe-area-inset-left));
         padding-right: max(20px, calc((100% - 1400px) / 2), env(safe-area-inset-right));

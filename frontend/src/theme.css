@@ -7,6 +7,7 @@
     --on-accent: #0f172a;
     --accent-grad: var(--accent);
     --radius: 0; /* squared corners */
+    --header-control-height: 38px;
     --font:
         'Roboto Flex', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial,
         'Noto Sans', sans-serif;
@@ -120,7 +121,7 @@ textarea {
 
 /* Header dropdowns match the 38px icon buttons beside them. */
 .app-bar .filter-select-trigger {
-    height: 38px;
+    height: var(--header-control-height);
 }
 
 .brand {
@@ -142,20 +143,56 @@ textarea {
 }
 
 .nav {
-    display: flex;
-    gap: 4px;
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    height: var(--header-control-height);
+    padding: 3px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+}
+
+.nav::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc(50% - 3px);
+    border-radius: inherit;
+    background: var(--accent);
+    transition: transform 0.25s ease-out;
+}
+
+.nav:has(a:nth-child(2).active)::before {
+    transform: translateX(100%);
 }
 
 .nav a {
-    padding: 7px 14px;
+    display: grid;
+    place-items: center;
+    padding: 0 14px;
     border-radius: var(--radius);
     color: var(--text-dim);
     font-weight: 500;
 }
 
 .nav a.active {
-    color: var(--text);
-    background: var(--surface-2);
+    color: var(--on-accent);
+}
+
+.nav a:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .nav::before {
+        transition: none;
+    }
 }
 
 .spacer {
@@ -166,7 +203,7 @@ textarea {
     display: grid;
     place-items: center;
     width: 38px;
-    height: 38px;
+    height: var(--header-control-height);
     border: 1px solid var(--border);
     background: var(--surface);
     color: var(--text);
@@ -885,7 +922,7 @@ tbody tr:hover {
     }
 
     .nav a {
-        padding: 6px 10px;
+        padding: 0 10px;
     }
 
     .app-bar .nav {
@@ -1018,6 +1055,7 @@ tbody tr:hover {
    bar further so the nav + theme/logout buttons never run off-screen. */
 @media (max-width: 430px) {
     .app-bar {
+        --header-control-height: 34px;
         gap: 8px;
         padding: 10px 12px;
         padding-top: max(10px, env(safe-area-inset-top));
@@ -1029,18 +1067,14 @@ tbody tr:hover {
 
     .icon-btn,
     .app-bar .filter-select-trigger {
-        height: 34px;
+        height: var(--header-control-height);
     }
 
     .icon-btn {
         width: 34px;
     }
 
-    .nav {
-        gap: 2px;
-    }
-
     .nav a {
-        padding: 6px 9px;
+        padding: 0 9px;
     }
 }

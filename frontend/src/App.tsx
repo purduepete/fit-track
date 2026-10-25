@@ -101,15 +101,15 @@ export default function App() {
                         </span>
                         <span className="brand-name">Fit Track</span>
                     </div>
-                    <nav className="nav">
+                    <nav className="nav" aria-label="Main navigation">
                         <NavLink to="/" end>
                             Dashboard
                         </NavLink>
                         <NavLink to="/workouts">Workouts</NavLink>
                     </nav>
                     <div className="spacer" />
-                    <StravaPullButton onAuthError={onAuthError} />
                     <RefreshButton />
+                    <StravaPullButton onAuthError={onAuthError} />
                     <FilterSelect<Theme>
                         ariaLabel="Theme"
                         value={preference}

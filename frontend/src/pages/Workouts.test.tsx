@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Workouts } from './Workouts';
 import { api } from '../lib/api';
 import type { WorkoutSummary } from '../lib/api';
+import { currentPacificWeek } from '../lib/format';
 
 function renderAt(entry: string) {
     return render(
@@ -34,14 +35,14 @@ describe('Workouts ?date= deep-link', () => {
         expect(screen.getByLabelText('Date range')).toBeDisabled();
     });
 
-    it('ignores a malformed date param (no date_to sent)', async () => {
+    it('ignores a malformed date param and uses the default current week', async () => {
         const workouts = vi.spyOn(api, 'workouts').mockResolvedValue({ items: [], total: 0 });
         vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
 
         renderAt('/workouts?date=not-a-date');
 
         await waitFor(() => expect(workouts).toHaveBeenCalled());
-        expect(workouts).toHaveBeenCalledWith(expect.objectContaining({ dateTo: undefined }));
+        expect(workouts).toHaveBeenCalledWith(expect.objectContaining(currentPacificWeek()));
         expect(screen.queryByText(/Showing workouts on/i)).not.toBeInTheDocument();
     });
 
@@ -55,8 +56,52 @@ describe('Workouts ?date= deep-link', () => {
         fireEvent.click(screen.getByRole('button', { name: /clear/i }));
 
         await waitFor(() => expect(screen.queryByText(/Showing workouts on/i)).not.toBeInTheDocument());
-        // After clearing, the most recent call must not carry a date_to bound.
-        expect(workouts).toHaveBeenLastCalledWith(expect.objectContaining({ dateTo: undefined }));
+        expect(workouts).toHaveBeenLastCalledWith(expect.objectContaining(currentPacificWeek()));
+    });
+});
+
+describe('Workouts current week', () => {
+    afterEach(() => {
+        vi.restoreAllMocks();
+        vi.useRealTimers();
+    });
+
+    it('defaults to the Pacific week, lists it first and keeps both bounds when loading more', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(new Date('2026-10-26T06:59:59Z'));
+        const workouts = vi.spyOn(api, 'workouts').mockResolvedValue({ items: [], total: 30 });
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        const { container } = renderAt('/workouts');
+        const bounds = { dateFrom: '2026-10-19', dateTo: '2026-10-25' };
+        await waitFor(() => expect(workouts).toHaveBeenCalledWith(expect.objectContaining(bounds)));
+        const range = screen.getByRole('combobox', { name: 'Date range' });
+        expect(range).toHaveTextContent('Current week');
+        expect(container.querySelector('select, datalist')).toBeNull();
+        fireEvent.click(range);
+        expect(screen.getAllByRole('option')[0]).toHaveTextContent('Current week');
+        fireEvent.keyDown(range, { key: 'Escape' });
+        fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
+        await waitFor(() => expect(workouts).toHaveBeenCalledTimes(2));
+        expect(workouts).toHaveBeenLastCalledWith(expect.objectContaining(bounds));
+    });
+
+    it('removes the upper bound for other presets and restores the week with keyboard selection', async () => {
+        const workouts = vi.spyOn(api, 'workouts').mockResolvedValue({ items: [], total: 0 });
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        renderAt('/workouts');
+        await waitFor(() => expect(workouts).toHaveBeenCalled());
+        const range = screen.getByLabelText('Date range');
+        fireEvent.click(range);
+        fireEvent.click(screen.getByRole('option', { name: 'All time' }));
+        await waitFor(() =>
+            expect(workouts).toHaveBeenLastCalledWith(
+                expect.objectContaining({ dateFrom: undefined, dateTo: undefined })
+            )
+        );
+        fireEvent.keyDown(range, { key: 'Enter' });
+        fireEvent.keyDown(range, { key: 'Home' });
+        fireEvent.keyDown(range, { key: 'Enter' });
+        await waitFor(() => expect(workouts).toHaveBeenLastCalledWith(expect.objectContaining(currentPacificWeek())));
     });
 });
 

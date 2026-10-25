@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     avgPaceSecPerUnit,
+    currentPacificWeek,
     formatDistance,
     formatDuration,
     formatHms,
@@ -14,6 +15,20 @@ import {
     metersToUnit,
     round,
 } from './format';
+
+describe('currentPacificWeek', () => {
+    it.each([
+        ['2026-10-26T06:59:59Z', '2026-10-19', '2026-10-25'],
+        ['2026-10-26T07:00:00Z', '2026-10-26', '2026-11-01'],
+        ['2026-11-02T07:59:59Z', '2026-10-26', '2026-11-01'],
+        ['2026-11-02T08:00:00Z', '2026-11-02', '2026-11-08'],
+        ['2026-03-08T10:00:00Z', '2026-03-02', '2026-03-08'],
+        ['2026-03-09T07:00:00Z', '2026-03-09', '2026-03-15'],
+        ['2026-01-01T20:00:00Z', '2025-12-29', '2026-01-04'],
+    ])('uses Pacific calendar boundaries at %s', (instant, dateFrom, dateTo) => {
+        expect(currentPacificWeek(new Date(instant))).toEqual({ dateFrom, dateTo });
+    });
+});
 
 describe('metersToUnit', () => {
     it('converts to miles', () => {

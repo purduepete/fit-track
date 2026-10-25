@@ -71,6 +71,23 @@ function pad2(n: number): string {
     return String(n).padStart(2, '0');
 }
 
+/** Inclusive Monday-Sunday calendar dates in Pacific time, including DST. */
+export function currentPacificWeek(now = new Date()): { dateFrom: string; dateTo: string } {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(now);
+    const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((value) => value.type === type)!.value;
+    // Use UTC only for calendar arithmetic so the browser's zone and DST cannot shift a day.
+    const day = new Date(`${part('year')}-${part('month')}-${part('day')}T00:00:00Z`);
+    day.setUTCDate(day.getUTCDate() - ((day.getUTCDay() + 6) % 7));
+    const dateFrom = day.toISOString().slice(0, 10);
+    day.setUTCDate(day.getUTCDate() + 6);
+    return { dateFrom, dateTo: day.toISOString().slice(0, 10) };
+}
+
 /** A "YYYY-MM-DD" (or ISO) date string -> "MM/DD/YYYY".
  *
  * ``local_date`` is already a calendar date (no time zone), so the date part is

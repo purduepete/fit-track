@@ -12,6 +12,7 @@ describe('App sign-in gates', () => {
         vi.restoreAllMocks();
         vi.unstubAllGlobals();
         localStorage.clear();
+        window.location.hash = '';
     });
 
     it('asks for a Cloudflare sign-in, not a token, when Access blocks the auth check', async () => {
@@ -44,6 +45,24 @@ describe('App sign-in gates', () => {
         vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ gateway: false })));
         render(<App />);
         expect(await screen.findByText(/Enter your read access token/)).toBeTruthy();
+    });
+
+    it('keeps the segmented navigation accessible and marks the active route', async () => {
+        vi.spyOn(api, 'dashboard').mockReturnValue(new Promise(() => {}));
+        vi.spyOn(api, 'workouts').mockResolvedValue({ items: [], total: 0 });
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ gateway: true })));
+        render(<App />);
+        const dashboard = await screen.findByRole('link', { name: 'Dashboard' });
+        const workouts = screen.getByRole('link', { name: 'Workouts' });
+        expect(screen.getByRole('navigation', { name: 'Main navigation' })).toHaveClass('nav');
+        expect(dashboard).toHaveAttribute('aria-current', 'page');
+        fireEvent.click(workouts);
+        expect(workouts).toHaveAttribute('aria-current', 'page');
+        expect(dashboard).not.toHaveAttribute('aria-current');
+        expect(await screen.findByLabelText('Date range')).toHaveTextContent('Current week');
+        fireEvent.click(dashboard);
+        expect(dashboard).toHaveAttribute('aria-current', 'page');
     });
 
     it('uses the custom Theme menu with keyboard selection, persistence and live system tracking', async () => {

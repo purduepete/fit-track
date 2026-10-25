@@ -24,6 +24,10 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   route (with a distance-sample fallback for indoor workouts). mi/km toggle.
 - **Route map** — the GPS track drawn on OpenStreetMap (no API key).
 - **Heart-rate chart** — HR over the course of the workout.
+- **Workout date filter**: defaults to Current week, Monday through Sunday in
+  Pacific time (including daylight saving). It is the first range option;
+  dashboard day links still show that exact day. Dashboard and Workouts share
+  a square segmented navigation control with a sliding selected state.
 - **Workout totals**: the bottom row totals the visible, loaded workouts after
   searching: count, duration, distance and active calories. Overall pace uses
   workouts with both distance and duration; average HR is duration-weighted

@@ -6,6 +6,7 @@ import { FilterSelect } from '../components/FilterSelect';
 import { usePageRefresh } from '../lib/refresh';
 import {
     avgPaceSecPerUnit,
+    currentPacificWeek,
     formatDistance,
     formatHms,
     formatLocalDate,
@@ -16,9 +17,9 @@ import {
 
 const PAGE_SIZE = 25;
 
-// Date-range presets. `days` -> today minus N days; `year` -> Jan 1 this year;
-// `all` -> no lower bound. Value is used as the select key.
+// Week uses both bounds; other presets keep their existing lower-bound behavior.
 const RANGES = [
+    { key: 'week', label: 'Current week' },
     { key: '30', label: 'Last 30 days' },
     { key: '7', label: 'Last 7 days' },
     { key: '90', label: 'Last 90 days' },
@@ -45,7 +46,7 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
     const rawDate = searchParams.get('date');
     const dateParam = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null;
     const [type, setType] = useState('');
-    const [range, setRange] = useState('30');
+    const [range, setRange] = useState('week');
     const [search, setSearch] = useState('');
     const [types, setTypes] = useState<string[]>([]);
     const [items, setItems] = useState<WorkoutSummary[]>([]);
@@ -56,10 +57,11 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
     const refresh = useCallback(() => setRevision((value) => value + 1), []);
     usePageRefresh(refresh, loading);
 
-    // When a specific day is deep-linked, filter to exactly that day
-    // (dateFrom == dateTo); otherwise use the range preset's lower bound.
-    const dateFrom = useMemo(() => (dateParam ? dateParam : rangeToDateFrom(range)), [dateParam, range]);
-    const dateTo = dateParam ?? undefined;
+    const { dateFrom, dateTo } = dateParam
+        ? { dateFrom: dateParam, dateTo: dateParam }
+        : range === 'week'
+          ? currentPacificWeek()
+          : { dateFrom: rangeToDateFrom(range), dateTo: undefined };
 
     // A deep-linked date must not be hidden by a leftover client-side search term.
     useEffect(() => {

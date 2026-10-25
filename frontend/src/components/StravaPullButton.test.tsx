@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StravaPullButton } from './StravaPullButton';
 import { api, ApiError } from '../lib/api';
 
@@ -11,6 +11,7 @@ vi.mock('react-router-dom', () => ({ useLocation: () => ({ pathname: '/' }) }));
 describe('Strava pull', () => {
     afterEach(() => {
         cleanup();
+        vi.useRealTimers();
         vi.restoreAllMocks();
         triggerRefresh.mockReset();
     });
@@ -41,6 +42,43 @@ describe('Strava pull', () => {
         render(<StravaPullButton onAuthError={vi.fn()} />);
         fireEvent.click(screen.getByRole('button', { name: 'Pull Strava data' }));
         expect(await screen.findByText('Strava is up to date.')).toBeTruthy();
+    });
+
+    for (const workouts of [0, 2]) {
+        it(`dismisses a successful ${workouts}-ride result after 5 seconds`, async () => {
+            vi.useFakeTimers();
+            vi.spyOn(api, 'pullStrava').mockResolvedValue({ workouts });
+            render(<StravaPullButton onAuthError={vi.fn()} />);
+            await act(async () => fireEvent.click(screen.getByRole('button')));
+            expect(screen.getByRole('status')).toHaveTextContent(
+                workouts ? 'Imported 2 Strava rides.' : 'Strava is up to date.'
+            );
+            act(() => vi.advanceTimersByTime(4999));
+            expect(screen.getByRole('status')).toBeTruthy();
+            act(() => vi.advanceTimersByTime(1));
+            expect(screen.queryByRole('status')).toBeNull();
+        });
+    }
+
+    it('cancels an old dismissal timer when another pull starts and keeps errors visible', async () => {
+        vi.useFakeTimers();
+        let reject!: (error: Error) => void;
+        vi.spyOn(api, 'pullStrava')
+            .mockResolvedValueOnce({ workouts: 0 })
+            .mockReturnValueOnce(
+                new Promise((_, rejectPull) => {
+                    reject = rejectPull;
+                })
+            );
+        render(<StravaPullButton onAuthError={vi.fn()} />);
+        await act(async () => fireEvent.click(screen.getByRole('button')));
+        act(() => vi.advanceTimersByTime(4000));
+        fireEvent.click(screen.getByRole('button'));
+        act(() => vi.advanceTimersByTime(10000));
+        expect(screen.getByRole('status')).toHaveTextContent('Pulling Strava data...');
+        await act(async () => reject(new Error('Strava unavailable')));
+        act(() => vi.advanceTimersByTime(10000));
+        expect(screen.getByRole('alert')).toHaveTextContent('Strava unavailable');
     });
 
     it('shows server errors and allows retry', async () => {

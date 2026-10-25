@@ -453,6 +453,8 @@ The header uses compact icon buttons for Refresh, Pull Strava data and Appearanc
 Its clock shows the latest underlying data import time, not the page refresh time.
 Header controls have accessible labels without hover tooltips. The timestamp's accessible
 label includes its full local date and relative age.
+Successful Strava pull messages disappear after 5 seconds. Running status and errors remain
+visible until the pull finishes or another attempt replaces the error.
 Appearance opens a themed Light / Midnight / System segmented control, with Midnight as the default.
 System follows OS changes live. Arrow keys, Home and End select a theme; Escape closes the popover.
 Pressing Appearance again also closes the popover, including on touch devices.

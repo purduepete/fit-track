@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useRefreshBar } from '../lib/refresh';
 import { Download, LoaderCircle } from 'lucide-react';
@@ -13,6 +13,12 @@ export function StravaPullButton({ onAuthError }: { onAuthError: () => void }) {
     const [message, setMessage] = useState('');
     const [error, setError] = useState(false);
     const busy = useRef(false);
+
+    useEffect(() => {
+        if (!message || pulling || error) return;
+        const timer = window.setTimeout(() => setMessage(''), 5000);
+        return () => window.clearTimeout(timer);
+    }, [message, pulling, error]);
 
     async function pull() {
         if (busy.current) return;

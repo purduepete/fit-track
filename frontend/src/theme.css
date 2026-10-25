@@ -372,6 +372,18 @@ textarea {
     padding: 28px 24px 64px;
 }
 
+@media (min-width: 1024px) {
+    .app-bar {
+        padding-left: max(20px, calc((100% - 1400px) / 2), env(safe-area-inset-left));
+        padding-right: max(20px, calc((100% - 1400px) / 2), env(safe-area-inset-right));
+    }
+    .container {
+        max-width: 1440px;
+        padding-left: max(20px, env(safe-area-inset-left));
+        padding-right: max(20px, env(safe-area-inset-right));
+    }
+}
+
 .page-view:not([hidden]) {
     animation: page-enter 160ms ease-out;
 }

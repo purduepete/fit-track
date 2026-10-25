@@ -5,6 +5,8 @@ import { api, ApiError } from '../lib/api';
 
 const { triggerRefresh } = vi.hoisted(() => ({ triggerRefresh: vi.fn() }));
 vi.mock('../lib/refresh', () => ({ useRefreshBar: () => ({ triggerRefresh }) }));
+vi.mock('../lib/dashboard', () => ({ useDashboard: () => ({ refresh: vi.fn() }) }));
+vi.mock('react-router-dom', () => ({ useLocation: () => ({ pathname: '/' }) }));
 
 describe('Strava pull', () => {
     afterEach(() => {
@@ -18,13 +20,18 @@ describe('Strava pull', () => {
         const pull = vi.spyOn(api, 'pullStrava').mockReturnValue(new Promise((resolve) => (complete = resolve)));
         render(<StravaPullButton onAuthError={vi.fn()} />);
         const button = screen.getByRole('button', { name: 'Pull Strava data' });
+        expect(button).toHaveTextContent('');
+        expect(button).not.toHaveAttribute('title');
+        expect(button).toHaveAccessibleDescription('Pull Strava data (from 10/23/2026 onward)');
         fireEvent.click(button);
         fireEvent.click(button);
         expect(button).toBeDisabled();
+        expect(button).toHaveAttribute('aria-busy', 'true');
         expect(screen.getByRole('status')).toHaveTextContent('Pulling Strava data');
         expect(pull).toHaveBeenCalledTimes(1);
         complete({ workouts: 1 });
         await waitFor(() => expect(button).not.toBeDisabled());
+        expect(button).toHaveAttribute('aria-busy', 'false');
         expect(screen.getByRole('status')).toHaveTextContent('Imported 1 Strava ride.');
         expect(triggerRefresh).toHaveBeenCalledOnce();
     });

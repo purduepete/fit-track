@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import App from './App';
 import { api } from './lib/api';
 
@@ -65,6 +65,49 @@ describe('App sign-in gates', () => {
         expect(dashboard).toHaveAttribute('aria-current', 'page');
     });
 
+    it('retains the Workouts view and filters while revalidating on return', async () => {
+        vi.spyOn(api, 'dashboard').mockReturnValue(new Promise(() => {}));
+        const load = vi.spyOn(api, 'workouts').mockResolvedValue({
+            items: [
+                {
+                    uuid: 'retained-ride',
+                    workout_type: 'Cycling',
+                    local_date: '2026-10-25',
+                    start_utc: '2026-10-25T16:00:00Z',
+                    duration_sec: 1800,
+                    distance_m: 10000,
+                    active_energy_kcal: 300,
+                    avg_hr: 120,
+                    max_hr: 150,
+                    has_route: false,
+                },
+            ],
+            total: 1,
+        });
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ gateway: true })));
+        render(<App />);
+        const dashboard = await screen.findByRole('link', { name: 'Dashboard' });
+        const workouts = screen.getByRole('link', { name: 'Workouts' });
+        const navigation = screen.getByRole('navigation');
+        fireEvent.click(workouts);
+        const search = await screen.findByRole('searchbox', { name: 'Search workouts' });
+        await waitFor(() => expect(load).toHaveBeenCalledOnce());
+        const ride = await within(screen.getByRole('region', { name: 'Workouts view' })).findByText('Cycling');
+        fireEvent.change(search, { target: { value: 'cycling' } });
+        fireEvent.click(dashboard);
+        expect(screen.queryByRole('searchbox')).toBeNull();
+        const calls = load.mock.calls.length;
+        load.mockReturnValue(new Promise(() => {}));
+        fireEvent.click(workouts);
+        expect(screen.getByRole('searchbox', { name: 'Search workouts' })).toBe(search);
+        expect(search).toHaveValue('cycling');
+        expect(within(screen.getByRole('region', { name: 'Workouts view' })).getByText('Cycling')).toBe(ride);
+        expect(screen.getByRole('navigation')).toBe(navigation);
+        await waitFor(() => expect(load.mock.calls.length).toBe(calls + 1));
+        expect(within(screen.getByRole('region', { name: 'Workouts view' })).queryByText('Loading…')).toBeNull();
+    });
+
     it('uses the custom Theme menu with keyboard selection, persistence and live system tracking', async () => {
         const listeners = new Set<() => void>();
         const media = {
@@ -79,26 +122,22 @@ describe('App sign-in gates', () => {
             vi.fn().mockImplementation(() => Promise.resolve(json({ gateway: true })))
         );
         const { container, unmount } = render(<App />);
-        const theme = await screen.findByRole('combobox', { name: 'Theme' });
+        const theme = await screen.findByRole('button', { name: 'Appearance' });
         expect(container.querySelector('header select, header datalist')).toBeNull();
-        expect(theme).toHaveTextContent('Midnight');
+        expect(theme).not.toHaveAttribute('title');
+        expect(theme).toHaveTextContent('');
         theme.focus();
-        fireEvent.keyDown(theme, { key: 'ArrowUp' });
-        expect(screen.getByRole('option', { name: 'Midnight' })).toHaveAttribute('aria-selected', 'true');
-        fireEvent.keyDown(theme, { key: 'Home' });
-        fireEvent.keyDown(theme, { key: 'ArrowDown' });
-        fireEvent.keyDown(theme, { key: 'Enter' });
-        expect(theme).toHaveFocus();
-        expect(theme).toHaveTextContent('Light');
+        fireEvent.click(theme);
+        const group = screen.getByRole('radiogroup', { name: 'Theme' });
+        expect(screen.getByRole('radio', { name: 'Midnight' })).toHaveAttribute('aria-checked', 'true');
+        expect(screen.getByRole('radio', { name: 'Midnight' })).toHaveFocus();
+        fireEvent.keyDown(group, { key: 'Home' });
+        expect(screen.getByRole('radio', { name: 'Light' })).toHaveFocus();
         expect(localStorage.getItem('fittrack_theme')).toBe('light');
         expect(document.documentElement.dataset.theme).toBe('light');
-        fireEvent.keyDown(theme, { key: ' ' });
-        fireEvent.keyDown(theme, { key: 'End' });
-        fireEvent.keyDown(theme, { key: ' ' });
+        fireEvent.keyDown(group, { key: 'ArrowRight' });
         expect(document.documentElement.dataset.theme).toBe('dark');
-        fireEvent.click(theme);
-        fireEvent.click(screen.getByRole('option', { name: 'System' }));
-        expect(theme).toHaveFocus();
+        fireEvent.keyDown(group, { key: 'End' });
         expect(localStorage.getItem('fittrack_theme')).toBe('system');
         expect(document.documentElement.dataset.theme).toBe('light');
         act(() => {
@@ -106,16 +145,41 @@ describe('App sign-in gates', () => {
             listeners.forEach((fn) => fn());
         });
         expect(document.documentElement.dataset.theme).toBe('dark');
-        for (const key of ['Escape', 'Tab']) {
-            fireEvent.click(theme);
-            fireEvent.keyDown(theme, { key });
-            expect(screen.queryByRole('listbox', { name: 'Theme' })).toBeNull();
-        }
+        fireEvent.keyDown(group, { key: 'Escape' });
+        expect(theme).toHaveFocus();
+        expect(screen.queryByRole('dialog')).toBeNull();
+        fireEvent.click(theme);
+        fireEvent.blur(screen.getByRole('radio', { name: 'System' }), { relatedTarget: document.body });
+        expect(screen.queryByRole('dialog')).toBeNull();
         fireEvent.click(theme);
         fireEvent.pointerDown(document.body);
-        expect(screen.queryByRole('listbox', { name: 'Theme' })).toBeNull();
+        expect(screen.queryByRole('dialog')).toBeNull();
         unmount();
         render(<App />);
-        expect(await screen.findByRole('combobox', { name: 'Theme' })).toHaveTextContent('System');
+        fireEvent.click(await screen.findByRole('button', { name: 'Appearance' }));
+        expect(screen.getByRole('radio', { name: 'System' })).toHaveAttribute('aria-checked', 'true');
+    });
+
+    it('keeps icon-only refresh wired to the active page and dismisses its tooltip with Escape', async () => {
+        vi.spyOn(api, 'dashboard').mockReturnValue(new Promise(() => {}));
+        window.location.hash = '#/workouts';
+        const workouts = vi.spyOn(api, 'workouts').mockResolvedValue({ items: [], total: 0 });
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        vi.stubGlobal(
+            'fetch',
+            vi.fn().mockImplementation(() => Promise.resolve(json({ gateway: true })))
+        );
+        render(<App />);
+        const refresh = await screen.findByRole('button', { name: 'Refresh data' });
+        expect(refresh).toHaveTextContent('');
+        expect(refresh).not.toHaveAttribute('title');
+        expect(refresh).toHaveAccessibleDescription('Refresh data');
+        refresh.focus();
+        fireEvent.keyDown(refresh, { key: 'Escape' });
+        expect(refresh.parentElement).toHaveClass('dismissed');
+        const calls = workouts.mock.calls.length;
+        fireEvent.click(refresh);
+        expect(workouts.mock.calls.length).toBe(calls + 1);
+        await screen.findByRole('button', { name: 'Refresh data' });
     });
 });

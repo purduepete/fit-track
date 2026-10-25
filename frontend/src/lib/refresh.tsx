@@ -62,16 +62,16 @@ export function useRefreshBar() {
  * Page hook: wires a page's `refresh()` and `loading` flag to the app-bar
  * button for as long as the page is mounted.
  */
-export function usePageRefresh(refresh: () => void, loading: boolean) {
+export function usePageRefresh(refresh: () => void, loading: boolean, active = true) {
     const ctx = useContext(RefreshContext);
 
     useEffect(() => {
-        if (!ctx) return;
+        if (!ctx || !active) return;
         ctx.registerRefresher(refresh);
         return () => ctx.unregisterRefresher(refresh);
-    }, [ctx, refresh]);
+    }, [ctx, refresh, active]);
 
     useEffect(() => {
-        ctx?.reportLoading(loading);
-    }, [ctx, loading]);
+        if (active) ctx?.reportLoading(loading);
+    }, [ctx, loading, active]);
 }

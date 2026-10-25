@@ -1,10 +1,15 @@
 import { useRef, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useRefreshBar } from '../lib/refresh';
-import { DownloadIcon, RefreshIcon } from './Icons';
+import { Download, LoaderCircle } from 'lucide-react';
+import { HeaderTooltip } from './HeaderTooltip';
+import { useDashboard } from '../lib/dashboard';
+import { useLocation } from 'react-router-dom';
 
 export function StravaPullButton({ onAuthError }: { onAuthError: () => void }) {
     const { triggerRefresh } = useRefreshBar();
+    const { refresh } = useDashboard();
+    const { pathname } = useLocation();
     const [pulling, setPulling] = useState(false);
     const [message, setMessage] = useState('');
     const [error, setError] = useState(false);
@@ -23,6 +28,7 @@ export function StravaPullButton({ onAuthError }: { onAuthError: () => void }) {
                     ? 'Strava is up to date.'
                     : `Imported ${result.workouts} Strava ${result.workouts === 1 ? 'ride' : 'rides'}.`
             );
+            if (pathname !== '/') refresh();
             triggerRefresh();
         } catch (e) {
             if (e instanceof ApiError && e.status === 401) onAuthError();
@@ -36,16 +42,22 @@ export function StravaPullButton({ onAuthError }: { onAuthError: () => void }) {
 
     return (
         <div className="strava-pull">
-            <button
-                className="icon-btn strava-pull-button"
-                onClick={() => void pull()}
-                disabled={pulling}
-                aria-label="Pull Strava data"
-                title="Pull Zwift rides from Strava (from 10/23/2026 onward)"
-            >
-                {pulling ? <RefreshIcon style={{ animation: 'spin 0.8s linear infinite' }} /> : <DownloadIcon />}
-                <span>Pull Strava data</span>
-            </button>
+            <HeaderTooltip label={pulling ? 'Pulling Strava data...' : 'Pull Strava data (from 10/23/2026 onward)'}>
+                <button
+                    type="button"
+                    className={`icon-btn header-icon${pulling ? ' is-busy' : ''}`}
+                    onClick={() => void pull()}
+                    disabled={pulling}
+                    aria-label="Pull Strava data"
+                    aria-busy={pulling}
+                >
+                    {pulling ? (
+                        <LoaderCircle size={18} aria-hidden="true" />
+                    ) : (
+                        <Download size={18} aria-hidden="true" />
+                    )}
+                </button>
+            </HeaderTooltip>
             {message && (
                 <p className={`strava-pull-message${error ? ' error' : ''}`} role={error ? 'alert' : 'status'}>
                     {message}

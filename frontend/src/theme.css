@@ -7,7 +7,7 @@
     --on-accent: #0f172a;
     --accent-grad: var(--accent);
     --radius: 0; /* squared corners */
-    --header-control-height: 38px;
+    --header-control-height: 36px;
     --font:
         'Roboto Flex', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Helvetica Neue', Arial,
         'Noto Sans', sans-serif;
@@ -72,6 +72,10 @@
     background: var(--scrollbar-track);
 }
 
+html {
+    scrollbar-gutter: stable;
+}
+
 body {
     margin: 0;
     font-family: var(--font);
@@ -125,7 +129,7 @@ textarea {
     background: var(--surface);
 }
 
-/* Header dropdowns match the 38px icon buttons beside them. */
+/* Header controls share one height. */
 .app-bar .filter-select-trigger {
     height: var(--header-control-height);
 }
@@ -221,27 +225,148 @@ textarea {
     border-color: var(--accent);
 }
 
-.strava-pull {
+.strava-pull,
+.appearance-menu,
+.header-tooltip {
     position: relative;
+}
+
+.header-tooltip {
+    display: inline-flex;
+}
+
+.header-actions .header-icon {
+    width: var(--header-control-height);
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: var(--text-dim);
+}
+
+.header-actions .header-icon:hover:not(:disabled),
+.header-actions .header-icon[aria-expanded='true'] {
+    background: var(--surface-2);
+    color: var(--text);
+}
+
+.header-icon:focus-visible,
+.theme-segments button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.header-icon:disabled {
+    opacity: 0.45;
+    cursor: default;
+}
+
+.is-busy svg {
+    animation: spin 0.8s linear infinite;
+}
+
+.header-tooltip-text {
+    position: absolute;
+    z-index: 2;
+    top: calc(100% + 8px);
+    right: 0;
+    width: max-content;
+    max-width: min(260px, calc(100vw - 28px));
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    font-size: 0.8rem;
+    visibility: hidden;
+}
+
+.header-tooltip:not(.dismissed):hover .header-tooltip-text,
+.header-tooltip:not(.dismissed):focus-within .header-tooltip-text {
+    visibility: visible;
+}
+
+.header-tooltip:has([aria-expanded='true']) .header-tooltip-text {
+    visibility: hidden;
+}
+
+.appearance-popover {
+    position: absolute;
+    z-index: 3;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 320px;
+    max-width: calc(100vw - 28px);
+    padding: 16px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+}
+
+.appearance-label {
+    display: block;
+    margin-bottom: 8px;
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.theme-segments {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    padding: 3px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+}
+
+.theme-segments::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    top: 3px;
+    bottom: 3px;
+    left: 3px;
+    width: calc((100% - 6px) / 3);
+    background: var(--accent);
+    transform: translateX(calc(var(--selected-theme) * 100%));
+    transition: transform 0.25s ease-out;
+}
+
+.theme-segments button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 5px;
+    height: 30px;
+    padding: 0 5px;
+    border: 0;
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.theme-segments button[aria-checked='true'] {
+    color: var(--on-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .theme-segments::before {
+        transition: none;
+    }
+
+    .is-busy svg {
+        animation: none;
+    }
 }
 
 .summary-row td {
     background: var(--surface-2);
     border-top: 2px solid var(--border);
     font-weight: 700;
-}
-
-.strava-pull-button {
-    display: flex;
-    gap: 8px;
-    width: auto;
-    padding: 0 10px;
-    white-space: nowrap;
-}
-
-.strava-pull-button:disabled {
-    opacity: 0.6;
-    cursor: wait;
 }
 
 .strava-pull-message {
@@ -277,6 +402,27 @@ textarea {
     padding: 28px 24px 64px;
 }
 
+.page-view:not([hidden]) {
+    animation: page-enter 160ms ease-out;
+}
+
+@keyframes page-enter {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .page-view:not([hidden]) {
+        animation: none;
+    }
+}
+
 .page-title {
     margin: 4px 0 24px;
     font-size: 1.6rem;
@@ -300,13 +446,40 @@ textarea {
     margin-bottom: 24px;
 }
 
-.last-updated {
-    margin: 0;
+.header-last-updated {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    color: var(--text-dim);
     font-size: 0.8rem;
+    white-space: nowrap;
 }
 
-.last-updated-ago {
-    opacity: 0.75;
+.header-last-updated:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+.header-update-error {
+    max-width: 180px;
+    font-size: 0.75rem;
+}
+
+@media (max-width: 820px) {
+    .header-update-label {
+        display: none;
+    }
+}
+
+@media (max-width: 430px) {
+    .brand {
+        gap: 6px;
+        font-size: 1rem;
+    }
+
+    .header-actions {
+        gap: 4px;
+    }
 }
 
 @keyframes spin {
@@ -442,15 +615,6 @@ textarea {
 }
 
 @media (max-width: 640px) {
-    .strava-pull-button span {
-        display: none;
-    }
-
-    .strava-pull-button {
-        width: 38px;
-        padding: 0;
-        justify-content: center;
-    }
     .steps-headline .steps-value {
         font-size: 1.5rem;
     }
@@ -1057,18 +1221,12 @@ tbody tr:hover {
     }
 }
 
-/* Very narrow phones: drop the brand wordmark (keep the logo) and tighten the
-   bar further so the nav + theme/logout buttons never run off-screen. */
+/* Tighten spacing on very narrow phones while keeping header controls uniform. */
 @media (max-width: 430px) {
     .app-bar {
-        --header-control-height: 34px;
         gap: 8px;
         padding: 10px 12px;
         padding-top: max(10px, env(safe-area-inset-top));
-    }
-
-    .brand-name {
-        display: none;
     }
 
     .icon-btn,
@@ -1077,7 +1235,7 @@ tbody tr:hover {
     }
 
     .icon-btn {
-        width: 34px;
+        width: var(--header-control-height);
     }
 
     .nav a {

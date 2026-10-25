@@ -14,9 +14,8 @@ import {
     YAxis,
 } from 'recharts';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../lib/api';
 import type { SleepBand, Vo2MaxBand } from '../lib/api';
-import { useApiResource } from '../lib/useApiResource';
+import { useDashboard } from '../lib/dashboard';
 import { StatCard } from '../components/StatCard';
 import {
     ActivityIcon,
@@ -27,15 +26,7 @@ import {
     HeartIcon,
     MoonIcon,
 } from '../components/Icons';
-import {
-    round,
-    formatLocalDate,
-    formatHoursMinutes,
-    formatLocalDateTime,
-    formatMinutesHms,
-    formatRelative,
-    formatSteps,
-} from '../lib/format';
+import { round, formatLocalDate, formatHoursMinutes, formatMinutesHms, formatSteps } from '../lib/format';
 import { barCursor, tooltipProps } from '../lib/chart';
 import { usePageRefresh } from '../lib/refresh';
 
@@ -123,9 +114,9 @@ function CardioFitness({ band, value }: { band: Vo2MaxBand; value: number }) {
     );
 }
 
-export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
-    const { data, error, loading, refresh } = useApiResource(() => api.dashboard(), [onAuthError], onAuthError);
-    usePageRefresh(refresh, loading);
+export function Dashboard({ active = true }: { active?: boolean }) {
+    const { data, error, loading, refresh } = useDashboard();
+    usePageRefresh(refresh, loading, active);
     const navigate = useNavigate();
 
     // Navigate to the Workouts page scoped to a clicked bar's day. The click is
@@ -199,16 +190,6 @@ export function Dashboard({ onAuthError }: { onAuthError: () => void }) {
         <>
             <div className="page-head">
                 <h1 className="page-title">Dashboard</h1>
-                <p className="muted last-updated">
-                    {data.last_ingest_utc ? (
-                        <>
-                            Last updated {formatLocalDateTime(data.last_ingest_utc)}{' '}
-                            <span className="last-updated-ago">({formatRelative(data.last_ingest_utc)})</span>
-                        </>
-                    ) : (
-                        'No data uploaded yet'
-                    )}
-                </p>
             </div>
             <div className="grid-cards">
                 <StatCard icon={<ActivityIcon />} label="Workouts (7d)" value={data.workouts_7d} />

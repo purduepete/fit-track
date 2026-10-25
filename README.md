@@ -444,6 +444,14 @@ nothing real.
 - [Testing](docs/testing.md)
 ## Theme preferences
 
-The header theme selector offers System, Light and Midnight, with Midnight as the default.
-System follows OS changes live. The icon button switches between Light and Midnight.
+Dashboard and Workouts keep their views mounted when switching tabs. Workouts retains filters
+and loaded rows while checking for fresh data on return. Content enters over 160ms, separately
+from the navigation selection slide; reduced-motion disables both animations. Scrollbar space
+is reserved so switching between short and long pages doesn't move the header.
+
+The header uses compact icon buttons for Refresh, Pull Strava data and Appearance.
+Its clock shows the latest underlying data import time, not the page refresh time.
+Focus or hover over the time for the full local date and relative age.
+Appearance opens a themed Light / Midnight / System segmented control, with Midnight as the default.
+System follows OS changes live. Arrow keys, Home and End select a theme; Escape closes the popover.
 The `fittrack_theme` storage key accepts `system`, `light` and `midnight`; legacy `dark` values migrate to Midnight.

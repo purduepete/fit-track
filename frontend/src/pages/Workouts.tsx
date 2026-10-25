@@ -37,7 +37,7 @@ function rangeToDateFrom(key: string): string | undefined {
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
-export function Workouts({ onAuthError }: { onAuthError: () => void }) {
+export function Workouts({ onAuthError, active = true }: { onAuthError: () => void; active?: boolean }) {
     const nav = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     // Deep-link support: `/workouts?date=YYYY-MM-DD` scopes the list to a single
@@ -55,7 +55,7 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
     const [error, setError] = useState<string | null>(null);
     const [revision, setRevision] = useState(0);
     const refresh = useCallback(() => setRevision((value) => value + 1), []);
-    usePageRefresh(refresh, loading);
+    usePageRefresh(refresh, loading, active);
 
     const { dateFrom, dateTo } = dateParam
         ? { dateFrom: dateParam, dateTo: dateParam }
@@ -69,24 +69,26 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
     }, [dateParam]);
 
     useEffect(() => {
+        if (!active) return;
         api.workoutTypes()
             .then(setTypes)
             .catch(() => setTypes([]));
-    }, [revision]);
+    }, [revision, active]);
 
     // (Re)load from the start whenever a server-side filter (type/range/day) changes.
     useEffect(() => {
-        let active = true;
+        if (!active) return;
+        let live = true;
         setLoading(true);
         setError(null);
         api.workouts({ type: type || undefined, dateFrom, dateTo, limit: PAGE_SIZE, offset: 0 })
             .then((res) => {
-                if (!active) return;
+                if (!live) return;
                 setItems(res.items);
                 setTotal(res.total);
             })
             .catch((e) => {
-                if (!active) return;
+                if (!live) return;
                 if (e instanceof ApiError && e.status === 401) {
                     clearToken();
                     onAuthError();
@@ -95,13 +97,13 @@ export function Workouts({ onAuthError }: { onAuthError: () => void }) {
                 }
             })
             .finally(() => {
-                if (active) setLoading(false);
+                if (live) setLoading(false);
             });
         return () => {
-            active = false;
+            live = false;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [type, dateFrom, dateTo, revision]);
+    }, [type, dateFrom, dateTo, revision, active]);
 
     function loadMore() {
         setLoading(true);

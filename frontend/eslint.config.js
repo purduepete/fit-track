@@ -24,7 +24,7 @@ export default tseslint.config(
         },
     },
     {
-        files: ['src/lib/refresh.tsx'],
+        files: ['src/lib/refresh.tsx', 'src/lib/dashboard.tsx'],
         rules: { 'react-refresh/only-export-components': 'off' },
     },
     {

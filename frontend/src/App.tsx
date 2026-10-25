@@ -1,16 +1,20 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
-import { NavLink, Route, HashRouter as Router, Routes } from 'react-router-dom';
+import { NavLink, Route, HashRouter as Router, Routes, useLocation } from 'react-router-dom';
 import { getToken, restoreToken } from './lib/api';
 import { sitedockOrigin } from './lib/sitedock';
-import { useTheme, type Theme } from './lib/useTheme';
-import { ActivityIcon, LogOutIcon, RefreshIcon } from './components/Icons';
+import { useTheme } from './lib/useTheme';
+import { ActivityIcon, LogOutIcon } from './components/Icons';
+import { LoaderCircle, RefreshCw } from 'lucide-react';
 import { AccessGate, TokenGate } from './components/TokenGate';
-import { FilterSelect } from './components/FilterSelect';
+import { AppearanceMenu } from './components/AppearanceMenu';
+import { HeaderTooltip } from './components/HeaderTooltip';
 import { RefreshProvider, useRefreshBar } from './lib/refresh';
 import { Dashboard } from './pages/Dashboard';
 import { Workouts } from './pages/Workouts';
 import { clearToken } from './lib/api';
 import { StravaPullButton } from './components/StravaPullButton';
+import { DashboardProvider, useDashboard } from './lib/dashboard';
+import { LastUpdated } from './components/LastUpdated';
 
 // The detail page pulls in Leaflet (map) + extra charts; code-split it so the
 // initial bundle (dashboard + list) stays lean.
@@ -93,67 +97,97 @@ export default function App() {
 
     return (
         <RefreshProvider>
-            <Router>
-                <header className="app-bar">
-                    <div className="brand">
-                        <span className="logo">
-                            <ActivityIcon size={18} />
-                        </span>
-                        <span className="brand-name">Fit Track</span>
-                    </div>
-                    <nav className="nav" aria-label="Main navigation">
-                        <NavLink to="/" end>
-                            Dashboard
-                        </NavLink>
-                        <NavLink to="/workouts">Workouts</NavLink>
-                    </nav>
-                    <div className="spacer" />
-                    <div className="header-actions">
-                        <RefreshButton />
-                        <StravaPullButton onAuthError={onAuthError} />
-                        <FilterSelect<Theme>
-                            ariaLabel="Theme"
-                            value={preference}
-                            onChange={setPreference}
-                            options={[
-                                { value: 'system', label: 'System' },
-                                { value: 'light', label: 'Light' },
-                                { value: 'midnight', label: 'Midnight' },
-                            ]}
-                        />
-                        {!gateway && (
-                            <button className="icon-btn" onClick={logout} title="Sign out">
-                                <LogOutIcon />
-                            </button>
-                        )}
-                    </div>
-                </header>
-                <main className="container">
-                    <Suspense fallback={<p className="muted">Loading…</p>}>
-                        <Routes>
-                            <Route path="/" element={<Dashboard onAuthError={onAuthError} />} />
-                            <Route path="/workouts" element={<Workouts onAuthError={onAuthError} />} />
-                            <Route path="/workouts/:uuid" element={<WorkoutDetail onAuthError={onAuthError} />} />
-                        </Routes>
-                    </Suspense>
-                </main>
-            </Router>
+            <DashboardProvider onAuthError={onAuthError}>
+                <Router>
+                    <header className="app-bar">
+                        <div className="brand">
+                            <span className="logo">
+                                <ActivityIcon size={18} />
+                            </span>
+                            <span className="brand-name">Fit Track</span>
+                        </div>
+                        <nav className="nav" aria-label="Main navigation">
+                            <NavLink to="/" end>
+                                Dashboard
+                            </NavLink>
+                            <NavLink to="/workouts">Workouts</NavLink>
+                        </nav>
+                        <div className="spacer" />
+                        <div className="header-actions">
+                            <LastUpdated />
+                            <RefreshButton />
+                            <StravaPullButton onAuthError={onAuthError} />
+                            <AppearanceMenu value={preference} onChange={setPreference} />
+                            {!gateway && (
+                                <button className="icon-btn" onClick={logout} title="Sign out">
+                                    <LogOutIcon />
+                                </button>
+                            )}
+                        </div>
+                    </header>
+                    <main className="container">
+                        <PageViews onAuthError={onAuthError} />
+                    </main>
+                </Router>
+            </DashboardProvider>
         </RefreshProvider>
+    );
+}
+
+function PageViews({ onAuthError }: { onAuthError: () => void }) {
+    const location = useLocation();
+    const workoutsActive = location.pathname === '/workouts';
+    const dashboardActive = location.pathname === '/';
+    const [workoutsLocation, setWorkoutsLocation] = useState(workoutsActive ? location : null);
+
+    useEffect(() => {
+        if (workoutsActive) setWorkoutsLocation(location);
+    }, [location, workoutsActive]);
+
+    return (
+        <>
+            <section className="page-view" hidden={!dashboardActive} aria-label="Dashboard view">
+                <Dashboard active={dashboardActive} />
+            </section>
+            {(workoutsActive || workoutsLocation) && (
+                <section className="page-view" hidden={!workoutsActive} aria-label="Workouts view">
+                    <Routes location={workoutsActive ? location : (workoutsLocation ?? location)}>
+                        <Route
+                            path="/workouts"
+                            element={<Workouts active={workoutsActive} onAuthError={onAuthError} />}
+                        />
+                    </Routes>
+                </section>
+            )}
+            <Suspense fallback={<p className="muted">Loading…</p>}>
+                <Routes>
+                    <Route path="/workouts/:uuid" element={<WorkoutDetail onAuthError={onAuthError} />} />
+                    <Route path="*" element={null} />
+                </Routes>
+            </Suspense>
+        </>
     );
 }
 
 /** App-bar refresh control: spins while the active page is fetching data. */
 function RefreshButton() {
     const { triggerRefresh, loading, canRefresh } = useRefreshBar();
+    const { refresh } = useDashboard();
+    const { pathname } = useLocation();
     return (
-        <button
-            className="icon-btn icon-btn--plain"
-            onClick={triggerRefresh}
-            disabled={!canRefresh || loading}
-            title="Refresh data"
-            aria-label="Refresh data"
-        >
-            <RefreshIcon style={loading ? { animation: 'spin 0.8s linear infinite' } : undefined} />
-        </button>
+        <HeaderTooltip label={loading ? 'Refreshing' : 'Refresh data'}>
+            <button
+                type="button"
+                className={`icon-btn header-icon${loading ? ' is-busy' : ''}`}
+                onClick={() => {
+                    if (pathname !== '/') refresh();
+                    triggerRefresh();
+                }}
+                disabled={!canRefresh || loading}
+                aria-label={loading ? 'Refreshing' : 'Refresh data'}
+            >
+                {loading ? <LoaderCircle size={18} aria-hidden="true" /> : <RefreshCw size={18} aria-hidden="true" />}
+            </button>
+        </HeaderTooltip>
     );
 }

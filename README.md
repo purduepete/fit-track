@@ -53,15 +53,15 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
 
 ## Repository layout
 
-| Path | Purpose |
-| --- | --- |
-| `backend/app/` | FastAPI app: config, db, models, auth, normalizer, geo/splits, routers |
+| Path               | Purpose                                                                                                                       |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `backend/app/`     | FastAPI app: config, db, models, auth, normalizer, geo/splits, routers                                                        |
 | `backend/scripts/` | `init_db`, `check_config`, `token_admin` / `New-IngestToken.ps1`, `upload_folder` / `Watch-Upload.ps1`, `backfill_export_xml` |
-| `backend/tests/` | pytest suite (geo, normalizer, persistence, API) |
-| `frontend/` | React + Vite + TS dashboard (Recharts, react-leaflet) |
-| `infra/main.bicep` | Azure Container Apps (Consumption, scale-to-zero) |
-| `Dockerfile` | Builds the SPA and serves it from FastAPI (incl. ODBC Driver 18) |
-| `docs/` | Architecture, data pipeline, splits algorithm, API, schema, testing |
+| `backend/tests/`   | pytest suite (geo, normalizer, persistence, API)                                                                              |
+| `frontend/`        | React + Vite + TS dashboard (Recharts, react-leaflet)                                                                         |
+| `infra/main.bicep` | Azure Container Apps (Consumption, scale-to-zero)                                                                             |
+| `Dockerfile`       | Builds the SPA and serves it from FastAPI (incl. ODBC Driver 18)                                                              |
+| `docs/`            | Architecture, data pipeline, splits algorithm, API, schema, testing                                                           |
 
 ## Quickstart (local)
 
@@ -247,7 +247,33 @@ cd frontend; npm run test                                # frontend
 CI (`.github/workflows/ci.yml`) runs both on every push/PR. See
 [`docs/testing.md`](docs/testing.md).
 
-## Deploy (Azure)
+## Release to jimbrownhome1
+
+After committing and pushing, release through Solution Deploy:
+
+```powershell
+& C:\Files\Dev\main\solution-deploy\Deploy.ps1 -Action Release `
+    -App fit-track -Target jimbrownhome1 -Component web -Commit origin/main `
+    -ApproveRelease -ApprovalReason 'Approved Fit Track web update' `
+    -DatabaseChangesReviewed
+```
+
+The command builds the pushed source, prepares a new release folder, switches
+the runtime, verifies both access paths, and records the completion time shown
+by the Solution Directory. Never copy a frontend build into `current` or an
+existing release folder: that leaves the recorded commit and release date stale.
+The web release leaves the upload watcher unchanged. Database input changes
+require a separate reviewed procedure; the review flag cannot bypass that check.
+See the Solution Deploy repository's `docs/Deployment.md` for the full procedure.
+
+GitHub CI remains enabled for tests, lint and builds. Uptime remains enabled
+for the public Cloudflare Access boundary. The obsolete Azure Deploy workflow
+is disabled in GitHub; keep it disabled while jimbrownhome1 hosts production.
+
+## Deploy (Azure, historical)
+
+These instructions describe the retired Azure installation. Production releases
+use the jimbrownhome1 procedure above.
 
 Cheapest path is **Azure Container Apps** on the Consumption plan
 (`minReplicas: 0` → scales to zero when idle). The app (`fittrack-api`) runs in
@@ -261,18 +287,18 @@ as a Container App secret. The Azure SQL server is reused cross-RG (see
 
 ### Option A — GitHub Actions (manual trigger)
 
-`.github/workflows/deploy.yml` is **`workflow_dispatch` only** (never on push,
-because a deploy hits the shared WebPortfolio DB). Run it from the Actions tab
-or `gh workflow run deploy.yml`. It requires:
+`.github/workflows/deploy.yml` is disabled. Its former `workflow_dispatch`
+procedure touches the shared WebPortfolio DB. Do not re-enable it for routine
+production releases. The historical procedure requires:
 
-| Kind | Name | Example |
-| --- | --- | --- |
-| secret | `AZURE_CREDENTIALS` | output of `az ad sp create-for-rbac --sdk-auth` |
-| secret | `GHCR_PAT` | classic PAT with `read:packages` (Container App pulls the private image with it) |
-| secret | `GHCR_PUSH_TOKEN` | classic PAT with `write:packages` (pushes the image from the runner) |
-| variable | `FITTRACK_RG` | `jimbpersonal-rg` |
-| variable | `ATHLETE_BIRTH_DATE` | `1970-09-20` (blank = disables VO₂ interpretation) |
-| variable | `ATHLETE_SEX` | `male` \| `female` |
+| Kind     | Name                 | Example                                                                          |
+| -------- | -------------------- | -------------------------------------------------------------------------------- |
+| secret   | `AZURE_CREDENTIALS`  | output of `az ad sp create-for-rbac --sdk-auth`                                  |
+| secret   | `GHCR_PAT`           | classic PAT with `read:packages` (Container App pulls the private image with it) |
+| secret   | `GHCR_PUSH_TOKEN`    | classic PAT with `write:packages` (pushes the image from the runner)             |
+| variable | `FITTRACK_RG`        | `jimbpersonal-rg`                                                                |
+| variable | `ATHLETE_BIRTH_DATE` | `1970-09-20` (blank = disables VO₂ interpretation)                               |
+| variable | `ATHLETE_SEX`        | `male` \| `female`                                                               |
 
 > ⚠️ If `AZURE_CREDENTIALS` is not set the workflow fails at the Azure login
 > step — use Option B.
@@ -337,7 +363,7 @@ az containerapp revision list -n fittrack-api -g jimbpersonal-rg `
 
 The most common cause is an **expired ghcr PAT**. The Container App stores the
 `read:packages` PAT as the **`registry-password`** secret (the name `infra/main.bicep`
-assigns). Beware: `az containerapp registry set` writes to a *different*,
+assigns). Beware: `az containerapp registry set` writes to a _different_,
 CLI-generated secret name (e.g. `ghcrio-purduepete`) and leaves the bicep one
 orphaned — a later deploy then switches the reference back. So always read
 `properties.configuration.registries[].passwordSecretRef` rather than assuming a
@@ -366,7 +392,7 @@ Note: `az containerapp registry set` **does not create a new revision and does n
 restart anything** — running replicas keep serving with the credential they
 started with, and a node-cached image can hide a broken new credential until the
 next cold start. So always follow a credential change with a revision restart,
-both to recover crash-looping replicas and to *prove* the new secret can actually
+both to recover crash-looping replicas and to _prove_ the new secret can actually
 pull. Remember to update the `GHCR_PAT` GitHub secret too, or the next Actions
 deploy will re-store the expired value.
 
@@ -399,7 +425,7 @@ page** — which is exactly how the 2026-08-03 outage went unnoticed.
 from a GitHub runner **three times a day** and fails the run (which emails you)
 if the app doesn't return 200 after three tries.
 
-It deliberately runs *outside* Azure. Because `minReplicas: 0`, **zero replicas is
+It deliberately runs _outside_ Azure. Because `minReplicas: 0`, **zero replicas is
 the normal idle state**, so an Azure metric alert on replica count or restarts
 cannot tell "idle" from "broken" — only a real HTTP request that forces a cold
 start can. The retries exist because that cold start takes ~20s.
@@ -423,7 +449,7 @@ mistaken for a real outage. Scheduled runs never set it: a red run whose log say
 > During the 2026-08-03 recovery the app briefly held the local `CR_PAT`
 > (`repo` + `write:packages`), which was then replaced by a dedicated read-only
 > classic PAT and verified to pull. `CR_PAT` still needs `write:packages` for
-> *pushing* images from your machine, so only the value stored **in the app**
+> _pushing_ images from your machine, so only the value stored **in the app**
 > should be read-only. When rotating, don't paste `CR_PAT` back in.
 
 ## ⚠️ Database-change policy
@@ -442,6 +468,7 @@ nothing real.
 - [API reference](docs/api.md)
 - [Database schema](docs/schema.md)
 - [Testing](docs/testing.md)
+
 ## Theme preferences
 
 Dashboard and Workouts keep their views mounted when switching tabs. Workouts retains filters

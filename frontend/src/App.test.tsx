@@ -174,9 +174,10 @@ describe('App sign-in gates', () => {
         expect(refresh).toHaveTextContent('');
         expect(refresh).not.toHaveAttribute('title');
         expect(document.querySelector('header [role="tooltip"], header [title]')).toBeNull();
+        await waitFor(() => expect(refresh).toBeEnabled());
         const calls = workouts.mock.calls.length;
         fireEvent.click(refresh);
-        expect(workouts.mock.calls.length).toBe(calls + 1);
+        await waitFor(() => expect(workouts.mock.calls.length).toBe(calls + 1));
         await screen.findByRole('button', { name: 'Refresh data' });
     });
 });

@@ -108,23 +108,25 @@ export default function App() {
                         <NavLink to="/workouts">Workouts</NavLink>
                     </nav>
                     <div className="spacer" />
-                    <RefreshButton />
-                    <StravaPullButton onAuthError={onAuthError} />
-                    <FilterSelect<Theme>
-                        ariaLabel="Theme"
-                        value={preference}
-                        onChange={setPreference}
-                        options={[
-                            { value: 'system', label: 'System' },
-                            { value: 'light', label: 'Light' },
-                            { value: 'midnight', label: 'Midnight' },
-                        ]}
-                    />
-                    {!gateway && (
-                        <button className="icon-btn" onClick={logout} title="Sign out">
-                            <LogOutIcon />
-                        </button>
-                    )}
+                    <div className="header-actions">
+                        <RefreshButton />
+                        <StravaPullButton onAuthError={onAuthError} />
+                        <FilterSelect<Theme>
+                            ariaLabel="Theme"
+                            value={preference}
+                            onChange={setPreference}
+                            options={[
+                                { value: 'system', label: 'System' },
+                                { value: 'light', label: 'Light' },
+                                { value: 'midnight', label: 'Midnight' },
+                            ]}
+                        />
+                        {!gateway && (
+                            <button className="icon-btn" onClick={logout} title="Sign out">
+                                <LogOutIcon />
+                            </button>
+                        )}
+                    </div>
                 </header>
                 <main className="container">
                     <Suspense fallback={<p className="muted">Loading…</p>}>

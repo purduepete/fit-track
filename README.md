@@ -451,7 +451,9 @@ is reserved so switching between short and long pages doesn't move the header.
 
 The header uses compact icon buttons for Refresh, Pull Strava data and Appearance.
 Its clock shows the latest underlying data import time, not the page refresh time.
-Focus or hover over the time for the full local date and relative age.
+Header controls have accessible labels without hover tooltips. The timestamp's accessible
+label includes its full local date and relative age.
 Appearance opens a themed Light / Midnight / System segmented control, with Midnight as the default.
 System follows OS changes live. Arrow keys, Home and End select a theme; Escape closes the popover.
+Pressing Appearance again also closes the popover, including on touch devices.
 The `fittrack_theme` storage key accepts `system`, `light` and `midnight`; legacy `dark` values migrate to Midnight.

@@ -2,7 +2,6 @@ import { useRef, useState } from 'react';
 import { api, ApiError } from '../lib/api';
 import { useRefreshBar } from '../lib/refresh';
 import { Download, LoaderCircle } from 'lucide-react';
-import { HeaderTooltip } from './HeaderTooltip';
 import { useDashboard } from '../lib/dashboard';
 import { useLocation } from 'react-router-dom';
 
@@ -42,22 +41,16 @@ export function StravaPullButton({ onAuthError }: { onAuthError: () => void }) {
 
     return (
         <div className="strava-pull">
-            <HeaderTooltip label={pulling ? 'Pulling Strava data...' : 'Pull Strava data (from 10/23/2026 onward)'}>
-                <button
-                    type="button"
-                    className={`icon-btn header-icon${pulling ? ' is-busy' : ''}`}
-                    onClick={() => void pull()}
-                    disabled={pulling}
-                    aria-label="Pull Strava data"
-                    aria-busy={pulling}
-                >
-                    {pulling ? (
-                        <LoaderCircle size={18} aria-hidden="true" />
-                    ) : (
-                        <Download size={18} aria-hidden="true" />
-                    )}
-                </button>
-            </HeaderTooltip>
+            <button
+                type="button"
+                className={`icon-btn header-icon${pulling ? ' is-busy' : ''}`}
+                onClick={() => void pull()}
+                disabled={pulling}
+                aria-label="Pull Strava data"
+                aria-busy={pulling}
+            >
+                {pulling ? <LoaderCircle size={18} aria-hidden="true" /> : <Download size={18} aria-hidden="true" />}
+            </button>
             {message && (
                 <p className={`strava-pull-message${error ? ' error' : ''}`} role={error ? 'alert' : 'status'}>
                     {message}

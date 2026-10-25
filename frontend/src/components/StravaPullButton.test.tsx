@@ -22,7 +22,7 @@ describe('Strava pull', () => {
         const button = screen.getByRole('button', { name: 'Pull Strava data' });
         expect(button).toHaveTextContent('');
         expect(button).not.toHaveAttribute('title');
-        expect(button).toHaveAccessibleDescription('Pull Strava data (from 10/23/2026 onward)');
+        expect(screen.queryByRole('tooltip')).toBeNull();
         fireEvent.click(button);
         fireEvent.click(button);
         expect(button).toBeDisabled();

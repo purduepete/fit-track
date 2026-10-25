@@ -23,7 +23,8 @@ describe('header data update time', () => {
         expect(screen.getByText('Data last updated')).toBeTruthy();
         expect(container.querySelector('time')).toHaveTextContent(formatLocalTime(imported));
         expect(container.querySelector('time')).toHaveAttribute('datetime', `${imported}Z`);
-        expect(screen.getByRole('tooltip')).toHaveTextContent(formatLocalDateTime(imported));
+        expect(screen.getByLabelText(new RegExp(formatLocalDateTime(imported)))).toBeTruthy();
+        expect(screen.queryByRole('tooltip')).toBeNull();
         rerender(<LastUpdated />);
         expect(container.querySelector('time')).toHaveTextContent(formatLocalTime(imported));
         resource.data = { last_ingest_utc: '2026-10-25T17:30:00Z' };
@@ -35,7 +36,7 @@ describe('header data update time', () => {
         resource.data = { last_ingest_utc: null };
         const { container } = render(<LastUpdated />);
         expect(container.querySelector('time')).toBeNull();
-        expect(screen.getByRole('tooltip')).toHaveTextContent('No data uploaded yet');
+        expect(screen.getByLabelText('No data uploaded yet')).toBeTruthy();
     });
 
     it('reports a failed timestamp lookup explicitly', () => {

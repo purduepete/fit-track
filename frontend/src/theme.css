@@ -226,13 +226,8 @@ textarea {
 }
 
 .strava-pull,
-.appearance-menu,
-.header-tooltip {
+.appearance-menu {
     position: relative;
-}
-
-.header-tooltip {
-    display: inline-flex;
 }
 
 .header-actions .header-icon {
@@ -262,31 +257,6 @@ textarea {
 
 .is-busy svg {
     animation: spin 0.8s linear infinite;
-}
-
-.header-tooltip-text {
-    position: absolute;
-    z-index: 2;
-    top: calc(100% + 8px);
-    right: 0;
-    width: max-content;
-    max-width: min(260px, calc(100vw - 28px));
-    padding: 8px 10px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text);
-    box-shadow: var(--shadow);
-    font-size: 0.8rem;
-    visibility: hidden;
-}
-
-.header-tooltip:not(.dismissed):hover .header-tooltip-text,
-.header-tooltip:not(.dismissed):focus-within .header-tooltip-text {
-    visibility: visible;
-}
-
-.header-tooltip:has([aria-expanded='true']) .header-tooltip-text {
-    visibility: hidden;
 }
 
 .appearance-popover {

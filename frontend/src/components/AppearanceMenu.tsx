@@ -1,7 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { Monitor, Moon, Palette, Sun } from 'lucide-react';
 import type { Theme } from '../lib/useTheme';
-import { HeaderTooltip } from './HeaderTooltip';
 
 const options = [
     { value: 'light', label: 'Light', Icon: Sun },
@@ -59,20 +58,25 @@ export function AppearanceMenu({ value, onChange }: { value: Theme; onChange: (t
                 if (!event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false);
             }}
         >
-            <HeaderTooltip label="Appearance">
-                <button
-                    type="button"
-                    className="icon-btn header-icon"
-                    ref={trigger}
-                    aria-label="Appearance"
-                    aria-haspopup="dialog"
-                    aria-expanded={open}
-                    aria-controls={open ? id : undefined}
-                    onClick={() => setOpen(!open)}
-                >
-                    <Palette size={18} aria-hidden="true" />
-                </button>
-            </HeaderTooltip>
+            <button
+                type="button"
+                className="icon-btn header-icon"
+                ref={trigger}
+                aria-label="Appearance"
+                aria-haspopup="dialog"
+                aria-expanded={open}
+                aria-controls={open ? id : undefined}
+                onPointerDown={(event) => {
+                    // Keep Safari from closing on blur before the closing click arrives.
+                    if (open) event.preventDefault();
+                }}
+                onClick={() => {
+                    if (open) trigger.current?.focus();
+                    setOpen((wasOpen) => !wasOpen);
+                }}
+            >
+                <Palette size={18} aria-hidden="true" />
+            </button>
             {open && (
                 <div
                     className="appearance-popover"

@@ -7,7 +7,6 @@ import { ActivityIcon, LogOutIcon } from './components/Icons';
 import { LoaderCircle, RefreshCw } from 'lucide-react';
 import { AccessGate, TokenGate } from './components/TokenGate';
 import { AppearanceMenu } from './components/AppearanceMenu';
-import { HeaderTooltip } from './components/HeaderTooltip';
 import { RefreshProvider, useRefreshBar } from './lib/refresh';
 import { Dashboard } from './pages/Dashboard';
 import { Workouts } from './pages/Workouts';
@@ -119,7 +118,7 @@ export default function App() {
                             <StravaPullButton onAuthError={onAuthError} />
                             <AppearanceMenu value={preference} onChange={setPreference} />
                             {!gateway && (
-                                <button className="icon-btn" onClick={logout} title="Sign out">
+                                <button className="icon-btn" onClick={logout} aria-label="Sign out">
                                     <LogOutIcon />
                                 </button>
                             )}
@@ -175,19 +174,17 @@ function RefreshButton() {
     const { refresh } = useDashboard();
     const { pathname } = useLocation();
     return (
-        <HeaderTooltip label={loading ? 'Refreshing' : 'Refresh data'}>
-            <button
-                type="button"
-                className={`icon-btn header-icon${loading ? ' is-busy' : ''}`}
-                onClick={() => {
-                    if (pathname !== '/') refresh();
-                    triggerRefresh();
-                }}
-                disabled={!canRefresh || loading}
-                aria-label={loading ? 'Refreshing' : 'Refresh data'}
-            >
-                {loading ? <LoaderCircle size={18} aria-hidden="true" /> : <RefreshCw size={18} aria-hidden="true" />}
-            </button>
-        </HeaderTooltip>
+        <button
+            type="button"
+            className={`icon-btn header-icon${loading ? ' is-busy' : ''}`}
+            onClick={() => {
+                if (pathname !== '/') refresh();
+                triggerRefresh();
+            }}
+            disabled={!canRefresh || loading}
+            aria-label={loading ? 'Refreshing' : 'Refresh data'}
+        >
+            {loading ? <LoaderCircle size={18} aria-hidden="true" /> : <RefreshCw size={18} aria-hidden="true" />}
+        </button>
     );
 }

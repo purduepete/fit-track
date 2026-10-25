@@ -160,7 +160,7 @@ describe('App sign-in gates', () => {
         expect(screen.getByRole('radio', { name: 'System' })).toHaveAttribute('aria-checked', 'true');
     });
 
-    it('keeps icon-only refresh wired to the active page and dismisses its tooltip with Escape', async () => {
+    it('keeps icon-only refresh wired to the active page without header tooltips', async () => {
         vi.spyOn(api, 'dashboard').mockReturnValue(new Promise(() => {}));
         window.location.hash = '#/workouts';
         const workouts = vi.spyOn(api, 'workouts').mockResolvedValue({ items: [], total: 0 });
@@ -173,10 +173,7 @@ describe('App sign-in gates', () => {
         const refresh = await screen.findByRole('button', { name: 'Refresh data' });
         expect(refresh).toHaveTextContent('');
         expect(refresh).not.toHaveAttribute('title');
-        expect(refresh).toHaveAccessibleDescription('Refresh data');
-        refresh.focus();
-        fireEvent.keyDown(refresh, { key: 'Escape' });
-        expect(refresh.parentElement).toHaveClass('dismissed');
+        expect(document.querySelector('header [role="tooltip"], header [title]')).toBeNull();
         const calls = workouts.mock.calls.length;
         fireEvent.click(refresh);
         expect(workouts.mock.calls.length).toBe(calls + 1);

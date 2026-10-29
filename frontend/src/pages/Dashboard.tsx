@@ -349,7 +349,11 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                         tick={{ fontSize: 11 }}
                                     />
                                     <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
-                                    <Tooltip {...tooltipProps} labelFormatter={formatLocalDate} />
+                                    <Tooltip
+                                        {...tooltipProps}
+                                        labelFormatter={formatLocalDate}
+                                        formatter={(value) => Number(value).toFixed(2)}
+                                    />
                                     <Line
                                         type="monotone"
                                         dataKey="value"

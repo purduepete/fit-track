@@ -78,7 +78,15 @@ describe('Workouts current week', () => {
         expect(range).toHaveTextContent('Current week');
         expect(container.querySelector('select, datalist')).toBeNull();
         fireEvent.click(range);
-        expect(screen.getAllByRole('option')[0]).toHaveTextContent('Current week');
+        expect(screen.getAllByRole('option').map((option) => option.textContent)).toEqual([
+            'Current week',
+            'Last 7 days',
+            'Last 30 days',
+            'Last 90 days',
+            'Last year',
+            'This year',
+            'All time',
+        ]);
         fireEvent.keyDown(range, { key: 'Escape' });
         fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
         await waitFor(() => expect(workouts).toHaveBeenCalledTimes(2));

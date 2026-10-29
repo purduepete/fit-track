@@ -20,8 +20,8 @@ const PAGE_SIZE = 25;
 // Week uses both bounds; other presets keep their existing lower-bound behavior.
 const RANGES = [
     { key: 'week', label: 'Current week' },
-    { key: '30', label: 'Last 30 days' },
     { key: '7', label: 'Last 7 days' },
+    { key: '30', label: 'Last 30 days' },
     { key: '90', label: 'Last 90 days' },
     { key: '365', label: 'Last year' },
     { key: 'year', label: 'This year' },

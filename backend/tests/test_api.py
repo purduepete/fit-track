@@ -93,6 +93,26 @@ def test_full_ingest_and_read_flow(client, auth_headers):
     assert "workouts_7d" in dash
 
 
+def test_workout_elevation_fields(client, auth_headers, db_session):
+    from app.models import Workout, WorkoutRoutePoint
+
+    payload = json.loads(json.dumps(WORKOUT_PAYLOAD))
+    payload["data"]["workouts"][0]["route"][0]["altitude"] = 10.0
+    payload["data"]["workouts"][0]["route"][1]["altitude"] = 40.0
+    _ingest(client, auth_headers, payload)
+    db_session.get(Workout, "API-W1").elevation_gain_m = 30.0
+    db_session.query(WorkoutRoutePoint).filter_by(seq=1).one().elevation_m = float("nan")
+    db_session.commit()
+
+    item = client.get("/api/workouts", headers=auth_headers).json()["items"][0]
+    assert item["elevation_gain_m"] == 30.0
+    detail = client.get("/api/workouts/API-W1?unit=mi", headers=auth_headers).json()
+    assert detail["elevation_gain_m"] == 30.0
+    assert [p["elevation_m"] for p in detail["route"]] == [10.0, None]
+    mi = [s["elevation_gain_m"] for s in detail["splits"] if s["unit_system"] == "mi"]
+    assert abs(sum(mi) - 30.0) < 1e-6
+
+
 def test_ingest_rejects_malformed_json(client, auth_headers):
     r = client.post(
         "/api/ingest/health-auto-export",

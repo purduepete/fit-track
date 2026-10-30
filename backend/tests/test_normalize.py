@@ -29,6 +29,16 @@ def test_parse_route_rejects_non_finite_and_out_of_range_coordinates():
     assert pts[0].lat == 47.6
 
 
+def test_parse_route_keeps_point_but_drops_non_finite_altitude():
+    ts = "2026-07-05 12:00:00 +0000"
+    raw = [
+        {"latitude": 47.6, "longitude": -122.1, "timestamp": ts, "altitude": 92.1},
+        {"latitude": 47.6, "longitude": -122.1, "timestamp": ts, "altitude": float("nan")},
+        {"latitude": 47.6, "longitude": -122.1, "timestamp": ts, "altitude": float("inf")},
+    ]
+    assert [p.elevation_m for p in _parse_route(raw)] == [92.1, None, None]
+
+
 def test_as_number_variants():
     assert as_number(5) == 5.0
     assert as_number({"qty": 3.5, "units": "mi"}) == 3.5

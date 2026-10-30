@@ -13,6 +13,22 @@ export function formatDistance(meters: number | null, unit: Unit, digits = 2): s
     return `${round(metersToUnit(meters, unit), digits)} ${unit}`;
 }
 
+const FEET_PER_METER = 3.28084;
+
+/** Meters in the elevation unit that goes with the distance unit: feet for mi, meters for km. */
+export function metersToElevation(meters: number, unit: Unit): number {
+    return unit === 'mi' ? meters * FEET_PER_METER : meters;
+}
+
+export function elevationUnit(unit: Unit): 'ft' | 'm' {
+    return unit === 'mi' ? 'ft' : 'm';
+}
+
+export function formatElevation(meters: number | null, unit: Unit): string {
+    if (meters == null || !isFinite(meters)) return '—';
+    return `${round(metersToElevation(meters, unit))} ${elevationUnit(unit)}`;
+}
+
 /** Seconds -> "H:MM:SS" (or "M:SS" when under an hour). */
 export function formatDuration(seconds: number | null): string {
     if (seconds == null) return '—';

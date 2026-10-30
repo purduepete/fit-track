@@ -1,7 +1,8 @@
 """Pydantic response/request schemas for the fittrack API."""
+import math
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class IngestResult(BaseModel):
@@ -23,6 +24,7 @@ class WorkoutSummary(BaseModel):
     avg_hr: float | None
     max_hr: float | None
     has_route: bool
+    elevation_gain_m: float | None = None
 
 
 class WorkoutList(BaseModel):
@@ -38,6 +40,7 @@ class SplitOut(BaseModel):
     pace_sec_per_unit: float
     avg_hr: float | None
     source: str
+    elevation_gain_m: float | None = None
 
 
 class RoutePointOut(BaseModel):
@@ -45,6 +48,13 @@ class RoutePointOut(BaseModel):
     lat: float
     lon: float
     ts_utc: datetime
+    elevation_m: float | None = None
+
+    @field_validator("elevation_m")
+    @classmethod
+    def _finite_elevation(cls, value: float | None) -> float | None:
+        # Older Apple rows may hold NaN/Infinity, which JSON cannot encode.
+        return value if value is not None and math.isfinite(value) else None
 
 
 class HrPointOut(BaseModel):

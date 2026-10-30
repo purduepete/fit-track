@@ -188,6 +188,7 @@ class ParsedWorkout:
     route: list[RoutePoint] = field(default_factory=list)
     hr_samples: list[HrSample] = field(default_factory=list)
     distance_samples: list[DistanceSample] = field(default_factory=list)
+    elevation_gain_m: float | None = None
 
 
 @dataclass
@@ -238,12 +239,15 @@ def _parse_route(raw: list) -> list[RoutePoint]:
             continue
         if not (-90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0):
             continue
+        elevation = as_number(first(p, "altitude", "elevation"))
+        if elevation is not None and not math.isfinite(elevation):
+            elevation = None
         pts.append(
             RoutePoint(
                 ts_utc=ts,
                 lat=lat,
                 lon=lon,
-                elevation_m=as_number(first(p, "altitude", "elevation")),
+                elevation_m=elevation,
                 speed_mps=as_number(p.get("speed")),
             )
         )
@@ -300,6 +304,7 @@ def build_workout(
     route: list[RoutePoint] | None = None,
     hr_samples: list[HrSample] | None = None,
     distance_samples: list[DistanceSample] | None = None,
+    elevation_gain_m: float | None = None,
 ) -> ParsedWorkout:
     """Assemble a :class:`ParsedWorkout` from already-extracted primitive fields.
 
@@ -325,6 +330,7 @@ def build_workout(
         route=route or [],
         hr_samples=hr_samples or [],
         distance_samples=distance_samples or [],
+        elevation_gain_m=elevation_gain_m,
     )
 
 
@@ -647,6 +653,7 @@ def persist_payload(
         existing.avg_hr = pw.avg_hr
         existing.max_hr = pw.max_hr
         existing.min_hr = pw.min_hr
+        existing.elevation_gain_m = pw.elevation_gain_m
         existing.has_route = has_route
         existing.updated_utc = now
         counts["workouts"] += 1
@@ -675,7 +682,10 @@ def persist_payload(
                 }
             )
         # Build the distance/time + HR axes once and derive both unit systems.
-        splits = compute_splits([] if virtual_route else route, pw.distance_samples, pw.hr_samples, ("mi", "km"))
+        splits = compute_splits(
+            [] if virtual_route else route, pw.distance_samples, pw.hr_samples, ("mi", "km"),
+            elevation_points=route,
+        )
         for r in splits:
             split_rows.append(
                 {
@@ -687,6 +697,7 @@ def persist_payload(
                     "pace_sec_per_unit": r.pace_sec_per_unit,
                     "avg_hr": r.avg_hr,
                     "source": r.source,
+                    "elevation_gain_m": r.elevation_gain_m,
                 }
             )
         counts["splits"] += len(splits)

@@ -12,7 +12,7 @@ from typing import Any
 
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from .geo import DistanceSample, HrSample, RoutePoint
@@ -165,12 +165,28 @@ def parse_strava_payload(payload: dict) -> ParsedPayload:
     distance = _number(activity.get("distance"), "distance")
     if duration < 0 or distance < 0:
         raise StravaError("Strava returned a negative ride duration or distance.")
-    streams = payload.get("streams", {})
-    times = streams.get("time", {}).get("data", [])
-    hr = streams.get("heartrate", {}).get("data", [])
-    distances = streams.get("distance", {}).get("data", [])
-    coordinates = streams.get("latlng", {}).get("data", [])
-    if any(values and len(values) != len(times) for values in (hr, distances, coordinates)):
+    elevation_gain = _optional_number(activity, "total_elevation_gain")
+    if elevation_gain is not None and elevation_gain < 0:
+        raise StravaError("Strava returned a negative elevation gain.")
+    streams = payload.get("streams") or {}
+    if not isinstance(streams, dict):
+        raise StravaError("Strava returned invalid ride streams.")
+
+    def stream(key: str) -> list:
+        entry = streams.get(key) or {}
+        data = entry.get("data") if isinstance(entry, dict) else None
+        if data is None:
+            return []
+        if not isinstance(data, list):
+            raise StravaError(f"Strava returned an invalid {key} stream.")
+        return data
+
+    times = stream("time")
+    hr = stream("heartrate")
+    distances = stream("distance")
+    coordinates = stream("latlng")
+    altitudes = stream("altitude")
+    if any(values and len(values) != len(times) for values in (hr, distances, coordinates, altitudes)):
         raise StravaError("Strava ride streams have mismatched lengths.")
     seconds = [_number(t, "stream time") for t in times]
     if any(t < 0 or t > duration for t in seconds) or any(
@@ -194,14 +210,19 @@ def parse_strava_payload(payload: dict) -> ParsedPayload:
         )
         for i in range(1, len(distance_values))
     ]
+    # Rides imported before the altitude stream was requested have none; keep their route.
+    elevations = (
+        [None if a is None else _number(a, "stream altitude") for a in altitudes]
+        if altitudes else [None] * len(coordinates)
+    )
     route = []
-    for t, coordinate in zip(seconds, coordinates, strict=False):
+    for t, coordinate, elevation in zip(seconds, coordinates, elevations, strict=False):
         if not isinstance(coordinate, list) or len(coordinate) != 2:
             raise StravaError("Strava returned an invalid route coordinate.")
         lat, lon = (_number(value, "route coordinate") for value in coordinate)
         if not -90 <= lat <= 90 or not -180 <= lon <= 180:
             raise StravaError("Strava returned an out-of-range route coordinate.")
-        route.append(RoutePoint(start_utc + timedelta(seconds=t), lat, lon))
+        route.append(RoutePoint(start_utc + timedelta(seconds=t), lat, lon, elevation_m=elevation))
     workout = build_workout(
         raw_type="Indoor Cycling", workout_id=f"strava:{activity_id}",
         start_utc=start_utc, end_utc=start_utc + timedelta(seconds=duration),
@@ -211,6 +232,7 @@ def parse_strava_payload(payload: dict) -> ParsedPayload:
         avg_hr=_optional_number(activity, "average_heartrate"),
         max_hr=_optional_number(activity, "max_heartrate"), min_hr=None,
         hr_samples=hr_samples, distance_samples=samples, route=route,
+        elevation_gain_m=elevation_gain,
     )
     return ParsedPayload(workouts=[workout])
 
@@ -233,15 +255,37 @@ def persist_strava_event(payload: dict, db: Session) -> dict[str, int]:
     db.add(event)
     event.payload_json = text
     counts = persist_payload(parsed, db, ingest_source="strava")
+    db.flush()
+    _delete_superseded_events(db, event.id, payload["activity"]["id"])
     event.status = "processed"
     event.processed_utc = utcnow()
     db.commit()
     return counts
 
 
+def _delete_superseded_events(db: Session, keep_id: int, activity_id: int) -> None:
+    # Older raw events for this ride (for example routes-v1, without altitude)
+    # would overwrite the newer data if scripts/reprocess_events.py replayed them.
+    # The substring pre-filter only narrows candidates; JSON parsing decides.
+    rows = db.execute(
+        select(RawIngestEvent.id, RawIngestEvent.payload_json).where(
+            RawIngestEvent.source == "strava", RawIngestEvent.id != keep_id,
+            RawIngestEvent.payload_json.contains(str(int(activity_id))),
+        )
+    ).all()
+    for row_id, payload_json in rows:
+        try:
+            other = json.loads(payload_json).get("activity", {}).get("id")
+        except (ValueError, AttributeError):
+            continue
+        if other == activity_id:
+            db.execute(delete(RawIngestEvent).where(RawIngestEvent.id == row_id))
+
+
 def summary_digest(summary: dict) -> str:
-    # Refresh pre-route imports once, even when Strava's summary is unchanged.
-    return payload_hash("strava:routes-v1:" + json.dumps(summary, sort_keys=True, separators=(",", ":")))
+    # Bumping the version re-fetches rides once, even when Strava's summary is
+    # unchanged. v2 added the altitude stream and total elevation gain.
+    return payload_hash("strava:routes-v2:" + json.dumps(summary, sort_keys=True, separators=(",", ":")))
 
 
 def sync_once(path: Path, session_factory, *, http: httpx.Client, stop: Event | None = None) -> int:
@@ -310,7 +354,7 @@ def _sync_once(path: Path, session_factory, *, http: httpx.Client, stop: Event |
                 logger.info("Skipping Strava activity %s before the configured import boundary", activity_id)
                 continue
             streams = client.get(
-                f"activities/{activity_id}/streams", keys="time,distance,heartrate,latlng", key_by_type="true",
+                f"activities/{activity_id}/streams", keys="time,distance,heartrate,latlng,altitude", key_by_type="true",
             )
             if not isinstance(streams, dict):
                 raise StravaError("Strava returned invalid ride streams.")

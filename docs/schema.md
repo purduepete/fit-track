@@ -46,6 +46,7 @@ One row per workout. `uuid` is the Apple workout id or `strava:<activity_id>`
 | `local_date` | char(10) | `YYYY-MM-DD` local calendar day |
 | `duration_sec`, `distance_m`, `active_energy_kcal` | float | |
 | `avg_hr`, `max_hr`, `min_hr` | float | |
+| `elevation_gain_m` | float, null | Strava `total_elevation_gain`; null for Apple workouts (migration `002_elevation.sql`) |
 | `has_route` | bit | |
 | `created_utc`, `updated_utc` | datetime2 | |
 
@@ -64,7 +65,8 @@ Indexes: `start_utc`; `(workout_type, local_date)`.
 GPS track. FK → `workouts.uuid` (cascade). Rebuilt on re-ingest.
 
 `id` bigint PK · `workout_uuid` · `seq` · `ts_utc` · `lat` · `lon` ·
-`elevation_m` · `speed_mps`. Index `(workout_uuid, seq)`.
+`elevation_m` · `speed_mps`. Index `(workout_uuid, seq)`. `elevation_m` is the
+Apple route `altitude` or the Strava `altitude` stream; non-finite values are stored as null.
 
 ## `public.workout_samples`
 Interval samples (currently `heart_rate`) tied to a workout.
@@ -76,7 +78,8 @@ Interval samples (currently `heart_rate`) tied to a workout.
 Computed per-unit splits (stored for both `mi` and `km`).
 
 `id` bigint PK · `workout_uuid` · `unit_system` (`mi`\|`km`) · `split_index` ·
-`distance_m` · `duration_sec` · `pace_sec_per_unit` · `avg_hr` · `source`
+`distance_m` · `duration_sec` · `pace_sec_per_unit` · `avg_hr` · `elevation_gain_m`
+(climbing only, from route elevation; null without elevation) · `source`
 (`gps`\|`sample`). Unique `(workout_uuid, unit_system, split_index)`.
 
 ## `public.daily_metrics`

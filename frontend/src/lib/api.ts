@@ -11,6 +11,7 @@ export interface WorkoutSummary {
     active_energy_kcal: number | null;
     avg_hr: number | null;
     max_hr: number | null;
+    elevation_gain_m: number | null;
     has_route: boolean;
 }
 
@@ -21,6 +22,7 @@ export interface Split {
     duration_sec: number;
     pace_sec_per_unit: number;
     avg_hr: number | null;
+    elevation_gain_m: number | null;
     source: string;
 }
 
@@ -29,6 +31,7 @@ export interface RoutePoint {
     lat: number;
     lon: number;
     ts_utc: string;
+    elevation_m: number | null;
 }
 
 export interface HrPoint {

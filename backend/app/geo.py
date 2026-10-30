@@ -31,6 +31,7 @@ class SplitRow:
     pace_sec_per_unit: float
     avg_hr: float | None
     source: str
+    elevation_gain_m: float | None = None
 
 
 @dataclass
@@ -90,6 +91,49 @@ def _hr_avg_fn(hr: list[HrSample]) -> Callable[[datetime, datetime], float | Non
     return avg_hr
 
 
+def _elev_gain_fn(points: list[RoutePoint]) -> Callable[[datetime, datetime], float | None]:
+    """Climbing (positive elevation change) between two instants.
+
+    Cumulative ascent is interpolated at each window edge, so a climb between
+    two samples that straddles a split boundary is shared between both splits.
+    """
+    pts = sorted(
+        (p for p in points if p.elevation_m is not None and math.isfinite(p.elevation_m)),
+        key=lambda p: p.ts_utc,
+    )
+    if len(pts) < 2:
+        return lambda _start, _end: None
+    t0 = pts[0].ts_utc
+    times = [(p.ts_utc - t0).total_seconds() for p in pts]
+    ascent = [0.0]
+    for a, b in zip(pts, pts[1:], strict=False):
+        ascent.append(ascent[-1] + max(0.0, b.elevation_m - a.elevation_m))
+
+    def at(t: float) -> float:
+        if t <= times[0]:
+            return ascent[0]
+        if t >= times[-1]:
+            return ascent[-1]
+        i = bisect.bisect_right(times, t)
+        ta, tb = times[i - 1], times[i]
+        if tb == ta:
+            return ascent[i]
+        return ascent[i - 1] + (t - ta) / (tb - ta) * (ascent[i] - ascent[i - 1])
+
+    def gain(seg_start: datetime, seg_end: datetime) -> float | None:
+        s = (seg_start - t0).total_seconds()
+        e = (seg_end - t0).total_seconds()
+        if e < times[0] or s > times[-1]:
+            return None
+        return at(e) - at(s)
+
+    return gain
+
+
+def _no_elevation(_start: datetime, _end: datetime) -> float | None:
+    return None
+
+
 def _splits_from_axes(
     dist_axis: list[float],
     time_axis: list[float],
@@ -97,6 +141,7 @@ def _splits_from_axes(
     avg_hr: Callable[[datetime, datetime], float | None],
     unit_system: str,
     source: str,
+    elev_gain: Callable[[datetime, datetime], float | None] = _no_elevation,
 ) -> list[SplitRow]:
     """Build per-unit splits from monotonic cumulative distance/elapsed arrays.
 
@@ -127,6 +172,7 @@ def _splits_from_axes(
                 pace_sec_per_unit=dur,
                 avg_hr=avg_hr(seg_start, seg_end),
                 source=source,
+                elevation_gain_m=elev_gain(seg_start, seg_end),
             )
         )
         prev_elapsed = elapsed
@@ -147,6 +193,7 @@ def _splits_from_axes(
                 pace_sec_per_unit=pace,
                 avg_hr=avg_hr(seg_start, seg_end),
                 source=source,
+                elevation_gain_m=elev_gain(seg_start, seg_end),
             )
         )
     return splits
@@ -456,9 +503,14 @@ def compute_splits(
     dist_samples: list[DistanceSample],
     hr: list[HrSample],
     unit_systems: tuple[str, ...] = ("mi", "km"),
+    elevation_points: list[RoutePoint] | None = None,
 ) -> list[SplitRow]:
     """Compute splits for several unit systems, building the distance/time and
-    HR axes ONCE (GPS route preferred, distance samples as fallback)."""
+    HR axes ONCE (GPS route preferred, distance samples as fallback).
+
+    Elevation comes from ``elevation_points`` when given (Strava rides split on
+    distance samples but carry elevation on their virtual route), else ``points``.
+    """
     if len(points) >= 2:
         dist_axis, time_axis, start_dt = _axes_from_route(points)
         source = "gps"
@@ -468,9 +520,10 @@ def compute_splits(
     else:
         return []
     avg_hr = _hr_avg_fn(hr)
+    elev_gain = _elev_gain_fn(points if elevation_points is None else elevation_points)
     out: list[SplitRow] = []
     for unit_system in unit_systems:
-        out.extend(_splits_from_axes(dist_axis, time_axis, start_dt, avg_hr, unit_system, source))
+        out.extend(_splits_from_axes(dist_axis, time_axis, start_dt, avg_hr, unit_system, source, elev_gain))
     return out
 
 
@@ -483,7 +536,9 @@ def compute_splits_from_route(
     if len(points) < 2:
         return []
     dist_axis, time_axis, start_dt = _axes_from_route(points)
-    return _splits_from_axes(dist_axis, time_axis, start_dt, _hr_avg_fn(hr), unit_system, "gps")
+    return _splits_from_axes(
+        dist_axis, time_axis, start_dt, _hr_avg_fn(hr), unit_system, "gps", _elev_gain_fn(points)
+    )
 
 
 def compute_splits_from_samples(

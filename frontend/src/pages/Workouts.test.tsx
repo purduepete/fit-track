@@ -154,6 +154,7 @@ describe('Workouts type dropdown', () => {
             active_energy_kcal: 100,
             avg_hr: 100,
             max_hr: 140,
+            elevation_gain_m: null,
             has_route: false,
             ...overrides,
         });
@@ -173,7 +174,7 @@ describe('Workouts type dropdown', () => {
 
         it('sums totals and calculates overall pace, duration-weighted HR and highest HR', async () => {
             setup([
-                workout(),
+                workout({ elevation_gain_m: 100 }),
                 workout({
                     uuid: 'two',
                     duration_sec: 1800,
@@ -188,7 +189,17 @@ describe('Workouts type dropdown', () => {
             const cells = within(row)
                 .getAllByRole('cell')
                 .map((cell) => cell.textContent);
-            expect(cells).toEqual(['Visible totals', '2 workouts', '40m', '6.00 mi', '6:40/mi', '400', '130', '160']);
+            expect(cells).toEqual([
+                'Visible totals',
+                '2 workouts',
+                '40m',
+                '6.00 mi',
+                '6:40/mi',
+                '400',
+                '130',
+                '160',
+                '328 ft',
+            ]);
             const pace = row.querySelector<HTMLElement>('[data-label="Avg pace"]')!;
             const hr = row.querySelector<HTMLElement>('[data-label="Avg HR"]')!;
             expect(pace).toHaveAttribute('tabindex', '0');
@@ -243,18 +254,18 @@ describe('Workouts type dropdown', () => {
                 within(row)
                     .getAllByRole('cell')
                     .map((cell) => cell.textContent)
-            ).toEqual(['Visible totals', '2 workouts', '10m', '1.00 mi', '—', '—', '—', '—']);
+            ).toEqual(['Visible totals', '2 workouts', '10m', '1.00 mi', '—', '—', '—', '—', '—']);
         });
 
         it('preserves zero totals and does not divide by zero', async () => {
-            setup([workout({ duration_sec: 0, distance_m: 0, active_energy_kcal: 0 })]);
+            setup([workout({ duration_sec: 0, distance_m: 0, active_energy_kcal: 0, elevation_gain_m: 0 })]);
             renderAt('/workouts');
             const row = (await screen.findByText('Visible totals')).closest('tr')!;
             expect(
                 within(row)
                     .getAllByRole('cell')
                     .map((cell) => cell.textContent)
-            ).toEqual(['Visible totals', '1 workout', '0s', '0.00 mi', '—', '0', '—', '140']);
+            ).toEqual(['Visible totals', '1 workout', '0s', '0.00 mi', '—', '0', '—', '140', '0 ft']);
         });
 
         it('does not show a totals row for an empty range', async () => {

@@ -79,6 +79,7 @@ describe('App sign-in gates', () => {
                     active_energy_kcal: 300,
                     avg_hr: 120,
                     max_hr: 150,
+                    elevation_gain_m: null,
                     has_route: false,
                 },
             ],

@@ -70,6 +70,64 @@ def test_parse_ride_local_date_streams_and_elapsed_time():
     assert sum(s.meters for s in workout.distance_samples) == 2000
     assert [(p.lat, p.lon) for p in workout.route] == [(1, 2), (3, 4), (5, 6)]
     assert [p.ts_utc for p in workout.route] == [p.ts_utc for p in workout.hr_samples]
+    # Rides fetched before the altitude stream was requested keep their route.
+    assert [p.elevation_m for p in workout.route] == [None, None, None]
+    assert workout.elevation_gain_m is None
+
+
+def climbing_ride():
+    payload = ride()
+    payload["activity"]["total_elevation_gain"] = 15.0
+    payload["streams"]["altitude"] = {"data": [10.0, 25.0, 20.0]}
+    return payload
+
+
+def test_parse_altitude_stream_and_total_gain():
+    workout = parse_strava_payload(climbing_ride()).workouts[0]
+    assert [p.elevation_m for p in workout.route] == [10.0, 25.0, 20.0]
+    assert workout.elevation_gain_m == 15.0
+
+
+@pytest.mark.parametrize("data", [[10.0], [10.0, True, 20.0], [10.0, float("inf"), 20.0], [10.0, "x", 20.0]])
+def test_reject_malformed_altitude(data):
+    payload = climbing_ride()
+    payload["streams"]["altitude"]["data"] = data
+    with pytest.raises(StravaError):
+        parse_strava_payload(payload)
+
+
+@pytest.mark.parametrize("value", [-1.0, float("nan"), True])
+def test_reject_invalid_total_elevation_gain(value):
+    payload = climbing_ride()
+    payload["activity"]["total_elevation_gain"] = value
+    with pytest.raises(StravaError):
+        parse_strava_payload(payload)
+
+
+def test_persist_elevation_on_workout_route_and_splits(db_session):
+    persist_strava_event(climbing_ride(), db_session)
+    assert db_session.get(Workout, "strava:123").elevation_gain_m == 15.0
+    points = db_session.query(WorkoutRoutePoint).order_by(WorkoutRoutePoint.seq).all()
+    assert [p.elevation_m for p in points] == [10.0, 25.0, 20.0]
+    km = db_session.query(WorkoutSplit).filter_by(unit_system="km").order_by(WorkoutSplit.split_index).all()
+    # Splits keep the distance-stream axis; elevation comes from the route.
+    assert [s.source for s in km] == ["sample", "sample"]
+    assert [s.distance_m for s in km] == [1000, 1000]
+    assert [s.elevation_gain_m for s in km] == [15.0, 0.0]
+
+
+def test_newer_event_replaces_older_raw_events_for_same_ride(db_session):
+    persist_strava_event(ride(), db_session)
+    other = ride()
+    other["summary"]["id"] = other["activity"]["id"] = 456
+    persist_strava_event(other, db_session)
+    changed = climbing_ride()
+    changed["summary"]["distance"] = 2001
+    persist_strava_event(changed, db_session)
+    events = db_session.query(RawIngestEvent).all()
+    assert sorted(json.loads(e.payload_json)["activity"]["id"] for e in events) == [123, 456]
+    kept = next(e for e in events if json.loads(e.payload_json)["activity"]["id"] == 123)
+    assert "altitude" in json.loads(kept.payload_json)["streams"]
 
 
 def test_optional_data_can_be_absent():
@@ -82,6 +140,23 @@ def test_optional_data_can_be_absent():
     assert workout.active_energy_kcal is None
     assert workout.hr_samples == []
     assert workout.route == []
+
+
+def test_null_stream_entries_are_treated_as_absent():
+    payload = ride()
+    payload["streams"]["altitude"] = None
+    payload["streams"]["heartrate"] = {"data": None}
+    workout = parse_strava_payload(payload).workouts[0]
+    assert workout.hr_samples == []
+    assert [p.elevation_m for p in workout.route] == [None, None, None]
+
+
+@pytest.mark.parametrize("streams", [["time"], {"altitude": {"data": "abc"}}])
+def test_reject_non_dict_streams_or_non_list_data(streams):
+    payload = ride()
+    payload["streams"] = streams
+    with pytest.raises(StravaError):
+        parse_strava_payload(payload)
 
 
 @pytest.mark.parametrize("field,value", [
@@ -243,7 +318,7 @@ def test_sync_pagination_filter_and_repeat_skip(token_file, db_session):
         if request.url.path.endswith("/124"):
             return httpx.Response(200, json={**payload["activity"], "id": 124, "device_name": "ROUVY"})
         if request.url.path.endswith("/streams"):
-            assert request.url.params["keys"] == "time,distance,heartrate,latlng"
+            assert request.url.params["keys"] == "time,distance,heartrate,latlng,altitude"
             return httpx.Response(200, json=payload["streams"])
         return httpx.Response(200, json=payload["activity"])
 
@@ -287,6 +362,37 @@ def test_sync_refreshes_pre_route_import_once(token_file, db_session):
     assert len(stream_calls) == 1
     assert db_session.query(Workout).count() == 1
     assert db_session.query(WorkoutRoutePoint).count() == 3
+
+
+def test_sync_refetches_routes_v1_import_with_altitude(token_file, db_session):
+    from contextlib import nullcontext
+
+    payload = climbing_ride()
+    old = ride()
+    persist_strava_event(old, db_session)
+    event = db_session.query(RawIngestEvent).one()
+    event.payload_hash = payload_hash(
+        "strava:routes-v1:" + json.dumps(payload["summary"], sort_keys=True, separators=(",", ":"))
+    )
+    db_session.commit()
+    stream_calls = []
+
+    def handler(request):
+        if request.url.path.endswith("/athlete"):
+            return httpx.Response(200, json={"id": 77})
+        if request.url.path.endswith("/athlete/activities"):
+            return httpx.Response(200, json=[payload["summary"]] if request.url.params["page"] == "1" else [])
+        if request.url.path.endswith("/streams"):
+            stream_calls.append(request.url.path)
+            return httpx.Response(200, json=payload["streams"])
+        return httpx.Response(200, json=payload["activity"])
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        assert sync_once(token_file, lambda: nullcontext(db_session), http=http) == 1
+        assert sync_once(token_file, lambda: nullcontext(db_session), http=http) == 0
+    assert len(stream_calls) == 1
+    assert db_session.get(Workout, "strava:123").elevation_gain_m == 15.0
+    assert db_session.query(RawIngestEvent).one().payload_hash == summary_digest(payload["summary"])
 
 
 def test_failed_sync_keeps_watermark(token_file, db_session):

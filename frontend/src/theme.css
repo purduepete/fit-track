@@ -521,9 +521,14 @@ textarea {
 
 /* Balanced columns that always divide the card count so no card is orphaned:
    dashboard (6 cards) -> 2-up phone / 3-up (3x2) tablet+; workout detail
-   (4 cards, .cards-4) -> 2-up phone / 4-up wider. */
+   (4 cards, .cards-4) -> 2-up phone / 4-up wider; 5 cards (.cards-5) -> 2-up
+   phone with the last card full width / 5-up wider. */
+.grid-cards.cards-5 > .card:last-child {
+    grid-column: 1 / -1;
+}
+
 @media (min-width: 640px) {
-    .grid-cards:not(.cards-4) {
+    .grid-cards:not(.cards-4):not(.cards-5) {
         grid-template-columns: repeat(3, 1fr);
     }
 }
@@ -531,6 +536,14 @@ textarea {
 @media (min-width: 720px) {
     .grid-cards.cards-4 {
         grid-template-columns: repeat(4, 1fr);
+    }
+
+    .grid-cards.cards-5 {
+        grid-template-columns: repeat(5, 1fr);
+    }
+
+    .grid-cards.cards-5 > .card:last-child {
+        grid-column: auto;
     }
 }
 
@@ -821,6 +834,21 @@ tbody tr:hover {
 @media (max-width: 820px) {
     .two-col {
         grid-template-columns: 1fr;
+    }
+}
+
+.two-col > * {
+    min-width: 0;
+}
+
+.splits-table-card {
+    overflow-x: auto;
+}
+
+@media (max-width: 480px) {
+    .splits-table-card th,
+    .splits-table-card td {
+        padding: 8px 6px;
     }
 }
 

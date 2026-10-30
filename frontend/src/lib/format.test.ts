@@ -4,6 +4,7 @@ import {
     currentPacificWeek,
     formatDistance,
     formatDuration,
+    formatElevation,
     formatHms,
     formatHoursMinutes,
     formatLocalDate,
@@ -36,6 +37,20 @@ describe('metersToUnit', () => {
     });
     it('converts to km', () => {
         expect(metersToUnit(1000, 'km')).toBe(1);
+    });
+});
+
+describe('formatElevation', () => {
+    it('uses feet for miles and meters for kilometers', () => {
+        expect(formatElevation(100, 'mi')).toBe('328 ft');
+        expect(formatElevation(1000, 'mi')).toBe('3,281 ft');
+        expect(formatElevation(100.4, 'km')).toBe('100 m');
+        expect(formatElevation(0, 'mi')).toBe('0 ft');
+    });
+
+    it('shows a dash for missing values', () => {
+        expect(formatElevation(null, 'mi')).toBe('—');
+        expect(formatElevation(NaN, 'km')).toBe('—');
     });
 });
 

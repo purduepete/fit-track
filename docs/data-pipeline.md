@@ -103,8 +103,19 @@ Behavior:
   location. Missing coordinates leave the map hidden. Real-world GPS outlier
   filtering is skipped for these points; splits still use the distance stream.
   Power and cadence are not imported.
-- The route-import format version refreshes pre-route imports once within the
-  existing overlap and fixed start boundary, updating the same workout IDs.
+- Elevation: the activity's `total_elevation_gain` is stored as the workout's
+  elevation gain (Strava's smoothed total), and the `altitude` stream fills each
+  route point's `elevation_m` for the elevation chart. Splits take per-split
+  climbing (ascent only) from the route elevation, interpolated at split
+  boundaries, so split gains won't sum exactly to Strava's total. Rides without
+  an altitude stream keep their route with empty elevation.
+- The route-import format version (`strava:routes-v2:`, which added `altitude`)
+  refreshes older imports once within the existing overlap and fixed start
+  boundary, updating the same workout IDs and replacing the older raw event for
+  each ride. Rides older than that overlap need the stored `last_sync` reset to
+  0 while the app is stopped so the next pull reaches back to the start boundary.
+- Apple Health workouts get split gain from route `altitude` when ingested. Apple
+  workouts stored before the elevation change keep empty split gain until re-ingested.
 - A Zwift-sourced Apple Health cycling workout and a direct Strava ride are
   considered duplicates when starts differ by at most 60 seconds and ends by
   at most 120 seconds. The first stored copy is kept. Apple Watch recordings

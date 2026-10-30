@@ -65,6 +65,7 @@ summaries (newest first) plus the total matching count for pagination:
       "active_energy_kcal": 286.6,
       "avg_hr": 117.8,
       "max_hr": 143.0,
+      "elevation_gain_m": null,
       "has_route": true
     }
   ]
@@ -82,8 +83,8 @@ Query: `unit` = `mi` (default) or `km`; `full` = `true` for the full-resolution
 series (default `false`).
 Returns the summary plus:
 
-- `splits[]` — `{split_index, distance_m, duration_sec, pace_sec_per_unit, avg_hr, source}`
-- `route[]` — `{seq, lat, lon, ts_utc}`
+- `splits[]` — `{split_index, distance_m, duration_sec, pace_sec_per_unit, avg_hr, elevation_gain_m, source}`
+- `route[]` — `{seq, lat, lon, ts_utc, elevation_m}` (`elevation_m` may be null)
 - `hr_series[]` — `{ts_utc, bpm}`
 - `route_total`, `hr_total` — full point counts before any downsampling
 - `route_downsampled`, `hr_downsampled` — `true` when the returned series was

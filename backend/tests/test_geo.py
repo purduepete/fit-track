@@ -432,3 +432,49 @@ def test_filtering_shrinks_gps_distance_and_keeps_gps_splits():
     splits = compute_splits(kept, [], [])
     assert splits
     assert all(s.source == "gps" for s in splits)
+
+def _climbing_route(n: int, rise_m_per_point: float) -> list[RoutePoint]:
+    route = _straight_line_route(n=n, spacing_m=10.0, secs_per_point=10.0)
+    for i, p in enumerate(route):
+        p.elevation_m = 100.0 + i * rise_m_per_point
+    return route
+
+
+def test_route_split_elevation_gain_counts_climbing():
+    # 2000 m climbing 0.5 m per 10 m point: about 50 m per km split.
+    splits = compute_splits_from_route(_climbing_route(201, 0.5), [], "km")
+    assert [round(s.elevation_gain_m) for s in splits] == [50, 50]
+
+
+def test_descent_only_split_has_zero_gain():
+    splits = compute_splits_from_route(_climbing_route(201, -0.5), [], "km")
+    assert [s.elevation_gain_m for s in splits] == [0.0, 0.0]
+
+
+def test_route_without_elevation_has_no_split_gain():
+    splits = compute_splits_from_route(_straight_line_route(201, 10.0, 10.0), [], "km")
+    assert all(s.elevation_gain_m is None for s in splits)
+
+
+def test_climb_straddling_split_boundary_is_shared():
+    # Distance samples put the km boundary at 300 s; elevation is only sampled
+    # at 0 s and 600 s, so neither split holds both points.
+    samples = [
+        DistanceSample(BASE, BASE + timedelta(seconds=300), 1000.0),
+        DistanceSample(BASE + timedelta(seconds=300), BASE + timedelta(seconds=600), 1000.0),
+    ]
+    elevation = [
+        RoutePoint(BASE, 0.0, 0.0, elevation_m=0.0),
+        RoutePoint(BASE + timedelta(seconds=600), 0.0, 0.0, elevation_m=60.0),
+    ]
+    splits = compute_splits([], samples, [], ("km",), elevation_points=elevation)
+    assert [s.source for s in splits] == ["sample", "sample"]
+    assert [s.elevation_gain_m for s in splits] == [30.0, 30.0]
+
+
+def test_split_gain_ignores_missing_and_non_finite_elevation():
+    route = _climbing_route(201, 0.5)
+    route[50].elevation_m = None
+    route[60].elevation_m = float("nan")
+    splits = compute_splits_from_route(route, [], "km")
+    assert [round(s.elevation_gain_m) for s in splits] == [50, 50]

@@ -5,7 +5,7 @@
   "runtime": {"kind": "python", "minimumVersion": "3.12"},
   "database": {
     "engine": "postgresql", "name": "fit_track",
-    "connectionEnvironment": "DATABASE_URL", "schemaVersion": 1,
+    "connectionEnvironment": "DATABASE_URL", "schemaVersion": 2,
     "migrationsDirectory": "deploy\\postgresql", "backupFormat": "custom"
   },
   "build": {"commands": [

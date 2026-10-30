@@ -8,6 +8,7 @@ import {
     avgPaceSecPerUnit,
     currentPacificWeek,
     formatDistance,
+    formatElevation,
     formatHms,
     formatLocalDate,
     formatLocalTime,
@@ -137,6 +138,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
         let distance: number | null = null;
         let calories: number | null = null;
         let maxHr: number | null = null;
+        let elevation: number | null = null;
         let paceDuration = 0;
         let paceDistance = 0;
         let hrDuration = 0;
@@ -146,6 +148,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
             if (workout.distance_m != null) distance = (distance ?? 0) + workout.distance_m;
             if (workout.active_energy_kcal != null) calories = (calories ?? 0) + workout.active_energy_kcal;
             if (workout.max_hr != null) maxHr = Math.max(maxHr ?? workout.max_hr, workout.max_hr);
+            if (workout.elevation_gain_m != null) elevation = (elevation ?? 0) + workout.elevation_gain_m;
             // Only pair known distance/duration values when deriving pace.
             if (workout.distance_m != null && workout.distance_m > 0 && workout.duration_sec != null) {
                 paceDuration += workout.duration_sec;
@@ -163,6 +166,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
             pace: avgPaceSecPerUnit(paceDistance, paceDuration, 'mi'),
             avgHr: hrDuration > 0 ? hrTotal / hrDuration : null,
             maxHr,
+            elevation,
         };
     }, [filtered]);
 
@@ -239,13 +243,14 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                             <th>Active kcal</th>
                             <th>Avg HR</th>
                             <th>Max HR</th>
+                            <th>Elev gain</th>
                         </tr>
                     </thead>
                     <tbody>
                         {groups.map((g) => (
                             <Fragment key={g.date}>
                                 <tr className="group-row">
-                                    <td colSpan={8}>
+                                    <td colSpan={9}>
                                         {formatLocalDate(g.date)}
                                         <span className="group-count">
                                             {g.rows.length} {g.rows.length === 1 ? 'workout' : 'workouts'}
@@ -266,13 +271,14 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                         <td data-label="Active kcal">{round(w.active_energy_kcal)}</td>
                                         <td data-label="Avg HR">{round(w.avg_hr)}</td>
                                         <td data-label="Max HR">{round(w.max_hr)}</td>
+                                        <td data-label="Elev gain">{formatElevation(w.elevation_gain_m, 'mi')}</td>
                                     </tr>
                                 ))}
                             </Fragment>
                         ))}
                         {!loading && filtered.length === 0 && (
                             <tr>
-                                <td colSpan={8} className="muted" style={{ textAlign: 'center', padding: 32 }}>
+                                <td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 32 }}>
                                     {items.length === 0
                                         ? 'No workouts in this range. Try a wider date range or ingest an export.'
                                         : 'No loaded workouts match your search.'}
@@ -305,6 +311,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                     {round(summary.avgHr)}
                                 </td>
                                 <td data-label="Max HR">{round(summary.maxHr)}</td>
+                                <td data-label="Elev gain">{formatElevation(summary.elevation, 'mi')}</td>
                             </tr>
                         </tfoot>
                     )}

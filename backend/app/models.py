@@ -97,6 +97,7 @@ class Workout(Base):
     avg_hr: Mapped[float | None] = mapped_column(Float, nullable=True)
     max_hr: Mapped[float | None] = mapped_column(Float, nullable=True)
     min_hr: Mapped[float | None] = mapped_column(Float, nullable=True)
+    elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     has_route: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_utc: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -176,6 +177,7 @@ class WorkoutSplit(Base):
     pace_sec_per_unit: Mapped[float] = mapped_column(Float, nullable=False)
     avg_hr: Mapped[float | None] = mapped_column(Float, nullable=True)
     source: Mapped[str] = mapped_column(String(10), nullable=False)  # gps|sample
+    elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     workout: Mapped[Workout] = relationship(back_populates="splits")
 

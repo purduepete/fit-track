@@ -1,11 +1,40 @@
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import {
+    Bar,
+    CartesianGrid,
+    ComposedChart,
+    Line,
+    LineChart,
+    ReferenceLine,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 import { api } from '../lib/api';
 import { useApiResource } from '../lib/useApiResource';
 import { StatCard } from '../components/StatCard';
-import { ActivityIcon, ChevronLeftIcon, ChevronRightIcon, ClockIcon, FlameIcon, HeartIcon } from '../components/Icons';
-import { formatDistance, formatHms, formatLocalDateTime, formatLocalTime, formatPace, round } from '../lib/format';
+import {
+    ActivityIcon,
+    ChevronLeftIcon,
+    ChevronRightIcon,
+    ClockIcon,
+    FlameIcon,
+    HeartIcon,
+    MountainIcon,
+} from '../components/Icons';
+import {
+    elevationUnit,
+    formatDistance,
+    formatElevation,
+    formatHms,
+    formatLocalDateTime,
+    formatLocalTime,
+    formatPace,
+    metersToElevation,
+    round,
+} from '../lib/format';
 import type { Unit } from '../lib/format';
 import { tooltipProps } from '../lib/chart';
 import { usePageRefresh } from '../lib/refresh';
@@ -50,7 +79,10 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
         pace: Math.round(s.pace_sec_per_unit),
         paceLabel: formatPace(s.pace_sec_per_unit, unit),
         hr: s.avg_hr ? Math.round(s.avg_hr) : null,
+        elev: s.elevation_gain_m == null ? null : Math.round(metersToElevation(s.elevation_gain_m, unit)),
     }));
+    const hasSplitGain = paceData.some((p) => p.elev != null);
+    const elevUnit = elevationUnit(unit);
 
     // Pace is seconds-per-unit (lower = faster). A line chart reads the trend well
     // even when splits are close, so zoom the axis to the actual spread (a line
@@ -68,6 +100,13 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
         t: new Date(h.ts_utc + 'Z').getTime(),
         bpm: Math.round(h.bpm),
     }));
+
+    const elevationData = data.route
+        .filter((p) => p.elevation_m != null)
+        .map((p) => ({
+            t: new Date(p.ts_utc + 'Z').getTime(),
+            elev: Math.round(metersToElevation(p.elevation_m as number, unit)),
+        }));
 
     return (
         <>
@@ -99,7 +138,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                 </span>
             </h1>
 
-            <div className="grid-cards cards-4">
+            <div className="grid-cards cards-5">
                 <StatCard icon={<ClockIcon />} label="Duration" value={formatHms(data.duration_sec)} />
                 <StatCard icon={<ActivityIcon />} label="Distance" value={formatDistance(data.distance_m, unit)} />
                 <StatCard
@@ -112,6 +151,11 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                     icon={<HeartIcon />}
                     label="Avg / Max HR"
                     value={`${round(data.avg_hr)} / ${round(data.max_hr)}`}
+                />
+                <StatCard
+                    icon={<MountainIcon />}
+                    label="Elevation gain"
+                    value={formatElevation(data.elevation_gain_m, unit)}
                 />
             </div>
 
@@ -135,13 +179,45 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                 </div>
             )}
 
+            {elevationData.length >= 2 && (
+                <div className="section">
+                    <h2>Elevation</h2>
+                    <div className="card">
+                        <ResponsiveContainer width="100%" height={200}>
+                            <LineChart data={elevationData}>
+                                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                <XAxis
+                                    dataKey="t"
+                                    type="number"
+                                    domain={['dataMin', 'dataMax']}
+                                    tick={{ fontSize: 11 }}
+                                    tickFormatter={(t) => formatLocalTime(Number(t))}
+                                />
+                                <YAxis
+                                    domain={['auto', 'auto']}
+                                    width={52}
+                                    tick={{ fontSize: 11 }}
+                                    tickFormatter={(v) => `${v} ${elevUnit}`}
+                                />
+                                <Tooltip
+                                    {...tooltipProps}
+                                    labelFormatter={(t) => formatLocalTime(Number(t))}
+                                    formatter={(v) => [`${round(Number(v))} ${elevUnit}`, 'Elevation']}
+                                />
+                                <Line type="monotone" dataKey="elev" stroke="#16a34a" strokeWidth={2} dot={false} />
+                            </LineChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
+
             <div className="section">
                 <h2>Splits</h2>
                 {splits.length === 0 ? (
                     <p className="muted">No split data for this workout.</p>
                 ) : (
                     <div className="two-col">
-                        <div className="card" style={{ padding: 0 }}>
+                        <div className="card splits-table-card" style={{ padding: 0 }}>
                             <table>
                                 <thead>
                                     <tr>
@@ -149,6 +225,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                                         <th>Pace</th>
                                         <th>Time</th>
                                         <th>Avg HR</th>
+                                        <th>Elev</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -166,6 +243,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                                             <td>{formatPace(s.pace_sec_per_unit, unit)}</td>
                                             <td>{formatHms(s.duration_sec)}</td>
                                             <td>{round(s.avg_hr)}</td>
+                                            <td>{formatElevation(s.elevation_gain_m, unit)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -173,13 +251,15 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                         </div>
                         <div className="card">
                             <p className="muted" style={{ margin: '0 0 8px', fontSize: '0.8rem' }}>
-                                Pace per {unit === 'mi' ? 'mile' : 'km'} — {formatPace(paceAvg, unit)} average.
+                                {hasSplitGain ? 'Pace and elevation gain' : 'Pace'} per {unit === 'mi' ? 'mile' : 'km'}:{' '}
+                                {formatPace(paceAvg, unit)} average.
                             </p>
                             <ResponsiveContainer width="100%" height={260}>
-                                <LineChart data={paceData}>
+                                <ComposedChart data={paceData}>
                                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                                     <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                                     <YAxis
+                                        yAxisId="pace"
                                         domain={paceDomain}
                                         allowDecimals={false}
                                         width={44}
@@ -188,13 +268,43 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                                             `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`
                                         }
                                     />
+                                    {hasSplitGain && (
+                                        <YAxis
+                                            yAxisId="elev"
+                                            orientation="right"
+                                            domain={[0, 'auto']}
+                                            allowDecimals={false}
+                                            width={52}
+                                            tick={{ fontSize: 11 }}
+                                            tickFormatter={(v) => `${v} ${elevUnit}`}
+                                        />
+                                    )}
                                     <Tooltip
                                         {...tooltipProps}
-                                        formatter={(value) => [formatPace(Number(value), unit), 'Pace']}
+                                        formatter={(value, name) =>
+                                            name === 'elev'
+                                                ? [`${round(Number(value))} ${elevUnit}`, 'Elevation gain']
+                                                : [formatPace(Number(value), unit), 'Pace']
+                                        }
                                         labelFormatter={(l) => `${unit === 'mi' ? 'Mile' : 'Km'} ${l}`}
                                     />
-                                    <ReferenceLine y={paceAvg} stroke="var(--text-dim)" strokeDasharray="4 4" />
+                                    {hasSplitGain && (
+                                        <Bar
+                                            yAxisId="elev"
+                                            dataKey="elev"
+                                            fill="#16a34a"
+                                            fillOpacity={0.35}
+                                            isAnimationActive={false}
+                                        />
+                                    )}
+                                    <ReferenceLine
+                                        yAxisId="pace"
+                                        y={paceAvg}
+                                        stroke="var(--text-dim)"
+                                        strokeDasharray="4 4"
+                                    />
                                     <Line
+                                        yAxisId="pace"
                                         type="monotone"
                                         dataKey="pace"
                                         stroke="#4f46e5"
@@ -202,7 +312,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                                         dot={{ r: 3, fill: '#4f46e5' }}
                                         activeDot={{ r: 5 }}
                                     />
-                                </LineChart>
+                                </ComposedChart>
                             </ResponsiveContainer>
                         </div>
                     </div>

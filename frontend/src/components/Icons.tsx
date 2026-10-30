@@ -34,6 +34,14 @@ export function FlameIcon({ size = 18, style }: IconProps) {
     );
 }
 
+export function MountainIcon({ size = 18, style }: IconProps) {
+    return (
+        <svg {...base(size, style)}>
+            <path d="m8 3 4 8 5-5 5 15H2L8 3z" />
+        </svg>
+    );
+}
+
 export function HeartIcon({ size = 18, style }: IconProps) {
     return (
         <svg {...base(size, style)}>

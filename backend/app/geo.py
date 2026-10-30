@@ -98,16 +98,16 @@ def _elev_gain_fn(points: list[RoutePoint]) -> Callable[[datetime, datetime], fl
     two samples that straddles a split boundary is shared between both splits.
     """
     pts = sorted(
-        (p for p in points if p.elevation_m is not None and math.isfinite(p.elevation_m)),
-        key=lambda p: p.ts_utc,
+        ((p.ts_utc, p.elevation_m) for p in points if p.elevation_m is not None and math.isfinite(p.elevation_m)),
+        key=lambda item: item[0],
     )
     if len(pts) < 2:
         return lambda _start, _end: None
-    t0 = pts[0].ts_utc
-    times = [(p.ts_utc - t0).total_seconds() for p in pts]
+    t0 = pts[0][0]
+    times = [(ts - t0).total_seconds() for ts, _ in pts]
     ascent = [0.0]
-    for a, b in zip(pts, pts[1:], strict=False):
-        ascent.append(ascent[-1] + max(0.0, b.elevation_m - a.elevation_m))
+    for (_, a), (_, b) in zip(pts, pts[1:], strict=False):
+        ascent.append(ascent[-1] + max(0.0, b - a))
 
     def at(t: float) -> float:
         if t <= times[0]:

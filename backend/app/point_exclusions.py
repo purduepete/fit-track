@@ -89,14 +89,14 @@ def _distance_source(db: Session, workout: Workout) -> tuple[DistanceSource | No
         for item in data.get("workouts", []):
             if not isinstance(item, dict):
                 continue
-            parsed = parse_workout(item)
-            if parsed is not None and parsed.uuid == workout.uuid:
+            candidate = parse_workout(item)
+            if candidate is not None and candidate.uuid == workout.uuid:
                 return (
                     DistanceSource(
                         "increment",
-                        [(sample.start_utc, sample.meters) for sample in parsed.distance_samples],
-                        parsed.distance_samples,
-                        [sample.start_utc for sample in parsed.distance_samples],
+                        [(sample.start_utc, sample.meters) for sample in candidate.distance_samples],
+                        candidate.distance_samples,
+                        [sample.start_utc for sample in candidate.distance_samples],
                         [],
                     ),
                     True,
@@ -162,8 +162,8 @@ def point_view(db: Session, workout: Workout) -> PointView:
             item.elevation_m.append(row.elevation_m)
         if row.speed_mps is not None and math.isfinite(row.speed_mps):
             item.speed_mps.append(row.speed_mps)
-    for row in heart_rate:
-        point(row.start_utc).heart_rate_bpm.append(row.value)
+    for sample in heart_rate:
+        point(sample.start_utc).heart_rate_bpm.append(sample.value)
     if source is not None:
         for timestamp in source.timestamps:
             point(timestamp)
@@ -239,7 +239,7 @@ def point_view(db: Session, workout: Workout) -> PointView:
         else:
             geo_route = _route_points(remaining_route)
             gps_route = [] if is_strava else geo_route
-            elevations = [
+            elevation_points = [
                 RoutePoint(timestamp, 0.0, 0.0, elevation)
                 for timestamp in sorted(points)
                 if timestamp not in matched
@@ -250,7 +250,7 @@ def point_view(db: Session, workout: Workout) -> PointView:
                 gps_route,
                 [] if uses_gps else _remaining_distances(source, matched),
                 hr,
-                elevation_points=elevations,
+                elevation_points=elevation_points,
             )
             splits = [SplitOut.model_validate(row, from_attributes=True) for row in recalculated]
 

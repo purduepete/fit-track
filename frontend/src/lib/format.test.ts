@@ -98,6 +98,12 @@ describe('formatMinutesHms', () => {
         expect(formatMinutesHms(45.5)).toBe('45m 30s');
         expect(formatMinutesHms(62)).toBe('1h 2m');
     });
+    it('matches workout durations at second and half-second boundaries', () => {
+        expect(formatMinutesHms(2427 / 60)).toBe(formatHms(2427));
+        expect(formatMinutesHms(62 / 60)).toBe(formatHms(61.5));
+        expect(formatMinutesHms(61 / 60)).toBe(formatHms(61.49999999999999));
+        expect(formatMinutesHms(3600 / 60)).toBe(formatHms(3599.8));
+    });
     it('handles null/invalid', () => {
         expect(formatMinutesHms(null)).toBe('—');
         expect(formatMinutesHms(Infinity)).toBe('—');

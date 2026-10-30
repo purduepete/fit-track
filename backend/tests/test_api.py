@@ -1,6 +1,8 @@
 """End-to-end API tests via FastAPI TestClient (in-memory SQLite)."""
 import json
 
+import pytest
+
 WORKOUT_PAYLOAD = {
     "data": {
         "workouts": [
@@ -501,6 +503,65 @@ def test_dashboard_trends_are_windowed(client, auth_headers, db_session):
     dates = [p["local_date"] for p in dash["weekly_minutes"]]
     assert recent.strftime("%Y-%m-%d") in dates
     assert old.strftime("%Y-%m-%d") not in dates
+
+
+@pytest.mark.parametrize(
+    ("duration", "display_seconds"),
+    [(2427.0, 2427), (61.5, 62), (61.49999999999999, 61), (3599.8, 3600), (0.0, 0)],
+)
+def test_dashboard_duration_matches_workout_detail(client, auth_headers, db_session, duration, display_seconds):
+    from datetime import timedelta
+
+    from app.models import Workout
+    from app.timeutil import utcnow
+
+    now = utcnow()
+    start = now - timedelta(days=1)
+    day = start.strftime("%Y-%m-%d")
+    db_session.add(
+        Workout(
+            uuid="duration-precision", workout_type="Indoor Cycling", start_utc=start, end_utc=start,
+            local_date=day, duration_sec=duration, has_route=False, created_utc=now, updated_utc=now,
+        )
+    )
+    db_session.commit()
+
+    detail = client.get("/api/workouts/duration-precision", headers=auth_headers).json()
+    dash = client.get("/api/dashboard", headers=auth_headers).json()
+    daily = next(point for point in dash["weekly_minutes"] if point["local_date"] == day)
+
+    assert detail["duration_sec"] == duration
+    assert daily["value"] * 60 == pytest.approx(display_seconds)
+    assert dash["minutes_7d"] * 60 == pytest.approx(display_seconds)
+
+
+def test_dashboard_duration_totals_sum_workouts_before_rounding(client, auth_headers, db_session):
+    from datetime import timedelta
+
+    from app.models import Workout
+    from app.timeutil import utcnow
+
+    now = utcnow()
+    first_day, second_day = now - timedelta(days=1), now - timedelta(days=2)
+    for uuid, start, duration in [
+        ("one", first_day, 2427.4),
+        ("two", first_day, 61.1),
+        ("three", second_day, 33.2),
+    ]:
+        db_session.add(
+            Workout(
+                uuid=uuid, workout_type="Indoor Cycling", start_utc=start, end_utc=start,
+                local_date=start.strftime("%Y-%m-%d"), duration_sec=duration, has_route=False,
+                created_utc=now, updated_utc=now,
+            )
+        )
+    db_session.commit()
+
+    dash = client.get("/api/dashboard", headers=auth_headers).json()
+    by_day = {point["local_date"]: point["value"] * 60 for point in dash["weekly_minutes"]}
+    assert by_day[first_day.strftime("%Y-%m-%d")] == pytest.approx(2489)
+    assert by_day[second_day.strftime("%Y-%m-%d")] == pytest.approx(33)
+    assert dash["minutes_7d"] * 60 == pytest.approx(2522)
 
 
 def test_dashboard_vo2max_band_and_trend(client, auth_headers, db_session, monkeypatch):

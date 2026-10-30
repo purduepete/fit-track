@@ -1,5 +1,6 @@
 """Dashboard aggregate endpoint (last-7-day summary + trend series)."""
 from datetime import timedelta
+from math import floor
 
 from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
@@ -29,6 +30,12 @@ RESTING_TREND_DAYS = 90
 VO2MAX_TREND_DAYS = 365
 SLEEP_TREND_DAYS = 30
 STEPS_TREND_DAYS = 30
+
+
+def _minutes_at_second_precision(seconds: float) -> float:
+    # Match the frontend's nearest-second rounding, including half seconds.
+    whole_seconds = floor(seconds)
+    return (whole_seconds + int(seconds - whole_seconds >= 0.5)) / 60.0
 
 
 def _latest_metric(db: Session, names: tuple[str, ...]) -> float | None:
@@ -184,7 +191,7 @@ def dashboard(
     return DashboardSummary(
         last_ingest_utc=last_ingest_utc,
         workouts_7d=workouts_7d,
-        minutes_7d=round(duration_7d / 60.0, 1),
+        minutes_7d=_minutes_at_second_precision(duration_7d),
         active_kcal_7d=round(energy_7d, 0),
         latest_resting_hr=_latest_metric(db, RESTING_HR_NAMES),
         latest_vo2max=latest_vo2max,
@@ -193,7 +200,7 @@ def dashboard(
         sleep_band=_sleep_band(latest_sleep),
         latest_steps=latest_steps,
         latest_steps_date=latest_steps_date,
-        weekly_minutes=[MetricPoint(local_date=d, value=round(s / 60.0, 1)) for d, _, s, _ in by_date],
+        weekly_minutes=[MetricPoint(local_date=d, value=_minutes_at_second_precision(s)) for d, _, s, _ in by_date],
         resting_hr_trend=[MetricPoint(local_date=d, value=v) for d, v in resting_trend],
         vo2max_trend=[MetricPoint(local_date=d, value=v) for d, v in vo2max_trend],
         sleep_trend=[MetricPoint(local_date=d, value=v) for d, v in sleep_trend],

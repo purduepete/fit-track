@@ -22,6 +22,19 @@ afterEach(() => {
     localStorage.removeItem('fittrack:full-res');
 });
 
+it('skips the spinner when a workout fails quickly and shows the error', async () => {
+    vi.spyOn(api, 'workout').mockRejectedValue(new Error('Workout unavailable'));
+    render(
+        <MemoryRouter initialEntries={['/workouts/ride']}>
+            <Routes>
+                <Route path="/workouts/:uuid" element={<WorkoutDetail onAuthError={() => {}} />} />
+            </Routes>
+        </MemoryRouter>
+    );
+    expect(await screen.findByText('Error: Workout unavailable')).toBeInTheDocument();
+    expect(screen.queryByRole('status', { name: 'Loading' })).not.toBeInTheDocument();
+});
+
 it('automatically loads sampled data and shows the map without resolution controls', async () => {
     localStorage.setItem('fittrack:full-res', '1');
     const detail: Detail = {

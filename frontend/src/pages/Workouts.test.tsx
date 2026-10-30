@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Workouts } from './Workouts';
 import { api } from '../lib/api';
@@ -75,6 +75,60 @@ describe('Workouts current week', () => {
         vi.useRealTimers();
     });
 
+    it('shows a spinner until the initial list request finishes', async () => {
+        let finish!: (value: { items: WorkoutSummary[]; total: number }) => void;
+        vi.spyOn(api, 'workouts').mockReturnValue(
+            new Promise((resolve) => {
+                finish = resolve;
+            })
+        );
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        renderAt('/workouts');
+
+        expect(screen.queryByRole('status', { name: 'Loading workouts' })).not.toBeInTheDocument();
+        expect(await screen.findByRole('status', { name: 'Loading workouts' })).toHaveClass('loading-spinner');
+        expect(screen.queryByRole('searchbox', { name: 'Search workouts' })).not.toBeInTheDocument();
+        expect(screen.queryByRole('table')).not.toBeInTheDocument();
+        expect(screen.queryByText(/No workouts in this range/)).not.toBeInTheDocument();
+
+        await act(async () => finish({ items: [], total: 0 }));
+        expect(screen.queryByRole('status', { name: 'Loading workouts' })).not.toBeInTheDocument();
+        expect(screen.getByText(/No workouts in this range/)).toBeInTheDocument();
+    });
+
+    it('skips the spinner when a list request fails quickly and shows the error', async () => {
+        vi.spyOn(api, 'workouts').mockRejectedValue(new Error('Could not load workouts'));
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        renderAt('/workouts');
+
+        expect(await screen.findByText('Error: Could not load workouts')).toBeInTheDocument();
+        expect(screen.queryByRole('status', { name: 'Loading workouts' })).not.toBeInTheDocument();
+    });
+
+    it('shows a compact spinner while loading more workouts', async () => {
+        let finish!: (value: { items: WorkoutSummary[]; total: number }) => void;
+        vi.spyOn(api, 'workouts')
+            .mockResolvedValueOnce({ items: [], total: 1 })
+            .mockReturnValueOnce(
+                new Promise((resolve) => {
+                    finish = resolve;
+                })
+            );
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        renderAt('/workouts');
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Load more' }));
+        expect(screen.getByRole('button', { name: 'Load more' })).toBeDisabled();
+        const button = await screen.findByRole('button', { name: 'Loading workouts' });
+        expect(button).toBeDisabled();
+        expect(button).toHaveAttribute('aria-busy', 'true');
+        expect(within(button).getByRole('status', { name: 'Loading workouts' })).toHaveClass('loading-spinner--small');
+        expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+
+        await act(async () => finish({ items: [], total: 0 }));
+        expect(screen.queryByRole('status', { name: 'Loading workouts' })).not.toBeInTheDocument();
+    });
+
     it('defaults to the Pacific week, lists it first and keeps both bounds when loading more', async () => {
         vi.useFakeTimers({ toFake: ['Date'] });
         vi.setSystemTime(new Date('2026-10-26T06:59:59Z'));
@@ -130,7 +184,14 @@ describe('Workouts type dropdown', () => {
         vi.spyOn(api, 'workoutTypes').mockResolvedValue(['Outdoor Walk', 'Running']);
 
         renderAt('/workouts');
-        await waitFor(() => expect(workouts).toHaveBeenCalled());
+        await waitFor(() => expect(workouts).toHaveBeenCalledOnce());
+        await screen.findByText(/No workouts in this range/);
+        let finish!: (value: { items: WorkoutSummary[]; total: number }) => void;
+        workouts.mockReturnValueOnce(
+            new Promise((resolve) => {
+                finish = resolve;
+            })
+        );
 
         fireEvent.click(screen.getByLabelText('Workout type'));
         fireEvent.click(await screen.findByRole('option', { name: 'Running' }));
@@ -138,7 +199,13 @@ describe('Workouts type dropdown', () => {
         await waitFor(() =>
             expect(workouts).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'Running', offset: 0 }))
         );
+        expect(await screen.findByRole('status', { name: 'Loading workouts' })).toBeInTheDocument();
+        expect(screen.queryByRole('table')).not.toBeInTheDocument();
+        expect(screen.getByLabelText('Workout type')).toBeInTheDocument();
         expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+        await act(async () => finish({ items: [], total: 0 }));
+        expect(screen.queryByRole('status', { name: 'Loading workouts' })).not.toBeInTheDocument();
+        expect(screen.getByRole('table').closest('.data-enter')).toBeInTheDocument();
     });
 
     describe('Visible workout totals', () => {

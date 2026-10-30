@@ -29,6 +29,8 @@ import {
 import { round, formatLocalDate, formatHoursMinutes, formatMinutesHms, formatSteps } from '../lib/format';
 import { barCursor, tooltipProps } from '../lib/chart';
 import { usePageRefresh } from '../lib/refresh';
+import { PageLoading } from '../components/LoadingSpinner';
+import { useDelayedLoading } from '../hooks/useDelayedLoading';
 
 // Red -> green scale, indexed by VO2 max category (0=Very Poor .. 5=Superior).
 const VO2_COLORS = ['#dc2626', '#f97316', '#f59e0b', '#84cc16', '#22c55e', '#16a34a'];
@@ -122,6 +124,7 @@ function CardioFitness({ band, value }: { band: Vo2MaxBand; value: number }) {
 
 export function Dashboard({ active = true }: { active?: boolean }) {
     const { data, error, loading, refresh } = useDashboard();
+    const showRefresh = useDelayedLoading(loading && data !== null);
     usePageRefresh(refresh, loading, active);
     const navigate = useNavigate();
 
@@ -142,7 +145,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
     }
 
     if (error) return <p className="error">{error}</p>;
-    if (!data) return <p className="muted">Loading…</p>;
+    if (!data) return <PageLoading />;
 
     const vo2Value =
         typeof data.latest_vo2max === 'number' ? (
@@ -193,161 +196,166 @@ export function Dashboard({ active = true }: { active?: boolean }) {
     const hasStepData = data.steps_trend.some((p) => p.value != null);
 
     return (
-        <>
-            <div className="page-head">
-                <h1 className="page-title">Dashboard</h1>
-            </div>
-            <div className="grid-cards">
-                <StatCard icon={<ActivityIcon />} label="Workouts (7d)" value={data.workouts_7d} />
-                <StatCard icon={<ClockIcon />} label="Minutes (7d)" value={formatMinutesHms(data.minutes_7d)} />
-                <StatCard
-                    icon={<FlameIcon />}
-                    label="Active energy (7d)"
-                    value={round(data.active_kcal_7d)}
-                    unit="kcal"
-                />
-                <StatCard icon={<HeartIcon />} label="Resting HR" value={round(data.latest_resting_hr)} unit="bpm" />
-                <StatCard icon={<GaugeIcon />} label="VO₂ max" value={vo2Value} />
-                <StatCard icon={<MoonIcon />} label="Sleep (last night)" value={sleepValue} />
-            </div>
-
-            <section className="dash-section">
-                <h2 className="section-title">This week</h2>
-                <div className="card">
-                    <h2>Workout minutes by day</h2>
-                    <p className="muted chart-caption">Active minutes per day over the last 7 days.</p>
-                    <ResponsiveContainer width="100%" height={240}>
-                        <BarChart data={data.weekly_minutes}>
-                            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                            <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
-                            <YAxis tick={{ fontSize: 11 }} />
-                            <Tooltip
-                                {...tooltipProps}
-                                cursor={barCursor}
-                                labelFormatter={formatLocalDate}
-                                formatter={(v) => [formatMinutesHms(v as number), 'Duration']}
-                            />
-                            <Bar dataKey="value" fill="#4f46e5" radius={[2, 2, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
+        <div className="data-enter">
+            <div className={`data-dim${showRefresh ? ' is-refreshing' : ''}`} aria-busy={loading}>
+                <div className="page-head">
+                    <h1 className="page-title">Dashboard</h1>
                 </div>
-            </section>
-
-            <section className="dash-section">
-                <h2 className="section-title">Activity</h2>
-                <div className="card">
-                    <h2>Daily steps</h2>
-                    <p className="muted chart-caption">
-                        Last 30 days. Dashed line = 10k goal, amber = weekly average. Green bars have a workout — tap to
-                        view it.
-                    </p>
-                    {hasStepData ? (
-                        <>
-                            <div className="steps-headline">
-                                <FootprintsIcon size={20} />
-                                <span className="steps-value">{formatSteps(data.latest_steps)}</span>
-                            </div>
-                            <div className="chart-legend">
-                                <span className="chart-legend-item">
-                                    <svg width="20" height="10" aria-hidden="true">
-                                        <line x1="0" y1="5" x2="20" y2="5" stroke={STEPS_AVG_COLOR} strokeWidth="2" />
-                                    </svg>
-                                    7-day block average
-                                </span>
-                                <span className="chart-legend-item">
-                                    <svg width="12" height="12" aria-hidden="true">
-                                        <rect width="12" height="12" rx="2" fill={WORKOUT_BAR_COLOR} />
-                                    </svg>
-                                    Workout logged
-                                </span>
-                            </div>
-                            <ResponsiveContainer width="100%" height={240}>
-                                <ComposedChart
-                                    data={stepsChartData}
-                                    margin={{ top: 18, right: 52, left: 0, bottom: 0 }}
-                                    onClick={handleChartClick}
-                                >
-                                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                                    <XAxis
-                                        dataKey="local_date"
-                                        tickFormatter={formatLocalDate}
-                                        tick={{ fontSize: 11 }}
-                                        interval="preserveStartEnd"
-                                        minTickGap={16}
-                                    />
-                                    <YAxis
-                                        domain={[0, (max: number) => Math.max(max, 10000) * 1.08]}
-                                        tickFormatter={(v) => formatSteps(v as number)}
-                                        tick={{ fontSize: 11 }}
-                                        width={48}
-                                    />
-                                    <Tooltip
-                                        {...tooltipProps}
-                                        cursor={barCursor}
-                                        labelFormatter={formatLocalDate}
-                                        formatter={(v, name) => {
-                                            if (name === 'avg') return [formatSteps(v as number), '7-day block avg'];
-                                            return [formatSteps(v as number), 'Steps'];
-                                        }}
-                                    />
-                                    <ReferenceLine
-                                        y={10000}
-                                        stroke="#22c55e"
-                                        strokeDasharray="4 4"
-                                        ifOverflow="extendDomain"
-                                        label={{ value: 'Goal 10k', position: 'right', fontSize: 11, fill: '#22c55e' }}
-                                    />
-                                    <Bar dataKey="value" radius={[2, 2, 0, 0]}>
-                                        {stepsChartData.map((d) => (
-                                            <Cell
-                                                key={d.local_date}
-                                                fill={d.workout != null ? WORKOUT_BAR_COLOR : STEPS_BAR_COLOR}
-                                                cursor={d.workout != null ? 'pointer' : 'default'}
-                                            />
-                                        ))}
-                                    </Bar>
-                                    <Line
-                                        type="stepAfter"
-                                        dataKey="avg"
-                                        stroke={STEPS_AVG_COLOR}
-                                        strokeWidth={2}
-                                        dot={false}
-                                        connectNulls={false}
-                                        isAnimationActive={false}
-                                    />
-                                </ComposedChart>
-                            </ResponsiveContainer>
-                        </>
-                    ) : (
-                        <p className="muted">Enable “Steps” in Health Auto Export to track daily steps here.</p>
-                    )}
+                <div className="grid-cards">
+                    <StatCard icon={<ActivityIcon />} label="Workouts (7d)" value={data.workouts_7d} />
+                    <StatCard icon={<ClockIcon />} label="Minutes (7d)" value={formatMinutesHms(data.minutes_7d)} />
+                    <StatCard
+                        icon={<FlameIcon />}
+                        label="Active energy (7d)"
+                        value={round(data.active_kcal_7d)}
+                        unit="kcal"
+                    />
+                    <StatCard
+                        icon={<HeartIcon />}
+                        label="Resting HR"
+                        value={round(data.latest_resting_hr)}
+                        unit="bpm"
+                    />
+                    <StatCard icon={<GaugeIcon />} label="VO₂ max" value={vo2Value} />
+                    <StatCard icon={<MoonIcon />} label="Sleep (last night)" value={sleepValue} />
                 </div>
-            </section>
 
-            <section className="dash-section">
-                <h2 className="section-title">Heart &amp; fitness</h2>
-                <div className="two-col">
+                <section className="dash-section">
+                    <h2 className="section-title">This week</h2>
                     <div className="card">
-                        <h2>Resting heart rate trend</h2>
-                        <p className="muted chart-caption">
-                            Lower is generally better — watch for a stable or downward trend.
-                        </p>
+                        <h2>Workout minutes by day</h2>
+                        <p className="muted chart-caption">Active minutes per day over the last 7 days.</p>
                         <ResponsiveContainer width="100%" height={240}>
-                            <LineChart data={data.resting_hr_trend}>
+                            <BarChart data={data.weekly_minutes}>
                                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                                 <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
-                                <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
-                                <Tooltip {...tooltipProps} labelFormatter={formatLocalDate} />
-                                <Line type="monotone" dataKey="value" stroke="#7c3aed" strokeWidth={2} dot={false} />
-                            </LineChart>
+                                <YAxis tick={{ fontSize: 11 }} />
+                                <Tooltip
+                                    {...tooltipProps}
+                                    cursor={barCursor}
+                                    labelFormatter={formatLocalDate}
+                                    formatter={(v) => [formatMinutesHms(v as number), 'Duration']}
+                                />
+                                <Bar dataKey="value" fill="#4f46e5" radius={[2, 2, 0, 0]} />
+                            </BarChart>
                         </ResponsiveContainer>
                     </div>
+                </section>
+
+                <section className="dash-section">
+                    <h2 className="section-title">Activity</h2>
                     <div className="card">
-                        <h2>VO₂ max trend</h2>
-                        <p className="muted chart-caption">Higher is better — see your cardio-fitness rating below.</p>
-                        {data.vo2max_trend.length > 0 ? (
+                        <h2>Daily steps</h2>
+                        <p className="muted chart-caption">
+                            Last 30 days. Dashed line = 10k goal, amber = weekly average. Green bars have a workout —
+                            tap to view it.
+                        </p>
+                        {hasStepData ? (
+                            <>
+                                <div className="steps-headline">
+                                    <FootprintsIcon size={20} />
+                                    <span className="steps-value">{formatSteps(data.latest_steps)}</span>
+                                </div>
+                                <div className="chart-legend">
+                                    <span className="chart-legend-item">
+                                        <svg width="20" height="10" aria-hidden="true">
+                                            <line
+                                                x1="0"
+                                                y1="5"
+                                                x2="20"
+                                                y2="5"
+                                                stroke={STEPS_AVG_COLOR}
+                                                strokeWidth="2"
+                                            />
+                                        </svg>
+                                        7-day block average
+                                    </span>
+                                    <span className="chart-legend-item">
+                                        <svg width="12" height="12" aria-hidden="true">
+                                            <rect width="12" height="12" rx="2" fill={WORKOUT_BAR_COLOR} />
+                                        </svg>
+                                        Workout logged
+                                    </span>
+                                </div>
+                                <ResponsiveContainer width="100%" height={240}>
+                                    <ComposedChart
+                                        data={stepsChartData}
+                                        margin={{ top: 18, right: 52, left: 0, bottom: 0 }}
+                                        onClick={handleChartClick}
+                                    >
+                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                        <XAxis
+                                            dataKey="local_date"
+                                            tickFormatter={formatLocalDate}
+                                            tick={{ fontSize: 11 }}
+                                            interval="preserveStartEnd"
+                                            minTickGap={16}
+                                        />
+                                        <YAxis
+                                            domain={[0, (max: number) => Math.max(max, 10000) * 1.08]}
+                                            tickFormatter={(v) => formatSteps(v as number)}
+                                            tick={{ fontSize: 11 }}
+                                            width={48}
+                                        />
+                                        <Tooltip
+                                            {...tooltipProps}
+                                            cursor={barCursor}
+                                            labelFormatter={formatLocalDate}
+                                            formatter={(v, name) => {
+                                                if (name === 'avg')
+                                                    return [formatSteps(v as number), '7-day block avg'];
+                                                return [formatSteps(v as number), 'Steps'];
+                                            }}
+                                        />
+                                        <ReferenceLine
+                                            y={10000}
+                                            stroke="#22c55e"
+                                            strokeDasharray="4 4"
+                                            ifOverflow="extendDomain"
+                                            label={{
+                                                value: 'Goal 10k',
+                                                position: 'right',
+                                                fontSize: 11,
+                                                fill: '#22c55e',
+                                            }}
+                                        />
+                                        <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+                                            {stepsChartData.map((d) => (
+                                                <Cell
+                                                    key={d.local_date}
+                                                    fill={d.workout != null ? WORKOUT_BAR_COLOR : STEPS_BAR_COLOR}
+                                                    cursor={d.workout != null ? 'pointer' : 'default'}
+                                                />
+                                            ))}
+                                        </Bar>
+                                        <Line
+                                            type="stepAfter"
+                                            dataKey="avg"
+                                            stroke={STEPS_AVG_COLOR}
+                                            strokeWidth={2}
+                                            dot={false}
+                                            connectNulls={false}
+                                            isAnimationActive={false}
+                                        />
+                                    </ComposedChart>
+                                </ResponsiveContainer>
+                            </>
+                        ) : (
+                            <p className="muted">Enable “Steps” in Health Auto Export to track daily steps here.</p>
+                        )}
+                    </div>
+                </section>
+
+                <section className="dash-section">
+                    <h2 className="section-title">Heart &amp; fitness</h2>
+                    <div className="two-col">
+                        <div className="card">
+                            <h2>Resting heart rate trend</h2>
+                            <p className="muted chart-caption">
+                                Lower is generally better — watch for a stable or downward trend.
+                            </p>
                             <ResponsiveContainer width="100%" height={240}>
-                                <LineChart data={data.vo2max_trend}>
+                                <LineChart data={data.resting_hr_trend}>
                                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                                     <XAxis
                                         dataKey="local_date"
@@ -355,87 +363,117 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                         tick={{ fontSize: 11 }}
                                     />
                                     <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
-                                    <Tooltip
-                                        {...tooltipProps}
-                                        labelFormatter={formatLocalDate}
-                                        formatter={(value) => Number(value).toFixed(2)}
-                                    />
+                                    <Tooltip {...tooltipProps} labelFormatter={formatLocalDate} />
                                     <Line
                                         type="monotone"
                                         dataKey="value"
-                                        stroke="#4f46e5"
+                                        stroke="#7c3aed"
                                         strokeWidth={2}
                                         dot={false}
                                     />
                                 </LineChart>
                             </ResponsiveContainer>
-                        ) : (
-                            <p className="muted">No VO₂ max readings yet.</p>
-                        )}
-                    </div>
-                </div>
-                {data.vo2max_band && typeof data.latest_vo2max === 'number' ? (
-                    <CardioFitness band={data.vo2max_band} value={data.latest_vo2max} />
-                ) : (
-                    <div className="card">
-                        <h2>Cardio fitness</h2>
-                        <p className="muted">
-                            Set your birth date and sex in the app config to interpret VO₂ max against age/sex norms.
-                        </p>
-                    </div>
-                )}
-            </section>
-
-            <section className="dash-section">
-                <h2 className="section-title">Sleep</h2>
-                <div className="two-col">
-                    <div className="card">
-                        <h2>Sleep hours</h2>
-                        <p className="muted chart-caption">Asleep hours per night; shaded band is the 7–9 h target.</p>
-                        {data.sleep_trend.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={240}>
-                                <BarChart data={data.sleep_trend}>
-                                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                                    <XAxis
-                                        dataKey="local_date"
-                                        tickFormatter={formatLocalDate}
-                                        tick={{ fontSize: 11 }}
-                                    />
-                                    <YAxis domain={[0, 'auto']} tick={{ fontSize: 11 }} unit="h" />
-                                    <Tooltip
-                                        {...tooltipProps}
-                                        cursor={barCursor}
-                                        labelFormatter={formatLocalDate}
-                                        formatter={(v) => [formatHoursMinutes(v as number), 'Asleep']}
-                                    />
-                                    <ReferenceArea
-                                        y1={7}
-                                        y2={9}
-                                        fill="#22c55e"
-                                        fillOpacity={0.12}
-                                        ifOverflow="extendDomain"
-                                    />
-                                    <Bar dataKey="value" fill="#7c3aed" radius={[2, 2, 0, 0]} />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <p className="muted">
-                                Enable “Sleep Analysis” in Health Auto Export to track nightly sleep hours here.
+                        </div>
+                        <div className="card">
+                            <h2>VO₂ max trend</h2>
+                            <p className="muted chart-caption">
+                                Higher is better — see your cardio-fitness rating below.
                             </p>
-                        )}
+                            {data.vo2max_trend.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={240}>
+                                    <LineChart data={data.vo2max_trend}>
+                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                        <XAxis
+                                            dataKey="local_date"
+                                            tickFormatter={formatLocalDate}
+                                            tick={{ fontSize: 11 }}
+                                        />
+                                        <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
+                                        <Tooltip
+                                            {...tooltipProps}
+                                            labelFormatter={formatLocalDate}
+                                            formatter={(value) => Number(value).toFixed(2)}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="value"
+                                            stroke="#4f46e5"
+                                            strokeWidth={2}
+                                            dot={false}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <p className="muted">No VO₂ max readings yet.</p>
+                            )}
+                        </div>
                     </div>
-                    {data.sleep_band && typeof data.latest_sleep_hours === 'number' ? (
-                        <SleepQuality band={data.sleep_band} hours={data.latest_sleep_hours} />
+                    {data.vo2max_band && typeof data.latest_vo2max === 'number' ? (
+                        <CardioFitness band={data.vo2max_band} value={data.latest_vo2max} />
                     ) : (
                         <div className="card">
-                            <h2>Sleep quality</h2>
+                            <h2>Cardio fitness</h2>
                             <p className="muted">
-                                Once sleep data arrives, its rating against the 7–9 h target appears here.
+                                Set your birth date and sex in the app config to interpret VO₂ max against age/sex
+                                norms.
                             </p>
                         </div>
                     )}
-                </div>
-            </section>
-        </>
+                </section>
+
+                <section className="dash-section">
+                    <h2 className="section-title">Sleep</h2>
+                    <div className="two-col">
+                        <div className="card">
+                            <h2>Sleep hours</h2>
+                            <p className="muted chart-caption">
+                                Asleep hours per night; shaded band is the 7–9 h target.
+                            </p>
+                            {data.sleep_trend.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={240}>
+                                    <BarChart data={data.sleep_trend}>
+                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                        <XAxis
+                                            dataKey="local_date"
+                                            tickFormatter={formatLocalDate}
+                                            tick={{ fontSize: 11 }}
+                                        />
+                                        <YAxis domain={[0, 'auto']} tick={{ fontSize: 11 }} unit="h" />
+                                        <Tooltip
+                                            {...tooltipProps}
+                                            cursor={barCursor}
+                                            labelFormatter={formatLocalDate}
+                                            formatter={(v) => [formatHoursMinutes(v as number), 'Asleep']}
+                                        />
+                                        <ReferenceArea
+                                            y1={7}
+                                            y2={9}
+                                            fill="#22c55e"
+                                            fillOpacity={0.12}
+                                            ifOverflow="extendDomain"
+                                        />
+                                        <Bar dataKey="value" fill="#7c3aed" radius={[2, 2, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <p className="muted">
+                                    Enable “Sleep Analysis” in Health Auto Export to track nightly sleep hours here.
+                                </p>
+                            )}
+                        </div>
+                        {data.sleep_band && typeof data.latest_sleep_hours === 'number' ? (
+                            <SleepQuality band={data.sleep_band} hours={data.latest_sleep_hours} />
+                        ) : (
+                            <div className="card">
+                                <h2>Sleep quality</h2>
+                                <p className="muted">
+                                    Once sleep data arrives, its rating against the 7–9 h target appears here.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </section>
+            </div>
+        </div>
     );
 }

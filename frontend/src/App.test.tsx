@@ -15,6 +15,23 @@ describe('App sign-in gates', () => {
         window.location.hash = '';
     });
 
+    it('shows an accessible spinner while checking authentication', async () => {
+        vi.stubGlobal('fetch', vi.fn().mockReturnValue(new Promise(() => {})));
+        render(<App />);
+        const spinner = await screen.findByRole('status', { name: 'Loading' });
+        expect(spinner).toHaveClass('loading-spinner');
+        expect(spinner.closest('.page-loading--full')).toBeInTheDocument();
+        expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
+    });
+
+    it('shows a page spinner while the dashboard data is loading', async () => {
+        vi.spyOn(api, 'dashboard').mockReturnValue(new Promise(() => {}));
+        vi.stubGlobal('fetch', vi.fn().mockResolvedValue(json({ gateway: true })));
+        render(<App />);
+        const dashboard = await screen.findByRole('region', { name: 'Dashboard view' });
+        expect(await within(dashboard).findByRole('status', { name: 'Loading' })).toHaveClass('loading-spinner');
+    });
+
     it('asks for a Cloudflare sign-in, not a token, when Access blocks the auth check', async () => {
         vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Load failed')));
         render(<App />);
@@ -106,7 +123,10 @@ describe('App sign-in gates', () => {
         expect(within(screen.getByRole('region', { name: 'Workouts view' })).getByText('Cycling')).toBe(ride);
         expect(screen.getByRole('navigation')).toBe(navigation);
         await waitFor(() => expect(load.mock.calls.length).toBe(calls + 1));
-        expect(within(screen.getByRole('region', { name: 'Workouts view' })).queryByText('Loading…')).toBeNull();
+        await new Promise((resolve) => setTimeout(resolve, 400));
+        const view = screen.getByRole('region', { name: 'Workouts view' });
+        expect(within(view).getByText('Cycling')).toBe(ride);
+        expect(within(view).queryByRole('status')).toBeNull();
     });
 
     it('uses the custom Theme menu with keyboard selection, persistence and live system tracking', async () => {

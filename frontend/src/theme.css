@@ -401,6 +401,54 @@ textarea {
     padding: 28px 24px 64px;
 }
 
+.page-loading,
+.loading-region {
+    display: grid;
+    place-items: center;
+}
+
+.page-loading {
+    min-height: calc(100dvh - 170px);
+}
+
+.page-loading--full {
+    min-height: 100dvh;
+}
+
+.loading-spinner {
+    display: block;
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+.loading-spinner--small {
+    width: 18px;
+    height: 18px;
+    border-width: 2px;
+    border-color: transparent;
+    border-top-color: currentColor;
+    border-right-color: currentColor;
+}
+
+.visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loading-spinner {
+        animation: none;
+    }
+}
+
 @media (min-width: 1024px) {
     html {
         scrollbar-width: auto;
@@ -437,6 +485,40 @@ textarea {
 @media (prefers-reduced-motion: reduce) {
     .page-view:not([hidden]) {
         animation: none;
+    }
+}
+
+/* Content that replaces a spinner fades in; content being refreshed dims in place. */
+.data-enter {
+    animation: data-enter 300ms ease-out;
+}
+
+@keyframes data-enter {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.data-dim {
+    transition: opacity 200ms ease-out;
+}
+
+.is-refreshing > .data-dim,
+.data-dim.is-refreshing {
+    opacity: 0.45;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .data-enter {
+        animation: none;
+    }
+    .data-dim {
+        transition: none;
     }
 }
 
@@ -745,6 +827,10 @@ textarea {
 
 .point-editor-content {
     min-width: 0;
+}
+
+.point-editor-loading {
+    min-height: 120px;
 }
 
 .point-editor-dialog {
@@ -1324,12 +1410,34 @@ tbody tr:hover {
     letter-spacing: 0;
 }
 
+.workouts-loading {
+    min-height: 120px;
+    margin-bottom: 16px;
+}
+
+.workouts-card {
+    min-height: 120px;
+}
+
 .workouts-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
     margin-top: 16px;
+}
+
+.load-more-button {
+    display: inline-grid;
+    place-items: center;
+}
+
+.load-more-button > * {
+    grid-area: 1 / 1;
+}
+
+.load-more-label--hidden {
+    visibility: hidden;
 }
 
 /* Narrow-screen (phone) tweaks: reclaim horizontal space and turn wide data

@@ -170,7 +170,9 @@ On failure, none of the requested changes are saved.
 
 7-day rollup and trend series. `weekly_workouts`/`weekly_minutes` cover the last
 7 days; `resting_hr_trend` covers the last 90 days; `vo2max_trend` covers the last
-365 days; `sleep_trend` covers the last 30 days. `vo2max_band` interprets the latest
+365 days; `sleep_trend` covers the last 30 days. `minutes_7d` and each
+`weekly_minutes` value are totals in minutes, rounded to the nearest second after
+adding the underlying durations. `vo2max_band` interprets the latest
 VO2 max against the athlete's age/sex (Cooper Institute categories) when
 `ATHLETE_BIRTH_DATE`/`ATHLETE_SEX` are configured, otherwise it is `null`.
 `latest_sleep_hours` is the most recent night's asleep hours (parsed from HAE

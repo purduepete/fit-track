@@ -151,6 +151,7 @@ it('shows load errors and retains unsaved edits after a failed save for retry', 
 
     fireEvent.click(screen.getByRole('button', { name: 'Manage points' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Could not load points');
+    expect(screen.queryByRole('status', { name: 'Loading workout points' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Try again' }));
     fireEvent.click((await screen.findAllByRole('checkbox', { name: /Use point/ }))[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
@@ -177,6 +178,7 @@ it('prevents editing and dismissal while a save is pending', async () => {
     fireEvent.click(screen.getByRole('button', { name: 'Manage points' }));
     fireEvent.click((await screen.findAllByRole('checkbox'))[0]);
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('status')).toHaveTextContent('Saving changes...');
     expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeDisabled();
     expect(screen.getAllByRole('checkbox')[0]).toBeDisabled();

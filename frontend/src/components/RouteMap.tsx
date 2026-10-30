@@ -24,7 +24,7 @@ export function RouteMap({ route }: { route: RoutePoint[] }) {
     if (points.length === 0) return null;
 
     return (
-        <div className="map">
+        <div className="map data-enter">
             <MapContainer ref={setMap} style={{ height: '100%', width: '100%' }} scrollWheelZoom>
                 <TileLayer
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'

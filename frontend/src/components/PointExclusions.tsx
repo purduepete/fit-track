@@ -4,6 +4,7 @@ import { api, ApiError, clearToken } from '../lib/api';
 import type { PointExclusionChanges, WorkoutDetail, WorkoutPoint } from '../lib/api';
 import { formatDistance, formatElevation, formatLocalDateTime, formatLocalTime, round } from '../lib/format';
 import type { Unit } from '../lib/format';
+import { LoadingSpinner } from './LoadingSpinner';
 
 const PAGE_SIZE = 40;
 
@@ -217,11 +218,12 @@ export function PointExclusions({
                             uses raw ascent. Duration and calories stay unchanged. Save applies changes across devices.
                         </p>
                         <div className="point-editor-content" aria-busy={busy !== null}>
-                            {busy && (
-                                <p role="status">
-                                    {busy === 'loading' ? 'Loading workout points...' : 'Saving changes...'}
-                                </p>
+                            {busy === 'loading' && (
+                                <div className="loading-region point-editor-loading">
+                                    <LoadingSpinner label="Loading workout points" />
+                                </div>
                             )}
+                            {busy === 'saving' && <p role="status">Saving changes...</p>}
                             {error && (
                                 <p className="error" role="alert">
                                     {error}
@@ -233,7 +235,7 @@ export function PointExclusions({
                                 </button>
                             )}
                             {full && (
-                                <>
+                                <div className="data-enter">
                                     {full.point_exclusions.some((marker) => !marker.matched) && (
                                         <div className="excluded-list">
                                             <h3>Missing source points</h3>
@@ -386,7 +388,7 @@ export function PointExclusions({
                                     ) : (
                                         <p className="muted">No matching points.</p>
                                     )}
-                                </>
+                                </div>
                             )}
                         </div>
                     </>

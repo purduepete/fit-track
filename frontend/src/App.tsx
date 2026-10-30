@@ -15,6 +15,7 @@ import { StravaPullButton } from './components/StravaPullButton';
 import { DashboardProvider, useDashboard } from './lib/dashboard';
 import { LastUpdated } from './components/LastUpdated';
 import { Tooltip } from './components/Tooltip';
+import { PageLoading } from './components/LoadingSpinner';
 
 // The detail page pulls in Leaflet (map) + extra charts; code-split it so the
 // initial bundle (dashboard + list) stays lean.
@@ -82,7 +83,7 @@ export default function App() {
         };
     }, [restoring]);
 
-    if (checkingAuth || restoring) return <p className="muted gate">Loading…</p>;
+    if (checkingAuth || restoring) return <PageLoading fullPage />;
     if (needsAccess) return <AccessGate />;
     if (!authed) return <TokenGate onSaved={() => setAuthed(true)} />;
 
@@ -100,7 +101,7 @@ export default function App() {
             <DashboardProvider onAuthError={onAuthError}>
                 <Router>
                     <Tooltip />
-                    <header className="app-bar">
+                    <header className="app-bar data-enter">
                         <div className="brand">
                             <span className="logo">
                                 <ActivityIcon size={18} />
@@ -160,7 +161,7 @@ function PageViews({ onAuthError }: { onAuthError: () => void }) {
                     </Routes>
                 </section>
             )}
-            <Suspense fallback={<p className="muted">Loading…</p>}>
+            <Suspense fallback={<PageLoading />}>
                 <Routes>
                     <Route path="/workouts/:uuid" element={<WorkoutDetail onAuthError={onAuthError} />} />
                     <Route path="*" element={null} />

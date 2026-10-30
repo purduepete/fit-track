@@ -289,13 +289,18 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                 </td>
                                 <td data-label="Duration">{formatHms(summary.duration)}</td>
                                 <td data-label="Distance">{formatDistance(summary.distance, 'mi')}</td>
-                                <td data-label="Avg pace" title="Total duration / distance for rides with both values">
+                                <td
+                                    data-label="Avg pace"
+                                    data-tip="Total duration / distance for rides with both values"
+                                    tabIndex={0}
+                                >
                                     {formatPace(summary.pace, 'mi')}
                                 </td>
                                 <td data-label="Active kcal">{round(summary.calories)}</td>
                                 <td
                                     data-label="Avg HR"
-                                    title="Duration-weighted average of available workout heart rates"
+                                    data-tip="Duration-weighted average of available workout heart rates"
+                                    tabIndex={0}
                                 >
                                     {round(summary.avgHr)}
                                 </td>

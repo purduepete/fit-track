@@ -44,6 +44,17 @@ regress in the UI. `useApiResource.test.ts` covers the shared data-loading hook:
 success populates data, a 401 clears the token and triggers logout, and other
 errors surface without logging out.
 
+`components/Tooltip.test.tsx` covers the shared `data-tip` host: hover and keyboard
+focus, moving onto the tooltip, Escape/scroll/click dismissal, existing description
+tokens, viewport bounds, dialog top-layer placement, unchanged table cells and refs,
+and the disabled date-range filter explanation. The host uses theme tokens and
+leaves the existing Recharts and Leaflet tooltips unchanged.
+
+```powershell
+cd frontend
+npm test -- src/components/Tooltip.test.tsx src/pages/Workouts.test.tsx src/pages/WorkoutDetail.test.tsx src/App.test.tsx
+```
+
 ## Lint & type-check
 
 ```powershell

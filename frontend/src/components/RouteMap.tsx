@@ -42,7 +42,7 @@ export function RouteMap({ route }: { route: RoutePoint[] }) {
             <button
                 type="button"
                 className="map-recenter"
-                title="Re-center route"
+                data-tip="Re-center route"
                 aria-label="Re-center route"
                 onClick={() => map?.fitBounds(points, { padding: [24, 24] })}
             >

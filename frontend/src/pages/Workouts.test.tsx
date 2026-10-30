@@ -5,10 +5,12 @@ import { Workouts } from './Workouts';
 import { api } from '../lib/api';
 import type { WorkoutSummary } from '../lib/api';
 import { currentPacificWeek } from '../lib/format';
+import { Tooltip } from '../components/Tooltip';
 
 function renderAt(entry: string) {
     return render(
         <MemoryRouter initialEntries={[entry]}>
+            <Tooltip />
             <Routes>
                 <Route path="/workouts" element={<Workouts onAuthError={() => {}} />} />
             </Routes>
@@ -33,6 +35,13 @@ describe('Workouts ?date= deep-link', () => {
         expect(screen.getByText(/Showing workouts on/i)).toBeInTheDocument();
         // The range dropdown is overridden by the exact-day filter.
         expect(screen.getByLabelText('Date range')).toBeDisabled();
+        const explanation = screen.getByRole('group', { name: 'Date range disabled reason' });
+        fireEvent.focusIn(explanation);
+        expect(screen.getByRole('tooltip')).toHaveTextContent(
+            'Showing a single day — clear the day filter to use ranges'
+        );
+        expect(explanation).toHaveAttribute('aria-describedby', screen.getByRole('tooltip').id);
+        expect(document.querySelector('[title]')).toBeNull();
     });
 
     it('ignores a malformed date param and uses the default current week', async () => {
@@ -180,6 +189,19 @@ describe('Workouts type dropdown', () => {
                 .getAllByRole('cell')
                 .map((cell) => cell.textContent);
             expect(cells).toEqual(['Visible totals', '2 workouts', '40m', '6.00 mi', '6:40/mi', '400', '130', '160']);
+            const pace = row.querySelector<HTMLElement>('[data-label="Avg pace"]')!;
+            const hr = row.querySelector<HTMLElement>('[data-label="Avg HR"]')!;
+            expect(pace).toHaveAttribute('tabindex', '0');
+            expect(hr).toHaveAttribute('tabindex', '0');
+            fireEvent.focusIn(pace);
+            expect(screen.getByRole('tooltip')).toHaveTextContent(
+                'Total duration / distance for rides with both values'
+            );
+            fireEvent.focusIn(hr);
+            expect(screen.getByRole('tooltip')).toHaveTextContent(
+                'Duration-weighted average of available workout heart rates'
+            );
+            expect(document.querySelector('[title]')).toBeNull();
         });
 
         it('follows the visible search results and hides when nothing matches', async () => {

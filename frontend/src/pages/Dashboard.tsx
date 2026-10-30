@@ -58,7 +58,7 @@ function SleepQuality({ band, hours }: { band: SleepBand; hours: number }) {
                 <div
                     className="vo2-scale"
                     style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
-                    role="img"
+                    role="group"
                     aria-label={`Sleep rating: ${band.category}`}
                 >
                     {SLEEP_TIERS.map((tier, i) => (
@@ -66,7 +66,10 @@ function SleepQuality({ band, hours }: { band: SleepBand; hours: number }) {
                             key={tier}
                             className={'vo2-seg' + (i === band.category_index ? ' current' : '')}
                             style={{ background: SLEEP_COLORS[i] }}
-                            title={tier}
+                            data-tip={tier}
+                            tabIndex={0}
+                            role="img"
+                            aria-label={tier}
                         >
                             {i === band.category_index && <span className="vo2-marker" />}
                         </div>
@@ -92,13 +95,16 @@ function CardioFitness({ band, value }: { band: Vo2MaxBand; value: number }) {
                     Your {round(value, 1)} mL/kg/min ranks as <strong>{band.category}</strong> for a {band.age}-year-old{' '}
                     {sexLabel === 'F' ? 'female' : 'male'}.
                 </p>
-                <div className="vo2-scale" role="img" aria-label={`VO2 max category: ${band.category}`}>
+                <div className="vo2-scale" role="group" aria-label={`VO2 max category: ${band.category}`}>
                     {VO2_TIERS.map((tier, i) => (
                         <div
                             key={tier}
                             className={'vo2-seg' + (i === band.category_index ? ' current' : '')}
                             style={{ background: VO2_COLORS[i] }}
-                            title={tier}
+                            data-tip={tier}
+                            tabIndex={0}
+                            role="img"
+                            aria-label={tier}
                         >
                             {i === band.category_index && <span className="vo2-marker" />}
                         </div>

@@ -77,7 +77,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                     onClick={() => data.prev_uuid && navigate(`/workouts/${data.prev_uuid}`)}
                     disabled={!data.prev_uuid}
                     aria-label="Older workout"
-                    title="Older workout (left arrow)"
+                    data-tip="Older workout (left arrow)"
                 >
                     <ChevronLeftIcon /> Older
                 </button>
@@ -86,7 +86,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                     onClick={() => data.next_uuid && navigate(`/workouts/${data.next_uuid}`)}
                     disabled={!data.next_uuid}
                     aria-label="Newer workout"
-                    title="Newer workout (right arrow)"
+                    data-tip="Newer workout (right arrow)"
                 >
                     Newer <ChevronRightIcon />
                 </button>

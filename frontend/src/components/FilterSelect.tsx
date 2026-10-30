@@ -123,6 +123,11 @@ export function FilterSelect<T extends string | number>({
         <div
             className="filter-select"
             ref={containerRef}
+            data-tip={disabled ? title : undefined}
+            tabIndex={disabled && title ? 0 : undefined}
+            role={disabled && title ? 'group' : undefined}
+            aria-label={disabled && title ? `${ariaLabel} disabled reason` : undefined}
+            aria-disabled={disabled && title ? true : undefined}
             onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget as Node)) setOpen(false);
             }}
@@ -131,7 +136,7 @@ export function FilterSelect<T extends string | number>({
                 ref={triggerRef}
                 type="button"
                 role="combobox"
-                tabIndex={-1}
+                tabIndex={title ? 0 : -1}
                 className="filter-select-trigger"
                 aria-label={ariaLabel}
                 aria-haspopup="listbox"
@@ -139,7 +144,7 @@ export function FilterSelect<T extends string | number>({
                 aria-controls={open ? listboxId : undefined}
                 aria-activedescendant={open && highlightIndex >= 0 ? optionId(highlightIndex) : undefined}
                 disabled={disabled}
-                title={title}
+                data-tip={!disabled ? title : undefined}
                 onClick={() => (open ? setOpen(false) : openMenu())}
                 onKeyDown={handleKeyDown}
             >

@@ -14,6 +14,7 @@ import { clearToken } from './lib/api';
 import { StravaPullButton } from './components/StravaPullButton';
 import { DashboardProvider, useDashboard } from './lib/dashboard';
 import { LastUpdated } from './components/LastUpdated';
+import { Tooltip } from './components/Tooltip';
 
 // The detail page pulls in Leaflet (map) + extra charts; code-split it so the
 // initial bundle (dashboard + list) stays lean.
@@ -98,6 +99,7 @@ export default function App() {
         <RefreshProvider>
             <DashboardProvider onAuthError={onAuthError}>
                 <Router>
+                    <Tooltip />
                     <header className="app-bar">
                         <div className="brand">
                             <span className="logo">

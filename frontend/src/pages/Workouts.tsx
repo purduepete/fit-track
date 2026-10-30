@@ -264,7 +264,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
 
                 {showListRefresh ? (
                     <div className="loading-region workouts-loading">
-                        <LoadingSpinner label="Loading workouts" delayMs={0} />
+                        <LoadingSpinner label="Loading workouts" show />
                     </div>
                 ) : (
                     <div className="data-enter">
@@ -379,7 +379,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                     <span className={showMoreSpinner ? 'load-more-label--hidden' : undefined}>
                                         Load more
                                     </span>
-                                    {showMoreSpinner && <LoadingSpinner label="Loading workouts" small delayMs={0} />}
+                                    {showMoreSpinner && <LoadingSpinner label="Loading workouts" small show />}
                                 </button>
                             )}
                         </div>

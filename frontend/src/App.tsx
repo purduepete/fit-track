@@ -1,10 +1,10 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
-import { NavLink, Route, HashRouter as Router, Routes, useLocation } from 'react-router-dom';
+import { Suspense, lazy, useEffect, useRef, useState } from 'react';
+import { NavLink, Route, HashRouter as Router, Routes, useLocation, type Location } from 'react-router-dom';
 import { getToken, restoreToken } from './lib/api';
 import { sitedockOrigin } from './lib/sitedock';
 import { useTheme } from './lib/useTheme';
 import { ActivityIcon, LogOutIcon } from './components/Icons';
-import { LoaderCircle, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { AccessGate, TokenGate } from './components/TokenGate';
 import { AppearanceMenu } from './components/AppearanceMenu';
 import { RefreshProvider, useRefreshBar } from './lib/refresh';
@@ -83,7 +83,7 @@ export default function App() {
         };
     }, [restoring]);
 
-    if (checkingAuth || restoring) return <PageLoading fullPage />;
+    if (checkingAuth || restoring) return <PageLoading />;
     if (needsAccess) return <AccessGate />;
     if (!authed) return <TokenGate onSaved={() => setAuthed(true)} />;
 
@@ -128,7 +128,7 @@ export default function App() {
                         </div>
                     </header>
                     <main className="container">
-                        <PageViews onAuthError={onAuthError} />
+                        <RouteFade onAuthError={onAuthError} />
                     </main>
                 </Router>
             </DashboardProvider>
@@ -136,8 +136,43 @@ export default function App() {
     );
 }
 
-function PageViews({ onAuthError }: { onAuthError: () => void }) {
+const ROUTE_LEAVE_MS = 250;
+
+/** Fades the outgoing page out, swaps the shown route, then fades the new page in. */
+function RouteFade({ onAuthError }: { onAuthError: () => void }) {
     const location = useLocation();
+    const [shown, setShown] = useState(location);
+    const [leaving, setLeaving] = useState(false);
+    const shownPath = useRef(location.pathname);
+
+    useEffect(() => {
+        if (location.pathname === shownPath.current) {
+            setShown(location);
+            setLeaving(false);
+            return;
+        }
+        if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+            shownPath.current = location.pathname;
+            setShown(location);
+            return;
+        }
+        setLeaving(true);
+        const timer = setTimeout(() => {
+            shownPath.current = location.pathname;
+            setShown(location);
+            setLeaving(false);
+        }, ROUTE_LEAVE_MS);
+        return () => clearTimeout(timer);
+    }, [location]);
+
+    return (
+        <div className="route-fade" data-leaving={leaving || undefined}>
+            <PageViews location={shown} onAuthError={onAuthError} />
+        </div>
+    );
+}
+
+function PageViews({ location, onAuthError }: { location: Location; onAuthError: () => void }) {
     const workoutsActive = location.pathname === '/workouts';
     const dashboardActive = location.pathname === '/';
     const [workoutsLocation, setWorkoutsLocation] = useState(workoutsActive ? location : null);
@@ -162,7 +197,7 @@ function PageViews({ onAuthError }: { onAuthError: () => void }) {
                 </section>
             )}
             <Suspense fallback={<PageLoading />}>
-                <Routes>
+                <Routes location={location}>
                     <Route path="/workouts/:uuid" element={<WorkoutDetail onAuthError={onAuthError} />} />
                     <Route path="*" element={null} />
                 </Routes>
@@ -187,7 +222,7 @@ function RefreshButton() {
             disabled={!canRefresh || loading}
             aria-label={loading ? 'Refreshing' : 'Refresh data'}
         >
-            {loading ? <LoaderCircle size={18} aria-hidden="true" /> : <RefreshCw size={18} aria-hidden="true" />}
+            <RefreshCw size={18} aria-hidden="true" />
         </button>
     );
 }

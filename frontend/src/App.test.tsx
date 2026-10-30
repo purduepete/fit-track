@@ -20,7 +20,7 @@ describe('App sign-in gates', () => {
         render(<App />);
         const spinner = await screen.findByRole('status', { name: 'Loading' });
         expect(spinner).toHaveClass('loading-spinner');
-        expect(spinner.closest('.page-loading--full')).toBeInTheDocument();
+        expect(spinner.closest('.page-loading')).toBeInTheDocument();
         expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
     });
 
@@ -114,11 +114,12 @@ describe('App sign-in gates', () => {
         const ride = await within(screen.getByRole('region', { name: 'Workouts view' })).findByText('Cycling');
         fireEvent.change(search, { target: { value: 'cycling' } });
         fireEvent.click(dashboard);
-        expect(screen.queryByRole('searchbox')).toBeNull();
+        expect(screen.getByRole('main').querySelector('.route-fade')).toHaveAttribute('data-leaving');
+        await waitFor(() => expect(screen.queryByRole('searchbox')).toBeNull());
         const calls = load.mock.calls.length;
         load.mockReturnValue(new Promise(() => {}));
         fireEvent.click(workouts);
-        expect(screen.getByRole('searchbox', { name: 'Search workouts' })).toBe(search);
+        await waitFor(() => expect(screen.getByRole('searchbox', { name: 'Search workouts' })).toBe(search));
         expect(search).toHaveValue('cycling');
         expect(within(screen.getByRole('region', { name: 'Workouts view' })).getByText('Cycling')).toBe(ride);
         expect(screen.getByRole('navigation')).toBe(navigation);

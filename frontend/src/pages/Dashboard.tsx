@@ -30,7 +30,6 @@ import { round, formatLocalDate, formatHoursMinutes, formatMinutesHms, formatSte
 import { barCursor, tooltipProps } from '../lib/chart';
 import { usePageRefresh } from '../lib/refresh';
 import { PageLoading } from '../components/LoadingSpinner';
-import { useDelayedLoading } from '../hooks/useDelayedLoading';
 
 // Red -> green scale, indexed by VO2 max category (0=Very Poor .. 5=Superior).
 const VO2_COLORS = ['#dc2626', '#f97316', '#f59e0b', '#84cc16', '#22c55e', '#16a34a'];
@@ -124,7 +123,6 @@ function CardioFitness({ band, value }: { band: Vo2MaxBand; value: number }) {
 
 export function Dashboard({ active = true }: { active?: boolean }) {
     const { data, error, loading, refresh } = useDashboard();
-    const showRefresh = useDelayedLoading(loading && data !== null);
     usePageRefresh(refresh, loading, active);
     const navigate = useNavigate();
 
@@ -197,7 +195,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
 
     return (
         <div className="data-enter">
-            <div className={`data-dim${showRefresh ? ' is-refreshing' : ''}`} aria-busy={loading}>
+            <div aria-busy={loading}>
                 <div className="page-head">
                     <h1 className="page-title">Dashboard</h1>
                 </div>

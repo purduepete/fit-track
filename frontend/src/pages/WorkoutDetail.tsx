@@ -17,7 +17,6 @@ import { useApiResource } from '../lib/useApiResource';
 import { StatCard } from '../components/StatCard';
 import { PointExclusions } from '../components/PointExclusions';
 import { LoadingSpinner, PageLoading } from '../components/LoadingSpinner';
-import { useDelayedLoading } from '../hooks/useDelayedLoading';
 import {
     ActivityIcon,
     ChevronLeftIcon,
@@ -54,7 +53,6 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
     // for both unit systems, so switching mi/km must not refetch the workout.
     const { data, error, loading, refresh } = useApiResource(() => api.workout(uuid), [uuid, onAuthError], onAuthError);
     usePageRefresh(refresh, loading);
-    const showRefresh = useDelayedLoading(loading && data !== null);
 
     // Left/right arrow keys move between workouts (ignoring when typing in a field).
     const prevUuid = data?.prev_uuid ?? null;
@@ -118,7 +116,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
 
     return (
         <div key={data.uuid} className="data-enter">
-            <div className={`data-dim${showRefresh ? ' is-refreshing' : ''}`} aria-busy={loading}>
+            <div aria-busy={loading}>
                 <div className="detail-nav">
                     <button
                         className="nav-btn"

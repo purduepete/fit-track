@@ -1,6 +1,7 @@
 """Pydantic response/request schemas for the fittrack API."""
 import math
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -25,6 +26,7 @@ class WorkoutSummary(BaseModel):
     max_hr: float | None
     has_route: bool
     elevation_gain_m: float | None = None
+    point_exclusion_warning: str | None = None
 
 
 class WorkoutList(BaseModel):
@@ -41,6 +43,34 @@ class SplitOut(BaseModel):
     avg_hr: float | None
     source: str
     elevation_gain_m: float | None = None
+
+
+class PointExclusion(BaseModel):
+    ts_utc: datetime
+
+    @field_validator("ts_utc")
+    @classmethod
+    def _naive_utc(cls, value: datetime) -> datetime:
+        return value.astimezone(UTC).replace(tzinfo=None) if value.utcoffset() is not None else value
+
+
+class PointExclusionOut(PointExclusion):
+    matched: bool
+
+
+class PointExclusionRequest(PointExclusion):
+    pass
+
+
+class WorkoutPointOut(BaseModel):
+    ts_utc: datetime
+    route_count: int = 0
+    elevation_m: list[float] = Field(default_factory=list)
+    speed_mps: list[float] = Field(default_factory=list)
+    heart_rate_bpm: list[float] = Field(default_factory=list)
+    distance_m: float | None = None
+    distance_kind: Literal["cumulative", "increment"] | None = None
+    excluded: bool = False
 
 
 class RoutePointOut(BaseModel):
@@ -62,6 +92,11 @@ class HrPointOut(BaseModel):
     bpm: float
 
 
+class ElevationPointOut(BaseModel):
+    ts_utc: datetime
+    elevation_m: float
+
+
 class WorkoutDetail(WorkoutSummary):
     source_name: str | None
     device_name: str | None
@@ -69,7 +104,10 @@ class WorkoutDetail(WorkoutSummary):
     min_hr: float | None
     splits: list[SplitOut]
     route: list[RoutePointOut]
+    elevation_series: list[ElevationPointOut]
     hr_series: list[HrPointOut]
+    point_exclusions: list[PointExclusionOut] = Field(default_factory=list)
+    data_points: list[WorkoutPointOut] = Field(default_factory=list)
     # Full counts + whether the returned series were downsampled (fetch ?full=true
     # for the complete series).
     route_total: int = 0

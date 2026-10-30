@@ -113,6 +113,183 @@ def test_workout_elevation_fields(client, auth_headers, db_session):
     assert abs(sum(mi) - 30.0) < 1e-6
 
 
+def test_point_exclusions_are_reversible_and_survive_reingest(client, auth_headers, db_session):
+    from app.models import WorkoutRoutePoint, WorkoutSample
+
+    payload = json.loads(json.dumps(WORKOUT_PAYLOAD))
+    workout = payload["data"]["workouts"][0]
+    workout["route"][0]["altitude"] = 10.0
+    workout["route"][1]["altitude"] = 40.0
+    workout["heartRateData"][0]["date"] = workout["route"][0]["timestamp"]
+    workout["heartRateData"].append(dict(workout["heartRateData"][0]))
+    other = json.loads(json.dumps(workout))
+    other["id"] = "API-W2"
+    payload["data"]["workouts"].append(other)
+    assert _ingest(client, auth_headers, payload).status_code == 200
+
+    before = client.get("/api/workouts/API-W1?full=true", headers=auth_headers).json()
+    timestamp = before["route"][0]["ts_utc"]
+    url = "/api/workouts/API-W1/point-exclusions"
+    edit_headers = {**auth_headers, "X-FitTrack-Edit": "1"}
+    marker = {"ts_utc": timestamp}
+    assert client.post(url, json=marker, headers=auth_headers).status_code == 403
+    assert client.post(url, json=marker, headers={"X-FitTrack-Edit": "1"}).status_code == 401
+    assert client.post(url, json={"ts_utc": "2000-01-01T00:00:00"}, headers=edit_headers).status_code == 404
+    assert client.post(url, json=marker, headers=edit_headers).status_code == 201
+    assert client.post(url, json=marker, headers=edit_headers).status_code == 409
+
+    after = client.get("/api/workouts/API-W1?full=true", headers=auth_headers).json()
+    assert len(after["route"]) == 1
+    assert after["hr_series"] == []
+    assert after["data_points"][0]["excluded"] is True
+    assert after["data_points"][0]["heart_rate_bpm"] == [110, 110]
+    assert all(point["matched"] for point in after["point_exclusions"])
+    assert after["avg_hr"] is None
+    assert after["elevation_gain_m"] is None
+    assert after["splits"] == []
+    assert db_session.query(WorkoutRoutePoint).count() == 4
+    assert db_session.query(WorkoutSample).count() == 4
+    assert client.get("/api/workouts/API-W2", headers=auth_headers).json()["point_exclusions"] == []
+
+    workout["route"][0]["altitude"] = 12.0
+    assert _ingest(client, auth_headers, payload).status_code == 200
+    reingested = client.get("/api/workouts/API-W1?full=true", headers=auth_headers).json()
+    assert len(reingested["route"]) == 1
+    assert reingested["hr_series"] == []
+    assert reingested["point_exclusions"][0]["matched"] is True
+
+    workout["route"][0]["timestamp"] = "2026-07-05 11:39:14 -0700"
+    for sample in workout["heartRateData"]:
+        sample["date"] = workout["route"][0]["timestamp"]
+    assert _ingest(client, auth_headers, payload).status_code == 200
+    changed = client.get("/api/workouts/API-W1?full=true", headers=auth_headers).json()
+    assert len(changed["route"]) == 2
+    assert len(changed["hr_series"]) == 2
+    assert changed["point_exclusions"][0]["matched"] is False
+
+    assert client.post(f"{url}/restore", json=marker, headers=edit_headers).status_code == 200
+    restored = client.get("/api/workouts/API-W1?full=true", headers=auth_headers).json()
+    assert restored["point_exclusions"] == []
+    assert not any(point["excluded"] for point in restored["data_points"])
+    assert db_session.query(WorkoutRoutePoint).count() == 4
+    assert db_session.query(WorkoutSample).count() == 4
+
+
+def test_exclusion_uses_gps_distance_when_distance_samples_overlap(client, auth_headers):
+    import pytest
+    from app.geo import haversine_m
+
+    payload = json.loads(json.dumps(WORKOUT_PAYLOAD))
+    workout = payload["data"]["workouts"][0]
+    workout["route"] = [
+        {"latitude": 0.0, "longitude": 0.0, "timestamp": "2026-07-05 11:39:13 -0700"},
+        {"latitude": 0.01, "longitude": 0.01, "timestamp": "2026-07-05 11:50:00 -0700"},
+        {"latitude": 0.03, "longitude": 0.0, "timestamp": "2026-07-05 12:10:07 -0700"},
+    ]
+    workout["walkingAndRunningDistance"] = [
+        {"qty": qty, "units": "m", "date": point["timestamp"]}
+        for qty, point in zip([1000, 2000, 3000], workout["route"], strict=True)
+    ]
+    assert _ingest(client, auth_headers, payload).status_code == 200
+    url = "/api/workouts/API-W1"
+    before = client.get(f"{url}?full=true", headers=auth_headers).json()
+    assert all(split["source"] == "gps" for split in before["splits"])
+    marker = {"ts_utc": before["route"][1]["ts_utc"]}
+    assert client.post(
+        f"{url}/point-exclusions", json=marker, headers={**auth_headers, "X-FitTrack-Edit": "1"}
+    ).status_code == 201
+    after = client.get(url, headers=auth_headers).json()
+    expected = haversine_m(0.0, 0.0, 0.03, 0.0)
+    assert after["distance_m"] == pytest.approx(expected)
+    split_distance = sum(split["distance_m"] for split in after["splits"] if split["unit_system"] == "km")
+    assert split_distance == pytest.approx(expected)
+
+
+def test_exclusion_recalculates_short_gps_distance_without_original_splits(client, auth_headers):
+    import pytest
+    from app.geo import haversine_m
+
+    payload = json.loads(json.dumps(WORKOUT_PAYLOAD))
+    workout = payload["data"]["workouts"][0]
+    workout["route"] = [
+        {"latitude": 0.0, "longitude": 0.0, "timestamp": "2026-07-05 11:39:13 -0700"},
+        {"latitude": 0.0001, "longitude": 0.0001, "timestamp": "2026-07-05 11:50:00 -0700"},
+        {"latitude": 0.0002, "longitude": 0.0, "timestamp": "2026-07-05 12:10:07 -0700"},
+    ]
+    assert _ingest(client, auth_headers, payload).status_code == 200
+    url = "/api/workouts/API-W1"
+    before = client.get(f"{url}?full=true", headers=auth_headers).json()
+    assert before["splits"] == []
+    marker = {"ts_utc": before["route"][1]["ts_utc"]}
+    assert client.post(
+        f"{url}/point-exclusions", json=marker, headers={**auth_headers, "X-FitTrack-Edit": "1"}
+    ).status_code == 201
+    after = client.get(url, headers=auth_headers).json()
+    assert after["distance_m"] == pytest.approx(haversine_m(0.0, 0.0, 0.0002, 0.0))
+    assert after["splits"] == []
+
+
+def test_exclusion_does_not_replace_a_shortened_gps_route_with_distance_samples(client, auth_headers):
+    payload = json.loads(json.dumps(WORKOUT_PAYLOAD))
+    workout = payload["data"]["workouts"][0]
+    workout["walkingAndRunningDistance"] = [
+        {"qty": 2000, "units": "m", "date": point["timestamp"]}
+        for point in workout["route"]
+    ]
+    assert _ingest(client, auth_headers, payload).status_code == 200
+    url = "/api/workouts/API-W1"
+    before = client.get(f"{url}?full=true", headers=auth_headers).json()
+    assert all(split["source"] == "gps" for split in before["splits"])
+    marker = {"ts_utc": before["route"][0]["ts_utc"]}
+    assert client.post(
+        f"{url}/point-exclusions", json=marker, headers={**auth_headers, "X-FitTrack-Edit": "1"}
+    ).status_code == 201
+    after = client.get(url, headers=auth_headers).json()
+    assert len(after["route"]) == 1
+    assert after["distance_m"] is None
+    assert after["splits"] == []
+
+
+def test_exclusion_rebuilds_remaining_health_distance_intervals(client, auth_headers):
+    import pytest
+
+    payload = json.loads(json.dumps(WORKOUT_PAYLOAD))
+    workout = payload["data"]["workouts"][0]
+    workout["route"] = []
+    workout["walkingAndRunningDistance"] = [
+        {"qty": 500, "units": "m", "date": "2026-07-05 11:39:13 -0700"},
+        {"qty": 1000, "units": "m", "date": "2026-07-05 11:40:13 -0700"},
+        {"qty": 1500, "units": "m", "date": "2026-07-05 11:41:13 -0700"},
+    ]
+    assert _ingest(client, auth_headers, payload).status_code == 200
+    url = "/api/workouts/API-W1"
+    before = client.get(f"{url}?full=true", headers=auth_headers).json()
+    middle = next(point for point in before["data_points"] if point["distance_m"] == 1000)
+    assert client.post(
+        f"{url}/point-exclusions",
+        json={"ts_utc": middle["ts_utc"]},
+        headers={**auth_headers, "X-FitTrack-Edit": "1"},
+    ).status_code == 201
+    after = client.get(url, headers=auth_headers).json()
+    assert after["distance_m"] == 2000
+    first_km = next(split for split in after["splits"] if split["unit_system"] == "km")
+    assert first_km["duration_sec"] == pytest.approx(120)
+
+
+def test_point_exclusion_gateway_access_requires_edit_header(client, auth_headers, monkeypatch):
+    from app.config import get_settings
+
+    payload = json.loads(json.dumps(WORKOUT_PAYLOAD))
+    payload["data"]["workouts"][0]["route"][0]["altitude"] = 10.0
+    assert _ingest(client, auth_headers, payload).status_code == 200
+    timestamp = client.get("/api/workouts/API-W1", headers=auth_headers).json()["route"][0]["ts_utc"]
+    monkeypatch.setattr(get_settings(), "gateway_read_auth", True)
+    url = "/api/workouts/API-W1/point-exclusions"
+    body = {"ts_utc": timestamp}
+    assert client.post(url, json=body).status_code == 403
+    assert client.post(url, json=body, headers={"X-FitTrack-Edit": "1"}).status_code == 201
+
+
 def test_ingest_rejects_malformed_json(client, auth_headers):
     r = client.post(
         "/api/ingest/health-auto-export",

@@ -85,8 +85,15 @@ Returns the summary plus:
 
 - `splits[]` — `{split_index, distance_m, duration_sec, pace_sec_per_unit, avg_hr, elevation_gain_m, source}`
 - `route[]` — `{seq, lat, lon, ts_utc, elevation_m}` (`elevation_m` may be null)
+- `elevation_series[]` — `{ts_utc, elevation_m}`
 - `hr_series[]` — `{ts_utc, bpm}`
-- `route_total`, `hr_total` — full point counts before any downsampling
+- `point_exclusions[]` — `{ts_utc, matched}`. An unmatched marker can still be
+  restored if its source timestamp has disappeared.
+- `data_points[]` — on `full=true`, available timestamps and their stored route
+  count, elevation, speed, heart-rate and source distance measurements, plus
+  `excluded`. Distance is cumulative for Strava and an increment for Health
+  Auto Export. This list includes excluded measurements for restoration.
+- `route_total`, `hr_total` — included point counts before any downsampling
 - `route_downsampled`, `hr_downsampled` — `true` when the returned series was
   reduced to the default caps (`MAX_ROUTE_POINTS` / `MAX_HR_POINTS`, 500 each)
 - `prev_uuid`, `next_uuid` — adjacent workouts by start time for prev/next
@@ -96,8 +103,44 @@ By default long GPS workouts are **downsampled** (deterministically, endpoints
 preserved) to keep responses and client rendering bounded; pass `full=true` to
 retrieve every point. `404` if the workout does not exist.
 
-The workout detail page always uses the default automatic sampling. It has no
-resolution notice or toggle; all original points remain stored.
+The map and charts use automatic sampling after excluded timestamps are removed.
+The point editor requests the full data-point list. Excluding a timestamp applies
+to every route position and measurement at that time, including duplicates.
+Stored source data is not deleted or changed.
+Exclusions are saved in the database on the workout, shared by every browser and
+device. Other open views receive the saved state when refreshed. The point
+editor is a modal: checked points are used, and unchecking a point excludes its
+entire timestamp. Changes save immediately.
+
+Affected heart-rate summaries use the arithmetic mean, minimum and maximum of
+the remaining heart-rate samples. Affected elevation gain uses positive changes
+in the remaining raw elevations, rather than Strava's smoothed total. Affected
+distance uses the remaining cumulative Strava distances, Health distance
+increments, or the remaining GPS route when GPS is the split source. Splits
+are recalculated from the remaining points. Duration and calories remain the
+source totals. The same adjusted summaries appear in the workout list.
+
+If original distance samples are missing after an exclusion, `distance_m` is
+null, splits are omitted, and `point_exclusion_warning` explains the problem.
+The exclusion can still be restored.
+
+## `POST /api/workouts/{uuid}/point-exclusions`
+
+Requires `X-FitTrack-Edit: 1` and either the configured Cloudflare/Tailscale
+gateway or an `ingest`/`all` bearer token.
+
+Body: `{"ts_utc": "2026-10-24T00:05:00"}` using a timestamp from the full
+data-point list. The response is the marker `{ts_utc}`. The marker survives
+re-imports while the timestamp remains in the workout, even when its values
+change. `404` means the point or workout was not found. `409` means the point
+is already excluded or the original samples needed for recalculation are
+unavailable.
+
+## `POST /api/workouts/{uuid}/point-exclusions/restore`
+
+Uses the same authorization and `X-FitTrack-Edit` header. Send the exclusion
+marker from the workout detail, without its `matched` field. The response is
+`{"status": "restored"}`; `404` means the workout or marker was not found.
 
 ## `GET /api/dashboard` _(read scope)_
 

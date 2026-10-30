@@ -67,3 +67,12 @@ def require_read(
     if get_settings().gateway_read_auth:
         return None
     return _validate(_extract_bearer(authorization), db, "read")
+
+
+def require_control(
+    authorization: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> ApiToken | None:
+    if get_settings().gateway_read_auth:
+        return None
+    return require_ingest(authorization, db)

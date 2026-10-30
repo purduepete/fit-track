@@ -60,3 +60,35 @@ describe('api.workouts query building', () => {
         expect(url).not.toContain('date_to');
     });
 });
+
+describe('point exclusions', () => {
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('sends an exclusion request with edit protection', async () => {
+        const spy = mockFetchOnce({});
+        await api.excludePoint('strava:123', '2026-10-24T00:00:00');
+        expect(spy).toHaveBeenCalledWith(
+            '/api/workouts/strava%3A123/point-exclusions',
+            expect.objectContaining({
+                method: 'POST',
+                headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-FitTrack-Edit': '1' }),
+                body: JSON.stringify({ ts_utc: '2026-10-24T00:00:00' }),
+            })
+        );
+    });
+
+    it('restores by marker without sending the response-only matched flag', async () => {
+        const spy = mockFetchOnce({ status: 'restored' });
+        const point = { ts_utc: '2026-10-24T00:00:00' };
+        const status = { ...point, matched: false };
+        await api.restorePoint('strava:123', status);
+        expect(spy).toHaveBeenCalledWith(
+            '/api/workouts/strava%3A123/point-exclusions/restore',
+            expect.objectContaining({
+                method: 'POST',
+                headers: expect.objectContaining({ 'X-FitTrack-Edit': '1' }),
+                body: JSON.stringify(point),
+            })
+        );
+    });
+});

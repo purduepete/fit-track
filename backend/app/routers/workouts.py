@@ -1,16 +1,21 @@
 """Read endpoints for the workout list and per-workout detail (splits/route/HR)."""
+import math
 from collections.abc import Sequence
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..auth import require_read
+from ..auth import require_control, require_read
 from ..db import get_db
 from ..models import Workout, WorkoutRoutePoint, WorkoutSample, WorkoutSplit
+from ..point_exclusions import point_view
 from ..schemas import (
+    ElevationPointOut,
     HrPointOut,
+    PointExclusion,
+    PointExclusionRequest,
     RoutePointOut,
     SplitOut,
     WorkoutDetail,
@@ -58,16 +63,16 @@ def _load_series(
     Returns ``(rows, total)`` where ``total`` is the untruncated count.
     """
     if full:
-        rows = list(db.scalars(select(model).where(*where).order_by(order_col)))
+        rows = list(db.scalars(select(model).where(*where).order_by(order_col, id_col)))
         return rows, len(rows)
-    ids = list(db.scalars(select(id_col).where(*where).order_by(order_col)))
+    ids = list(db.scalars(select(id_col).where(*where).order_by(order_col, id_col)))
     total = len(ids)
     idxs = _sample_indices(total, cap)
     if len(idxs) == total:
-        rows = list(db.scalars(select(model).where(*where).order_by(order_col)))
+        rows = list(db.scalars(select(model).where(*where).order_by(order_col, id_col)))
         return rows, total
     wanted = [ids[i] for i in idxs]
-    rows = list(db.scalars(select(model).where(id_col.in_(wanted)).order_by(order_col)))
+    rows = list(db.scalars(select(model).where(id_col.in_(wanted)).order_by(order_col, id_col)))
     return rows, total
 
 
@@ -98,7 +103,10 @@ def list_workouts(
         .offset(offset)
         .limit(limit)
     )
-    items = [WorkoutSummary.model_validate(w, from_attributes=True) for w in db.scalars(stmt)]
+    items = [
+        point_view(db, w).summary if w.point_exclusions else WorkoutSummary.model_validate(w, from_attributes=True)
+        for w in db.scalars(stmt)
+    ]
     return WorkoutList(items=items, total=total)
 
 
@@ -146,32 +154,62 @@ def get_workout(
         .limit(1)
     )
 
-    # Return every split (both unit systems); the client selects mi/km locally so
-    # toggling units never refetches the workout.
-    splits = db.scalars(
-        select(WorkoutSplit)
-        .where(WorkoutSplit.workout_uuid == uuid)
-        .order_by(WorkoutSplit.unit_system, WorkoutSplit.split_index)
-    ).all()
-    route_out, route_total = _load_series(
-        db, WorkoutRoutePoint, WorkoutRoutePoint.id, WorkoutRoutePoint.seq,
-        [WorkoutRoutePoint.workout_uuid == uuid], MAX_ROUTE_POINTS, full,
-    )
-    hr_out, hr_total = _load_series(
-        db, WorkoutSample, WorkoutSample.id, WorkoutSample.start_utc,
-        [WorkoutSample.workout_uuid == uuid, WorkoutSample.metric_type == "heart_rate"],
-        MAX_HR_POINTS, full,
-    )
+    if full or w.point_exclusions or (w.source_name == "Strava" and not w.has_route):
+        view = point_view(db, w)
+        summary = view.summary
+        splits = view.splits
+        route_total, hr_total = len(view.route), len(view.heart_rate)
+        route_out = view.route if full else [view.route[i] for i in _sample_indices(route_total, MAX_ROUTE_POINTS)]
+        hr_out = view.heart_rate if full else [view.heart_rate[i] for i in _sample_indices(hr_total, MAX_HR_POINTS)]
+        exclusions = view.exclusions
+        data_points = view.points if full else []
+        min_hr = view.min_hr
+        elevations = [
+            ElevationPointOut(ts_utc=point.ts_utc, elevation_m=value)
+            for point in view.points if not point.excluded for value in point.elevation_m
+        ]
+        if not full:
+            elevations = [elevations[i] for i in _sample_indices(len(elevations), MAX_ROUTE_POINTS)]
+    else:
+        summary = WorkoutSummary.model_validate(w, from_attributes=True)
+        splits = [
+            SplitOut.model_validate(s, from_attributes=True)
+            for s in db.scalars(
+                select(WorkoutSplit)
+                .where(WorkoutSplit.workout_uuid == uuid)
+                .order_by(WorkoutSplit.unit_system, WorkoutSplit.split_index)
+            )
+        ]
+        route_out, route_total = _load_series(
+            db, WorkoutRoutePoint, WorkoutRoutePoint.id, WorkoutRoutePoint.seq,
+            [WorkoutRoutePoint.workout_uuid == uuid], MAX_ROUTE_POINTS, False,
+        )
+        hr_out, hr_total = _load_series(
+            db, WorkoutSample, WorkoutSample.id, WorkoutSample.start_utc,
+            [WorkoutSample.workout_uuid == uuid, WorkoutSample.metric_type == "heart_rate"],
+            MAX_HR_POINTS, False,
+        )
+        exclusions = []
+        data_points = []
+        min_hr = w.min_hr
+        elevations = [
+            ElevationPointOut(ts_utc=row.ts_utc, elevation_m=row.elevation_m)
+            for row in route_out
+            if row.elevation_m is not None and math.isfinite(row.elevation_m)
+        ]
 
     return WorkoutDetail(
-        **WorkoutSummary.model_validate(w, from_attributes=True).model_dump(),
+        **summary.model_dump(),
         source_name=w.source_name,
         device_name=w.device_name,
         end_utc=w.end_utc,
-        min_hr=w.min_hr,
-        splits=[SplitOut.model_validate(s, from_attributes=True) for s in splits],
+        min_hr=min_hr,
+        splits=splits,
         route=[RoutePointOut.model_validate(r, from_attributes=True) for r in route_out],
+        elevation_series=elevations,
         hr_series=[HrPointOut(ts_utc=s.start_utc, bpm=s.value) for s in hr_out],
+        point_exclusions=exclusions,
+        data_points=data_points,
         route_total=route_total,
         hr_total=hr_total,
         route_downsampled=len(route_out) < route_total,
@@ -179,3 +217,61 @@ def get_workout(
         prev_uuid=prev_uuid,
         next_uuid=next_uuid,
     )
+
+
+def _lock_workout(db: Session, uuid: str) -> Workout:
+    workout = db.scalar(select(Workout).where(Workout.uuid == uuid).with_for_update())
+    if workout is None:
+        raise HTTPException(status_code=404, detail="Workout not found")
+    return workout
+
+
+def _require_edit_header(value: str | None) -> None:
+    if value != "1":
+        raise HTTPException(status_code=403, detail="Missing FitTrack edit header")
+
+
+@router.post("/{uuid}/point-exclusions", response_model=PointExclusion, status_code=201)
+def exclude_point(
+    uuid: str,
+    request: PointExclusionRequest,
+    x_fittrack_edit: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+    _token=Depends(require_control),
+) -> PointExclusion:
+    _require_edit_header(x_fittrack_edit)
+    workout = _lock_workout(db, uuid)
+    exclusions = [PointExclusion.model_validate(item) for item in workout.point_exclusions]
+    exclusion = PointExclusion(ts_utc=request.ts_utc)
+    if exclusion in exclusions:
+        raise HTTPException(status_code=409, detail="Point is already excluded")
+    view = point_view(db, workout)
+    if not any(point.ts_utc == exclusion.ts_utc for point in view.points):
+        raise HTTPException(status_code=404, detail="Workout point not found")
+    if not view.can_recalculate:
+        raise HTTPException(
+            status_code=409,
+            detail="Original distance samples are unavailable; this workout's splits cannot be recalculated.",
+        )
+    workout.point_exclusions = [*workout.point_exclusions, exclusion.model_dump(mode="json")]
+    db.commit()
+    return exclusion
+
+
+@router.post("/{uuid}/point-exclusions/restore")
+def restore_point(
+    uuid: str,
+    exclusion: PointExclusion,
+    x_fittrack_edit: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+    _token=Depends(require_control),
+) -> dict[str, str]:
+    _require_edit_header(x_fittrack_edit)
+    workout = _lock_workout(db, uuid)
+    exclusions = [PointExclusion.model_validate(item) for item in workout.point_exclusions]
+    if exclusion not in exclusions:
+        raise HTTPException(status_code=404, detail="Excluded point not found")
+    exclusions.remove(exclusion)
+    workout.point_exclusions = [item.model_dump(mode="json") for item in exclusions]
+    db.commit()
+    return {"status": "restored"}

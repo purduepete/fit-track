@@ -1,7 +1,9 @@
 """ORM models. All tables live in the ``fit`` schema of the WebPortfolio DB."""
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     Float,
@@ -11,6 +13,7 @@ from sqlalchemy import (
     String,
     Unicode,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy import (
     DateTime as _SA_DateTime,
@@ -18,7 +21,7 @@ from sqlalchemy import (
 from sqlalchemy import (
     UnicodeText as _SA_UnicodeText,
 )
-from sqlalchemy.dialects import mssql
+from sqlalchemy.dialects import mssql, postgresql
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from .config import get_settings
@@ -98,6 +101,12 @@ class Workout(Base):
     max_hr: Mapped[float | None] = mapped_column(Float, nullable=True)
     min_hr: Mapped[float | None] = mapped_column(Float, nullable=True)
     elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    point_exclusions: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON().with_variant(postgresql.JSONB(), "postgresql"),
+        nullable=False,
+        default=list,
+        server_default=text("'[]'"),
+    )
 
     has_route: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_utc: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -197,5 +206,4 @@ class DailyMetric(Base):
     unit: Mapped[str | None] = mapped_column(String(20), nullable=True)
     source_name: Mapped[str | None] = mapped_column(Unicode(120), nullable=True)
     updated_utc: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-
 

@@ -12,6 +12,7 @@ export interface WorkoutSummary {
     avg_hr: number | null;
     max_hr: number | null;
     elevation_gain_m: number | null;
+    point_exclusion_warning?: string | null;
     has_route: boolean;
 }
 
@@ -24,6 +25,14 @@ export interface Split {
     avg_hr: number | null;
     elevation_gain_m: number | null;
     source: string;
+}
+
+export interface PointExclusion {
+    ts_utc: string;
+}
+
+export interface PointExclusionStatus extends PointExclusion {
+    matched: boolean;
 }
 
 export interface RoutePoint {
@@ -39,6 +48,22 @@ export interface HrPoint {
     bpm: number;
 }
 
+export interface ElevationPoint {
+    ts_utc: string;
+    elevation_m: number;
+}
+
+export interface WorkoutPoint {
+    ts_utc: string;
+    route_count: number;
+    elevation_m: number[];
+    speed_mps: number[];
+    heart_rate_bpm: number[];
+    distance_m: number | null;
+    distance_kind: 'cumulative' | 'increment' | null;
+    excluded: boolean;
+}
+
 export interface WorkoutDetail extends WorkoutSummary {
     source_name: string | null;
     device_name: string | null;
@@ -46,7 +71,10 @@ export interface WorkoutDetail extends WorkoutSummary {
     min_hr: number | null;
     splits: Split[];
     route: RoutePoint[];
+    elevation_series: ElevationPoint[];
     hr_series: HrPoint[];
+    point_exclusions: PointExclusionStatus[];
+    data_points: WorkoutPoint[];
     route_total: number;
     hr_total: number;
     route_downsampled: boolean;
@@ -182,4 +210,16 @@ export const api = {
     workoutTypes: () => apiGet<string[]>('/api/workouts/types'),
     workout: (uuid: string, full = false) =>
         apiGet<WorkoutDetail>(`/api/workouts/${encodeURIComponent(uuid)}${full ? '?full=true' : ''}`),
+    excludePoint: (uuid: string, tsUtc: string) =>
+        apiGet<PointExclusion>(`/api/workouts/${encodeURIComponent(uuid)}/point-exclusions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-FitTrack-Edit': '1' },
+            body: JSON.stringify({ ts_utc: tsUtc }),
+        }),
+    restorePoint: (uuid: string, point: PointExclusion) =>
+        apiGet<{ status: string }>(`/api/workouts/${encodeURIComponent(uuid)}/point-exclusions/restore`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-FitTrack-Edit': '1' },
+            body: JSON.stringify({ ts_utc: point.ts_utc }),
+        }),
 };

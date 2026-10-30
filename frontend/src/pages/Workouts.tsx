@@ -231,6 +231,12 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
 
             {error && <p className="error">{error}</p>}
 
+            {filtered.some((workout) => workout.point_exclusion_warning) && (
+                <p className="error" role="alert">
+                    Adjusted distance or splits are unavailable for some workouts. Open a workout for details.
+                </p>
+            )}
+
             <div className="card" style={{ padding: 0 }}>
                 <table className="stack-table">
                     <thead>

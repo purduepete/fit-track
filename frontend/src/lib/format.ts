@@ -123,9 +123,10 @@ export function formatLocalDateTime(iso: string): string {
 }
 
 /** Local time-of-day label (24-hour clock). Accepts an ISO string or epoch ms. */
-export function formatLocalTime(value: string | number): string {
+export function formatLocalTime(value: string | number, includeSeconds = false): string {
     const d = typeof value === 'number' ? new Date(value) : toDate(value);
-    return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    const time = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    return includeSeconds ? `${time}:${pad2(d.getSeconds())}` : time;
 }
 
 export function round(n: number | null, digits = 0): string {

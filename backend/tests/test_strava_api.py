@@ -7,11 +7,11 @@ from app.strava import StravaBusy, StravaError
 
 @pytest.fixture
 def gateway(monkeypatch, tmp_path):
-    from types import SimpleNamespace
+    from app.config import get_settings
 
-    monkeypatch.setattr(strava, "get_settings", lambda: SimpleNamespace(
-        gateway_read_auth=True, strava_token_file=str(tmp_path / "tokens.json"),
-    ))
+    settings = get_settings()
+    monkeypatch.setattr(settings, "gateway_read_auth", True)
+    monkeypatch.setattr(settings, "strava_token_file", str(tmp_path / "tokens.json"))
 
 
 def test_pull_requires_authorization(client):

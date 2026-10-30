@@ -15,6 +15,7 @@ import {
 import { api } from '../lib/api';
 import { useApiResource } from '../lib/useApiResource';
 import { StatCard } from '../components/StatCard';
+import { PointExclusions } from '../components/PointExclusions';
 import {
     ActivityIcon,
     ChevronLeftIcon,
@@ -59,7 +60,13 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
         const onKey = (e: KeyboardEvent) => {
             const el = e.target as HTMLElement | null;
             const tag = el?.tagName;
-            if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || el?.isContentEditable) {
+            if (
+                tag === 'INPUT' ||
+                tag === 'SELECT' ||
+                tag === 'TEXTAREA' ||
+                el?.isContentEditable ||
+                el?.closest('dialog[open]')
+            ) {
                 return;
             }
             if (e.key === 'ArrowLeft' && prevUuid) navigate(`/workouts/${prevUuid}`);
@@ -101,12 +108,10 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
         bpm: Math.round(h.bpm),
     }));
 
-    const elevationData = data.route
-        .filter((p) => p.elevation_m != null)
-        .map((p) => ({
-            t: new Date(p.ts_utc + 'Z').getTime(),
-            elev: Math.round(metersToElevation(p.elevation_m as number, unit)),
-        }));
+    const elevationData = data.elevation_series.map((p) => ({
+        t: new Date(p.ts_utc + 'Z').getTime(),
+        elev: Math.round(metersToElevation(p.elevation_m, unit)),
+    }));
 
     return (
         <>
@@ -137,6 +142,12 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                     · {formatLocalDateTime(data.start_utc)}
                 </span>
             </h1>
+
+            {data.point_exclusion_warning && (
+                <p className="error" role="alert">
+                    {data.point_exclusion_warning}
+                </p>
+            )}
 
             <div className="grid-cards cards-5">
                 <StatCard icon={<ClockIcon />} label="Duration" value={formatHms(data.duration_sec)} />
@@ -179,37 +190,69 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                 </div>
             )}
 
-            {elevationData.length >= 2 && (
-                <div className="section">
-                    <h2>Elevation</h2>
-                    <div className="card">
-                        <ResponsiveContainer width="100%" height={200}>
-                            <LineChart data={elevationData}>
-                                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                                <XAxis
-                                    dataKey="t"
-                                    type="number"
-                                    domain={['dataMin', 'dataMax']}
-                                    tick={{ fontSize: 11 }}
-                                    tickFormatter={(t) => formatLocalTime(Number(t))}
-                                />
-                                <YAxis
-                                    domain={['auto', 'auto']}
-                                    width={52}
-                                    tick={{ fontSize: 11 }}
-                                    tickFormatter={(v) => `${v} ${elevUnit}`}
-                                />
-                                <Tooltip
-                                    {...tooltipProps}
-                                    labelFormatter={(t) => formatLocalTime(Number(t))}
-                                    formatter={(v) => [`${round(Number(v))} ${elevUnit}`, 'Elevation']}
-                                />
-                                <Line type="monotone" dataKey="elev" stroke="#16a34a" strokeWidth={2} dot={false} />
-                            </LineChart>
-                        </ResponsiveContainer>
+            <div
+                className={`workout-chart-row${elevationData.length >= 2 && hrData.length > 0 ? ' workout-chart-row--paired' : ''}`}
+            >
+                {elevationData.length >= 2 && (
+                    <div className="section">
+                        <h2>Elevation</h2>
+                        <div className="card">
+                            <ResponsiveContainer width="100%" height={360}>
+                                <LineChart data={elevationData}>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                    <XAxis
+                                        dataKey="t"
+                                        type="number"
+                                        domain={['dataMin', 'dataMax']}
+                                        tick={{ fontSize: 11 }}
+                                        tickFormatter={(t) => formatLocalTime(Number(t))}
+                                    />
+                                    <YAxis
+                                        domain={['auto', 'auto']}
+                                        width={52}
+                                        tick={{ fontSize: 11 }}
+                                        tickFormatter={(v) => `${v} ${elevUnit}`}
+                                    />
+                                    <Tooltip
+                                        {...tooltipProps}
+                                        labelFormatter={(t) => formatLocalTime(Number(t), true)}
+                                        formatter={(v) => [`${round(Number(v))} ${elevUnit}`, 'Elevation']}
+                                    />
+                                    <Line type="monotone" dataKey="elev" stroke="#16a34a" strokeWidth={2} dot={false} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
+                {hrData.length > 0 && (
+                    <div className="section">
+                        <h2>Heart rate</h2>
+                        <div className="card">
+                            <ResponsiveContainer width="100%" height={360}>
+                                <LineChart data={hrData}>
+                                    <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                    <XAxis
+                                        dataKey="t"
+                                        type="number"
+                                        domain={['dataMin', 'dataMax']}
+                                        tick={{ fontSize: 11 }}
+                                        tickFormatter={(t) => formatLocalTime(Number(t))}
+                                    />
+                                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
+                                    <Tooltip
+                                        {...tooltipProps}
+                                        labelFormatter={(t) => formatLocalTime(Number(t), true)}
+                                        formatter={(v) => [`${v} bpm`, 'HR']}
+                                    />
+                                    <Line type="monotone" dataKey="bpm" stroke="#e5484d" strokeWidth={2} dot={false} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+                )}
+            </div>
+
+            <PointExclusions key={data.uuid} workout={data} unit={unit} onChange={refresh} onAuthError={onAuthError} />
 
             <div className="section">
                 <h2>Splits</h2>
@@ -318,33 +361,6 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                     </div>
                 )}
             </div>
-
-            {hrData.length > 0 && (
-                <div className="section">
-                    <h2>Heart rate</h2>
-                    <div className="card">
-                        <ResponsiveContainer width="100%" height={240}>
-                            <LineChart data={hrData}>
-                                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                                <XAxis
-                                    dataKey="t"
-                                    type="number"
-                                    domain={['dataMin', 'dataMax']}
-                                    tick={{ fontSize: 11 }}
-                                    tickFormatter={(t) => formatLocalTime(Number(t))}
-                                />
-                                <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
-                                <Tooltip
-                                    {...tooltipProps}
-                                    labelFormatter={(t) => formatLocalTime(Number(t))}
-                                    formatter={(v) => [`${v} bpm`, 'HR']}
-                                />
-                                <Line type="monotone" dataKey="bpm" stroke="#e5484d" strokeWidth={2} dot={false} />
-                            </LineChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            )}
         </>
     );
 }

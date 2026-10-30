@@ -5,27 +5,20 @@ from pathlib import Path
 import httpx
 from fastapi import APIRouter, Depends, Header, HTTPException
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
 
-from ..auth import require_ingest
+from ..auth import require_control
 from ..config import get_settings
-from ..db import SessionLocal, get_db
+from ..db import SessionLocal
 from ..strava import StravaBusy, StravaError, sync_once
 
 router = APIRouter(prefix="/api/strava", tags=["strava"])
 logger = logging.getLogger("fittrack.strava")
 
 
-def require_sync(authorization: str | None = Header(default=None), db: Session = Depends(get_db)):
-    if get_settings().gateway_read_auth:
-        return
-    return require_ingest(authorization, db)
-
-
 @router.post("/pull")
 def pull_strava(
     x_fittrack_sync: str | None = Header(default=None),
-    _token=Depends(require_sync),
+    _token=Depends(require_control),
 ) -> dict[str, int]:
     # The custom header requires a CORS preflight for cross-origin browser POSTs.
     if x_fittrack_sync != "1":

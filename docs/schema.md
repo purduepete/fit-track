@@ -47,6 +47,7 @@ One row per workout. `uuid` is the Apple workout id or `strava:<activity_id>`
 | `duration_sec`, `distance_m`, `active_energy_kcal` | float | |
 | `avg_hr`, `max_hr`, `min_hr` | float | |
 | `elevation_gain_m` | float, null | Strava `total_elevation_gain`; null for Apple workouts (migration `002_elevation.sql`) |
+| `point_exclusions` | JSON array | Reversible per-workout timestamp exclusions (migration `003_point_exclusions.sql`); original samples remain unchanged |
 | `has_route` | bit | |
 | `created_utc`, `updated_utc` | datetime2 | |
 

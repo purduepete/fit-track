@@ -164,6 +164,14 @@ describe('Workouts type dropdown', () => {
             return vi.spyOn(api, 'workouts').mockResolvedValue({ items, total });
         }
 
+        it('warns when adjusted workout distance or splits cannot be calculated', async () => {
+            setup([workout({ point_exclusion_warning: 'Original distance samples are unavailable.' })]);
+            renderAt('/workouts');
+            expect(await screen.findByRole('alert')).toHaveTextContent(
+                'Adjusted distance or splits are unavailable for some workouts.'
+            );
+        });
+
         it('groups thousands in row and total distances and calories', async () => {
             setup([workout({ distance_m: 1609344, active_energy_kcal: 1396 })]);
             renderAt('/workouts');

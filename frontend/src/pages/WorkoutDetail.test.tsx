@@ -71,6 +71,14 @@ it('automatically loads sampled data and shows the map without resolution contro
         </MemoryRouter>
     );
     expect(await screen.findByText('Route map')).toBeInTheDocument();
+    const title = screen.getByRole('heading', { name: /Indoor Cycling/, level: 1 });
+    const managePoints = screen.getByRole('button', { name: 'Manage points' });
+    expect(title.closest('.workout-title-row')).toContainElement(managePoints);
+    expect(managePoints).toHaveClass('icon-btn');
+    expect(managePoints).toHaveAttribute('data-tip', 'Manage points');
+    expect(managePoints.querySelector('svg')).toBeInTheDocument();
+    expect(managePoints).toHaveTextContent('');
+    expect(screen.queryByRole('heading', { name: 'Workout data points' })).not.toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Original distance samples are unavailable.');
     expect(workout).toHaveBeenCalledWith('strava:123');
     expect(screen.queryByText(/resolution|simplified view|route points/i)).not.toBeInTheDocument();
@@ -209,7 +217,12 @@ it('refreshes the route, both charts, and summaries after excluding or restoring
     };
     let detail = structuredClone(original);
     vi.spyOn(api, 'workout').mockImplementation(async () => structuredClone(detail));
-    vi.spyOn(api, 'excludePoint').mockImplementation(async (_uuid, ts_utc) => {
+    vi.spyOn(api, 'savePointExclusions').mockImplementation(async (_uuid, changes) => {
+        if (changes.restore.length) {
+            detail = structuredClone(original);
+            return { status: 'saved' };
+        }
+        const ts_utc = changes.exclude[0].ts_utc;
         detail.route = detail.route.filter((point) => point.ts_utc !== ts_utc);
         detail.hr_series = detail.hr_series.filter((point) => point.ts_utc !== ts_utc);
         detail.elevation_series = detail.elevation_series.filter((point) => point.ts_utc !== ts_utc);
@@ -218,11 +231,7 @@ it('refreshes the route, both charts, and summaries after excluding or restoring
         detail.avg_hr = 110;
         detail.max_hr = 120;
         detail.elevation_gain_m = 10;
-        return { ts_utc };
-    });
-    vi.spyOn(api, 'restorePoint').mockImplementation(async () => {
-        detail = structuredClone(original);
-        return { status: 'restored' };
+        return { status: 'saved' };
     });
     render(
         <MemoryRouter initialEntries={['/workouts/filtered']}>
@@ -242,13 +251,18 @@ it('refreshes the route, both charts, and summaries after excluding or restoring
     expect(chartPoints('Heart rate')).toHaveLength(3);
     fireEvent.click(screen.getByRole('button', { name: 'Manage points' }));
     fireEvent.click((await screen.findAllByRole('checkbox', { name: /Use point/ }))[1]);
+    expect(chartPoints('Elevation')).toHaveLength(3);
+    expect(chartPoints('Heart rate')).toHaveLength(3);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(chartPoints('Elevation')).toHaveLength(2));
     expect(chartPoints('Heart rate')).toHaveLength(2);
     expect(screen.getByText('Route map')).toHaveAttribute('data-route-count', '2');
     expect(screen.getByText('Avg / Max HR').closest('.card')).toHaveTextContent('110 / 120');
     expect(screen.getByText('Elevation gain').closest('.card')).toHaveTextContent('33 ft');
 
+    fireEvent.click(screen.getByRole('button', { name: 'Manage points' }));
     fireEvent.click((await screen.findAllByRole('checkbox', { name: /Use point/ }))[1]);
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     await waitFor(() => expect(chartPoints('Elevation')).toHaveLength(3));
     expect(chartPoints('Heart rate')).toHaveLength(3);
     expect(screen.getByText('Route map')).toHaveAttribute('data-route-count', '3');
@@ -303,7 +317,7 @@ it('opens a fresh point editor when navigating to another workout', async () => 
         if (!workout) throw new Error(`Unknown workout ${uuid}`);
         return structuredClone(workout);
     });
-    const exclude = vi.spyOn(api, 'excludePoint').mockResolvedValue({ ts_utc: '2026-10-24T00:00:00' });
+    const save = vi.spyOn(api, 'savePointExclusions').mockResolvedValue({ status: 'saved' });
     render(
         <MemoryRouter initialEntries={['/workouts/first']}>
             <Routes>
@@ -314,7 +328,7 @@ it('opens a fresh point editor when navigating to another workout', async () => 
 
     fireEvent.click(await screen.findByRole('button', { name: 'Manage points' }));
     expect(await screen.findByText('Heart rate 111 bpm')).toBeInTheDocument();
-    const done = screen.getByRole('button', { name: 'Done' });
+    const done = screen.getByRole('button', { name: 'Cancel' });
     done.focus();
     fireEvent.keyDown(done, { key: 'ArrowRight' });
     expect(screen.queryByRole('heading', { name: /second/ })).not.toBeInTheDocument();
@@ -325,5 +339,11 @@ it('opens a fresh point editor when navigating to another workout', async () => 
     fireEvent.click(screen.getByRole('button', { name: 'Manage points' }));
     expect(await screen.findByText('Heart rate 122 bpm')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('checkbox', { name: /Use point/ }));
-    await waitFor(() => expect(exclude).toHaveBeenCalledWith('second', '2026-10-24T00:00:00'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await waitFor(() =>
+        expect(save).toHaveBeenCalledWith('second', {
+            exclude: [{ ts_utc: '2026-10-24T00:00:00' }],
+            restore: [],
+        })
+    );
 });

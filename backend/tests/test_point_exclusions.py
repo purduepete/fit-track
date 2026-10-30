@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import timedelta
+from unittest.mock import patch
 
 import pytest
 from app.models import RawIngestEvent, Workout, WorkoutRoutePoint, WorkoutSample
@@ -31,6 +32,94 @@ def ride():
             "altitude": {"data": [10, 1000, 20, 30]},
         },
     }
+
+
+def test_batch_saves_all_changes_once_and_preserves_other_saved_points(client, auth_headers, db_session):
+    persist_strava_event(ride(), db_session)
+    url = "/api/workouts/strava:123"
+    headers = {**auth_headers, "X-FitTrack-Edit": "1"}
+    points = client.get(f"{url}?full=true", headers=auth_headers).json()["data_points"]
+    markers = [{"ts_utc": point["ts_utc"]} for point in points]
+    missing = {"ts_utc": "2026-10-23T02:31:05"}
+    stored = db_session.get(Workout, "strava:123")
+    stored.point_exclusions = [markers[0], markers[1], missing]
+    db_session.commit()
+    changes = {"exclude": [markers[2], markers[2]], "restore": [markers[1], missing]}
+    with patch.object(db_session, "commit", wraps=db_session.commit) as commit:
+        response = client.post(f"{url}/point-exclusions/batch", json=changes, headers=headers)
+        assert response.status_code == 200
+        assert response.json() == {"status": "saved"}
+        commit.assert_called_once()
+    after = client.get(f"{url}?full=true", headers=auth_headers).json()
+    assert [point["ts_utc"] for point in after["point_exclusions"]] == [
+        markers[0]["ts_utc"], markers[2]["ts_utc"]
+    ]
+    assert [point["excluded"] for point in after["data_points"]] == [True, False, True, False]
+    assert after["avg_hr"] == 170
+    assert db_session.query(WorkoutRoutePoint).count() == 4
+    assert db_session.query(WorkoutSample).count() == 4
+    assert client.post(f"{url}/point-exclusions/batch", json=changes, headers=headers).status_code == 200
+    assert client.get(f"{url}?full=true", headers=auth_headers).json() == after
+
+
+def test_batch_rejects_invalid_changes_without_saving_anything(client, auth_headers, db_session):
+    persist_strava_event(ride(), db_session)
+    url = "/api/workouts/strava:123"
+    headers = {**auth_headers, "X-FitTrack-Edit": "1"}
+    points = client.get(f"{url}?full=true", headers=auth_headers).json()["data_points"]
+    first, second = ({"ts_utc": point["ts_utc"]} for point in points[:2])
+    assert client.post(f"{url}/point-exclusions", json=first, headers=headers).status_code == 201
+    invalid = {"ts_utc": "2026-10-24T00:00:00"}
+    response = client.post(
+        f"{url}/point-exclusions/batch",
+        json={"exclude": [second, invalid], "restore": [first]},
+        headers=headers,
+    )
+    assert response.status_code == 404
+    assert db_session.get(Workout, "strava:123").point_exclusions == [first]
+    response = client.post(
+        f"{url}/point-exclusions/batch",
+        json={"exclude": [second], "restore": [{"ts_utc": second["ts_utc"] + "Z"}]},
+        headers=headers,
+    )
+    assert response.status_code == 422
+    assert db_session.get(Workout, "strava:123").point_exclusions == [first]
+    assert client.post(
+        "/api/workouts/missing/point-exclusions/batch", json={}, headers=headers
+    ).status_code == 404
+
+
+def test_batch_missing_source_blocks_new_exclusions_but_allows_restoration(client, auth_headers, db_session):
+    persist_strava_event(ride(), db_session)
+    url = "/api/workouts/strava:123"
+    headers = {**auth_headers, "X-FitTrack-Edit": "1"}
+    points = client.get(f"{url}?full=true", headers=auth_headers).json()["data_points"]
+    first, second = ({"ts_utc": point["ts_utc"]} for point in points[:2])
+    assert client.post(f"{url}/point-exclusions", json=first, headers=headers).status_code == 201
+    db_session.query(RawIngestEvent).delete()
+    db_session.commit()
+    response = client.post(
+        f"{url}/point-exclusions/batch", json={"exclude": [second], "restore": [first]}, headers=headers
+    )
+    assert response.status_code == 409
+    assert db_session.get(Workout, "strava:123").point_exclusions == [first]
+    assert client.post(
+        f"{url}/point-exclusions/batch", json={"restore": [first]}, headers=headers
+    ).status_code == 200
+    assert db_session.get(Workout, "strava:123").point_exclusions == []
+
+
+def test_batch_requires_control_access_and_edit_header(client, auth_headers, db_session, monkeypatch):
+    from app.config import get_settings
+
+    persist_strava_event(ride(), db_session)
+    url = "/api/workouts/strava:123/point-exclusions/batch"
+    monkeypatch.setattr(get_settings(), "gateway_read_auth", False)
+    assert client.post(url, json={}, headers={"X-FitTrack-Edit": "1"}).status_code == 401
+    assert client.post(url, json={}, headers=auth_headers).status_code == 403
+    monkeypatch.setattr(get_settings(), "gateway_read_auth", True)
+    assert client.post(url, json={}).status_code == 403
+    assert client.post(url, json={}, headers={"X-FitTrack-Edit": "1"}).status_code == 200
 
 
 def test_exclusion_recalculates_whole_strava_point(client, auth_headers, db_session):

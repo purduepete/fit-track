@@ -136,12 +136,21 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                 </button>
             </div>
 
-            <h1 className="page-title">
-                {data.workout_type}{' '}
-                <span className="muted" style={{ fontSize: '1rem' }}>
-                    · {formatLocalDateTime(data.start_utc)}
-                </span>
-            </h1>
+            <div className="page-head workout-title-row">
+                <h1 className="page-title">
+                    {data.workout_type}{' '}
+                    <span className="muted" style={{ fontSize: '1rem' }}>
+                        · {formatLocalDateTime(data.start_utc)}
+                    </span>
+                </h1>
+                <PointExclusions
+                    key={data.uuid}
+                    workout={data}
+                    unit={unit}
+                    onChange={refresh}
+                    onAuthError={onAuthError}
+                />
+            </div>
 
             {data.point_exclusion_warning && (
                 <p className="error" role="alert">
@@ -251,8 +260,6 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                     </div>
                 )}
             </div>
-
-            <PointExclusions key={data.uuid} workout={data} unit={unit} onChange={refresh} onAuthError={onAuthError} />
 
             <div className="section">
                 <h2>Splits</h2>

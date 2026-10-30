@@ -104,13 +104,16 @@ preserved) to keep responses and client rendering bounded; pass `full=true` to
 retrieve every point. `404` if the workout does not exist.
 
 The map and charts use automatic sampling after excluded timestamps are removed.
-The point editor requests the full data-point list. Excluding a timestamp applies
-to every route position and measurement at that time, including duplicates.
+The point editor opens with **Manage points** beside the workout title and
+requests the full data-point list. Excluding a timestamp applies to every route
+position and measurement at that time, including duplicates.
 Stored source data is not deleted or changed.
 Exclusions are saved in the database on the workout, shared by every browser and
 device. Other open views receive the saved state when refreshed. The point
 editor is a modal: checked points are used, and unchecking a point excludes its
-entire timestamp. Changes save immediately.
+entire timestamp. Checkbox edits remain drafts until **Save** applies them
+together and closes the modal. **Cancel** discards the draft. Escape and outside
+clicks do not close the editor while changes are unsaved.
 
 Affected heart-rate summaries use the arithmetic mean, minimum and maximum of
 the remaining heart-rate samples. Affected elevation gain uses positive changes
@@ -141,6 +144,27 @@ unavailable.
 Uses the same authorization and `X-FitTrack-Edit` header. Send the exclusion
 marker from the workout detail, without its `matched` field. The response is
 `{"status": "restored"}`; `404` means the workout or marker was not found.
+
+## `POST /api/workouts/{uuid}/point-exclusions/batch`
+
+Uses the same authorization and `X-FitTrack-Edit` header. The point editor
+sends only changed timestamps:
+
+```json
+{
+  "exclude": [{"ts_utc": "2026-10-24T00:05:00"}],
+  "restore": [{"ts_utc": "2026-10-24T00:06:00"}]
+}
+```
+
+All changes are validated before one transaction commits them. Other saved
+timestamps remain unchanged, including changes made on another device.
+Repeating a saved request is safe: already-excluded points and already-restored
+markers need no further change. A missing source marker can still be restored.
+The response is `{"status": "saved"}`. `422` means the same timestamp appears in
+both lists, `404` means the workout or a new exclusion point is missing, and
+`409` means new exclusions cannot be recalculated from available source data.
+On failure, none of the requested changes are saved.
 
 ## `GET /api/dashboard` _(read scope)_
 

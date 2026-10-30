@@ -1,6 +1,7 @@
 """Read endpoints for the workout list and per-workout detail (splits/route/HR)."""
 import math
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
@@ -15,6 +16,7 @@ from ..schemas import (
     ElevationPointOut,
     HrPointOut,
     PointExclusion,
+    PointExclusionChanges,
     PointExclusionRequest,
     RoutePointOut,
     SplitOut,
@@ -231,6 +233,43 @@ def _require_edit_header(value: str | None) -> None:
         raise HTTPException(status_code=403, detail="Missing FitTrack edit header")
 
 
+def _validate_new_exclusions(db: Session, workout: Workout, timestamps: set[datetime]) -> None:
+    if not timestamps:
+        return
+    view = point_view(db, workout)
+    if timestamps - {point.ts_utc for point in view.points}:
+        raise HTTPException(status_code=404, detail="Workout point not found")
+    if not view.can_recalculate:
+        raise HTTPException(
+            status_code=409,
+            detail="Original distance samples are unavailable; this workout's splits cannot be recalculated.",
+        )
+
+
+@router.post("/{uuid}/point-exclusions/batch")
+def save_point_exclusions(
+    uuid: str,
+    request: PointExclusionChanges,
+    x_fittrack_edit: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+    _token=Depends(require_control),
+) -> dict[str, str]:
+    _require_edit_header(x_fittrack_edit)
+    exclude = {point.ts_utc for point in request.exclude}
+    restore = {point.ts_utc for point in request.restore}
+    if exclude & restore:
+        raise HTTPException(status_code=422, detail="A point cannot be both excluded and restored")
+    workout = _lock_workout(db, uuid)
+    current = {PointExclusion.model_validate(item).ts_utc for item in workout.point_exclusions}
+    _validate_new_exclusions(db, workout, exclude - current)
+    workout.point_exclusions = [
+        PointExclusion(ts_utc=timestamp).model_dump(mode="json")
+        for timestamp in sorted((current | exclude) - restore)
+    ]
+    db.commit()
+    return {"status": "saved"}
+
+
 @router.post("/{uuid}/point-exclusions", response_model=PointExclusion, status_code=201)
 def exclude_point(
     uuid: str,
@@ -245,14 +284,7 @@ def exclude_point(
     exclusion = PointExclusion(ts_utc=request.ts_utc)
     if exclusion in exclusions:
         raise HTTPException(status_code=409, detail="Point is already excluded")
-    view = point_view(db, workout)
-    if not any(point.ts_utc == exclusion.ts_utc for point in view.points):
-        raise HTTPException(status_code=404, detail="Workout point not found")
-    if not view.can_recalculate:
-        raise HTTPException(
-            status_code=409,
-            detail="Original distance samples are unavailable; this workout's splits cannot be recalculated.",
-        )
+    _validate_new_exclusions(db, workout, {exclusion.ts_utc})
     workout.point_exclusions = [*workout.point_exclusions, exclusion.model_dump(mode="json")]
     db.commit()
     return exclusion

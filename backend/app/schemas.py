@@ -62,6 +62,11 @@ class PointExclusionRequest(PointExclusion):
     pass
 
 
+class PointExclusionChanges(BaseModel):
+    exclude: list[PointExclusion] = Field(default_factory=list)
+    restore: list[PointExclusion] = Field(default_factory=list)
+
+
 class WorkoutPointOut(BaseModel):
     ts_utc: datetime
     route_count: int = 0

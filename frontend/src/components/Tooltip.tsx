@@ -6,7 +6,6 @@ export function Tooltip() {
     const id = useId();
     const popup = useRef<HTMLDivElement>(null);
     const [active, setActive] = useState<{ trigger: HTMLElement; text: string } | null>(null);
-    const [position, setPosition] = useState<{ left: number; top: number } | null>(null);
 
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | undefined;
@@ -94,7 +93,9 @@ export function Tooltip() {
                 y + height - box.height - 8
             )
         );
-        setPosition({ left, top });
+        popup.current.style.left = `${left}px`;
+        popup.current.style.top = `${top}px`;
+        popup.current.style.visibility = 'visible';
         return () => {
             const remaining = (trigger.getAttribute('aria-describedby') ?? '')
                 .split(/\s+/)
@@ -111,7 +112,7 @@ export function Tooltip() {
             id={id}
             role="tooltip"
             className="app-tooltip"
-            style={{ left: position?.left ?? 0, top: position?.top ?? 0, visibility: position ? 'visible' : 'hidden' }}
+            style={{ left: 0, top: 0, visibility: 'hidden' }}
         >
             {active.text}
         </div>,

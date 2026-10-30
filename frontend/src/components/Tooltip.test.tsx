@@ -1,4 +1,4 @@
-import { createRef } from 'react';
+import { createRef, Profiler } from 'react';
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Tooltip } from './Tooltip';
@@ -143,5 +143,25 @@ describe('shared tooltips', () => {
         fireEvent.keyDown(wrapper, { key: 'Enter' });
         expect(screen.queryByRole('listbox')).toBeNull();
         expect(onChange).not.toHaveBeenCalled();
+    });
+
+    it('does not render again just to position a newly opened tooltip', () => {
+        const showPopover = vi.fn();
+        Object.defineProperty(HTMLElement.prototype, 'showPopover', { configurable: true, value: showPopover });
+        const onRender = vi.fn();
+        render(
+            <>
+                <Profiler id="tooltip" onRender={onRender}>
+                    <Tooltip />
+                </Profiler>
+                <button data-tip="First page">First page</button>
+            </>
+        );
+        fireEvent.focusIn(screen.getByRole('button'));
+        const tip = screen.getByRole('tooltip');
+        expect(tip).toHaveStyle({ visibility: 'visible', left: '8px', top: '8px' });
+        expect(showPopover).toHaveBeenCalledOnce();
+        expect(onRender).toHaveBeenCalledTimes(2);
+        Reflect.deleteProperty(HTMLElement.prototype, 'showPopover');
     });
 });

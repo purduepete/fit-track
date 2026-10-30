@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { api, ApiError, clearToken } from '../lib/api';
-import type { WorkoutDetail, WorkoutPoint } from '../lib/api';
+import type { PointExclusionChanges, WorkoutDetail, WorkoutPoint } from '../lib/api';
 import { formatDistance, formatElevation, formatLocalDateTime, formatLocalTime, round } from '../lib/format';
 import type { Unit } from '../lib/format';
 
@@ -49,8 +50,10 @@ export function PointExclusions({
     const [page, setPage] = useState(0);
     const [busy, setBusy] = useState<'loading' | 'saving' | null>(null);
     const [error, setError] = useState('');
+    const [changes, setChanges] = useState<Record<string, boolean>>({});
     const dialog = useRef<HTMLDialogElement>(null);
     const trigger = useRef<HTMLButtonElement>(null);
+    const dirty = Object.keys(changes).length > 0;
 
     useEffect(() => {
         if (!open || !dialog.current) return;
@@ -72,11 +75,11 @@ export function PointExclusions({
             if (event.key !== 'Escape') return;
             event.preventDefault();
             event.stopPropagation();
-            if (busy !== 'saving') setOpen(false);
+            if (busy !== 'saving' && !dirty) setOpen(false);
         };
         document.addEventListener('keydown', dismiss);
         return () => document.removeEventListener('keydown', dismiss);
-    }, [open, busy]);
+    }, [open, busy, dirty]);
 
     const filtered = useMemo(() => {
         const search = query.trim().toLowerCase();
@@ -101,6 +104,8 @@ export function PointExclusions({
     async function load() {
         setBusy('loading');
         setError('');
+        setFull(null);
+        setChanges({});
         try {
             setFull(await api.workout(workout.uuid, true));
         } catch (cause) {
@@ -111,15 +116,29 @@ export function PointExclusions({
         }
     }
 
-    async function update(action: () => Promise<unknown>) {
+    function changePoint(timestamp: string, savedExcluded: boolean, excluded: boolean) {
+        setChanges((current) => {
+            const next = { ...current };
+            if (savedExcluded === excluded) delete next[timestamp];
+            else next[timestamp] = excluded;
+            return next;
+        });
+    }
+
+    async function save() {
+        if (!dirty || busy !== null) return;
+        const request: PointExclusionChanges = { exclude: [], restore: [] };
+        for (const [ts_utc, excluded] of Object.entries(changes)) {
+            request[excluded ? 'exclude' : 'restore'].push({ ts_utc });
+        }
         setBusy('saving');
         setError('');
         try {
-            await action();
+            await api.savePointExclusions(workout.uuid, request);
+            setChanges({});
+            setOpen(false);
             onChange();
-            setFull(await api.workout(workout.uuid, true));
         } catch (cause) {
-            setFull(null);
             reportError(cause);
         } finally {
             setBusy(null);
@@ -127,23 +146,22 @@ export function PointExclusions({
     }
 
     return (
-        <section className="section point-editor" aria-labelledby="point-editor-heading">
-            <div className="point-editor-heading">
-                <h2 id="point-editor-heading">Workout data points</h2>
-                <button
-                    ref={trigger}
-                    type="button"
-                    className="nav-btn"
-                    aria-haspopup="dialog"
-                    aria-controls="point-editor-dialog"
-                    onClick={() => {
-                        setOpen(true);
-                        void load();
-                    }}
-                >
-                    Manage points
-                </button>
-            </div>
+        <div className="point-editor">
+            <button
+                ref={trigger}
+                type="button"
+                className="icon-btn"
+                aria-label="Manage points"
+                aria-haspopup="dialog"
+                aria-controls="point-editor-dialog"
+                data-tip="Manage points"
+                onClick={() => {
+                    setOpen(true);
+                    void load();
+                }}
+            >
+                <SlidersHorizontal size={18} aria-hidden="true" />
+            </button>
             <dialog
                 ref={dialog}
                 id="point-editor-dialog"
@@ -151,12 +169,12 @@ export function PointExclusions({
                 aria-labelledby="point-editor-dialog-heading"
                 aria-describedby="point-editor-description"
                 onCancel={(event) => {
-                    if (busy === 'saving') event.preventDefault();
+                    if (busy === 'saving' || dirty) event.preventDefault();
                     else setOpen(false);
                 }}
                 onClose={() => setOpen(false)}
                 onClick={(event) => {
-                    if (event.target !== event.currentTarget || busy === 'saving') return;
+                    if (event.target !== event.currentTarget || busy === 'saving' || dirty) return;
                     const box = event.currentTarget.getBoundingClientRect();
                     if (
                         event.clientX < box.left ||
@@ -171,24 +189,37 @@ export function PointExclusions({
                     <>
                         <div className="point-editor-heading">
                             <h2 id="point-editor-dialog-heading">Workout data points</h2>
-                            <button
-                                type="button"
-                                className="nav-btn"
-                                disabled={busy === 'saving'}
-                                onClick={() => setOpen(false)}
-                            >
-                                Done
-                            </button>
+                            <div className="point-editor-actions">
+                                <button
+                                    type="button"
+                                    className="nav-btn"
+                                    disabled={busy === 'saving'}
+                                    onClick={() => {
+                                        setChanges({});
+                                        setOpen(false);
+                                    }}
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    className="nav-btn"
+                                    disabled={busy !== null || !dirty}
+                                    onClick={() => void save()}
+                                >
+                                    Save
+                                </button>
+                            </div>
                         </div>
                         <p id="point-editor-description" className="muted point-editor-note">
                             Unchecked points exclude all measurements at that time from the route, charts, and splits.
                             Heart rate, distance, and elevation gain recalculate from included points; elevation gain
-                            uses raw ascent. Duration and calories stay unchanged. Saves sync across devices.
+                            uses raw ascent. Duration and calories stay unchanged. Save applies changes across devices.
                         </p>
                         <div className="point-editor-content" aria-busy={busy !== null}>
                             {busy && (
                                 <p role="status">
-                                    {busy === 'loading' ? 'Loading workout points...' : 'Saving change...'}
+                                    {busy === 'loading' ? 'Loading workout points...' : 'Saving changes...'}
                                 </p>
                             )}
                             {error && (
@@ -218,11 +249,13 @@ export function PointExclusions({
                                                                     type="checkbox"
                                                                     className="point-editor-checkbox"
                                                                     aria-label={`Use missing point ${pointTime(marker.ts_utc)}`}
-                                                                    checked={false}
+                                                                    checked={changes[marker.ts_utc] === false}
                                                                     disabled={busy !== null}
-                                                                    onChange={() =>
-                                                                        void update(() =>
-                                                                            api.restorePoint(workout.uuid, marker)
+                                                                    onChange={(event) =>
+                                                                        changePoint(
+                                                                            marker.ts_utc,
+                                                                            true,
+                                                                            !event.target.checked
                                                                         )
                                                                     }
                                                                 />
@@ -278,18 +311,15 @@ export function PointExclusions({
                                                                         type="checkbox"
                                                                         className="point-editor-checkbox"
                                                                         aria-label={`Use point ${pointTime(point.ts_utc)}`}
-                                                                        checked={!point.excluded}
+                                                                        checked={
+                                                                            !(changes[point.ts_utc] ?? point.excluded)
+                                                                        }
                                                                         disabled={busy !== null}
-                                                                        onChange={() =>
-                                                                            void update(() =>
-                                                                                point.excluded
-                                                                                    ? api.restorePoint(workout.uuid, {
-                                                                                          ts_utc: point.ts_utc,
-                                                                                      })
-                                                                                    : api.excludePoint(
-                                                                                          workout.uuid,
-                                                                                          point.ts_utc
-                                                                                      )
+                                                                        onChange={(event) =>
+                                                                            changePoint(
+                                                                                point.ts_utc,
+                                                                                point.excluded,
+                                                                                !event.target.checked
                                                                             )
                                                                         }
                                                                     />
@@ -301,25 +331,55 @@ export function PointExclusions({
                                             </table>
                                             {pageCount > 1 && (
                                                 <div className="point-editor-pagination">
-                                                    <button
-                                                        type="button"
-                                                        className="nav-btn"
-                                                        disabled={busy !== null || currentPage === 0}
-                                                        onClick={() => setPage(currentPage - 1)}
+                                                    <div
+                                                        className="point-editor-page-buttons"
+                                                        role="group"
+                                                        aria-label="Point pages"
                                                     >
-                                                        Previous
-                                                    </button>
+                                                        <button
+                                                            type="button"
+                                                            className="nav-btn"
+                                                            aria-label="First page"
+                                                            data-tip="First page"
+                                                            disabled={busy !== null || currentPage === 0}
+                                                            onClick={() => setPage(0)}
+                                                        >
+                                                            <ChevronFirst size={16} aria-hidden="true" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="nav-btn"
+                                                            aria-label="Previous page"
+                                                            data-tip="Previous page"
+                                                            disabled={busy !== null || currentPage === 0}
+                                                            onClick={() => setPage(currentPage - 1)}
+                                                        >
+                                                            <ChevronLeft size={16} aria-hidden="true" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="nav-btn"
+                                                            aria-label="Next page"
+                                                            data-tip="Next page"
+                                                            disabled={busy !== null || currentPage === pageCount - 1}
+                                                            onClick={() => setPage(currentPage + 1)}
+                                                        >
+                                                            <ChevronRight size={16} aria-hidden="true" />
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className="nav-btn"
+                                                            aria-label="Last page"
+                                                            data-tip="Last page"
+                                                            disabled={busy !== null || currentPage === pageCount - 1}
+                                                            onClick={() => setPage(pageCount - 1)}
+                                                        >
+                                                            <ChevronLast size={16} aria-hidden="true" />
+                                                        </button>
+                                                    </div>
                                                     <span>
                                                         Page {currentPage + 1} of {pageCount}
                                                     </span>
-                                                    <button
-                                                        type="button"
-                                                        className="nav-btn"
-                                                        disabled={busy !== null || currentPage === pageCount - 1}
-                                                        onClick={() => setPage(currentPage + 1)}
-                                                    >
-                                                        Next
-                                                    </button>
                                                 </div>
                                             )}
                                         </>
@@ -332,6 +392,6 @@ export function PointExclusions({
                     </>
                 )}
             </dialog>
-        </section>
+        </div>
     );
 }

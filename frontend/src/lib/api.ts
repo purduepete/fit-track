@@ -31,6 +31,11 @@ export interface PointExclusion {
     ts_utc: string;
 }
 
+export interface PointExclusionChanges {
+    exclude: PointExclusion[];
+    restore: PointExclusion[];
+}
+
 export interface PointExclusionStatus extends PointExclusion {
     matched: boolean;
 }
@@ -210,6 +215,12 @@ export const api = {
     workoutTypes: () => apiGet<string[]>('/api/workouts/types'),
     workout: (uuid: string, full = false) =>
         apiGet<WorkoutDetail>(`/api/workouts/${encodeURIComponent(uuid)}${full ? '?full=true' : ''}`),
+    savePointExclusions: (uuid: string, changes: PointExclusionChanges) =>
+        apiGet<{ status: string }>(`/api/workouts/${encodeURIComponent(uuid)}/point-exclusions/batch`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-FitTrack-Edit': '1' },
+            body: JSON.stringify(changes),
+        }),
     excludePoint: (uuid: string, tsUtc: string) =>
         apiGet<PointExclusion>(`/api/workouts/${encodeURIComponent(uuid)}/point-exclusions`, {
             method: 'POST',

@@ -64,6 +64,24 @@ describe('api.workouts query building', () => {
 describe('point exclusions', () => {
     afterEach(() => vi.unstubAllGlobals());
 
+    it('saves draft changes in one protected request', async () => {
+        const spy = mockFetchOnce({ status: 'saved' });
+        const changes = {
+            exclude: [{ ts_utc: '2026-10-24T00:00:00' }],
+            restore: [{ ts_utc: '2026-10-24T00:01:00' }],
+        };
+        await expect(api.savePointExclusions('strava:123', changes)).resolves.toEqual({ status: 'saved' });
+        expect(spy).toHaveBeenCalledTimes(1);
+        expect(spy).toHaveBeenCalledWith(
+            '/api/workouts/strava%3A123/point-exclusions/batch',
+            expect.objectContaining({
+                method: 'POST',
+                headers: expect.objectContaining({ 'Content-Type': 'application/json', 'X-FitTrack-Edit': '1' }),
+                body: JSON.stringify(changes),
+            })
+        );
+    });
+
     it('sends an exclusion request with edit protection', async () => {
         const spy = mockFetchOnce({});
         await api.excludePoint('strava:123', '2026-10-24T00:00:00');

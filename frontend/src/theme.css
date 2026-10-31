@@ -799,7 +799,6 @@ textarea {
 }
 
 .point-editor-heading,
-.point-editor-controls,
 .point-editor-pagination,
 .excluded-list li {
     display: flex;
@@ -811,6 +810,10 @@ textarea {
 .point-editor-heading h2 {
     margin: 0;
     font-size: 1.05rem;
+}
+
+.point-editor-heading h2:focus {
+    outline: none;
 }
 
 .point-editor-heading {
@@ -830,11 +833,14 @@ textarea {
 }
 
 .point-editor-actions {
+    align-items: center;
     gap: 8px;
-    margin-left: auto;
     margin-top: 16px;
     flex-shrink: 0;
-    justify-content: flex-end;
+}
+
+.point-editor-actions > .nav-btn {
+    margin-left: auto;
 }
 
 .point-editor-page-buttons .nav-btn {
@@ -887,27 +893,6 @@ textarea {
 
 .point-editor-dialog::backdrop {
     background: rgb(0 0 0 / 60%);
-}
-
-.point-editor-controls {
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    align-items: end;
-}
-
-.point-editor-controls label {
-    display: grid;
-    gap: 5px;
-    font-size: 0.8rem;
-}
-
-.point-editor-controls input[type='search'] {
-    min-width: 0;
-    padding: 8px;
-    border: 1px solid var(--border);
-    background: var(--surface);
-    color: var(--text);
-    font-size: 1rem;
 }
 
 .point-editor button:focus-visible,
@@ -964,7 +949,7 @@ textarea {
 
 .point-editor-pagination {
     justify-content: flex-start;
-    margin-top: 12px;
+    gap: 8px;
     font-size: 0.85rem;
 }
 

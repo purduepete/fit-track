@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, SlidersHorizontal, X } from 'lucide-react';
 import { api, ApiError, clearToken } from '../lib/api';
 import type { PointExclusionChanges, WorkoutDetail, WorkoutPoint } from '../lib/api';
@@ -60,7 +60,6 @@ export function PointExclusions({
         onAuthError
     );
     const full = loaded?.workout === workout && loaded.version === pointsVersion ? loaded.full : null;
-    const [query, setQuery] = useState('');
     const [page, setPage] = useState(0);
     const [saving, setSaving] = useState(false);
     const busy = saving ? 'saving' : loading || (!full && !loadError) ? 'loading' : null;
@@ -68,7 +67,7 @@ export function PointExclusions({
     const [changes, setChanges] = useState<Record<string, boolean>>({});
     const dialog = useRef<HTMLDialogElement>(null);
     const trigger = useRef<HTMLButtonElement>(null);
-    const closeButton = useRef<HTMLButtonElement>(null);
+    const heading = useRef<HTMLHeadingElement>(null);
     const dirty = Object.keys(changes).length > 0;
 
     useEffect(() => {
@@ -77,7 +76,7 @@ export function PointExclusions({
         const opener = trigger.current;
         const overflow = document.body.style.overflow;
         modal.showModal();
-        closeButton.current?.focus();
+        heading.current?.focus();
         document.body.style.overflow = 'hidden';
         return () => {
             modal.close();
@@ -98,17 +97,10 @@ export function PointExclusions({
         return () => document.removeEventListener('keydown', dismiss);
     }, [open, busy, dirty]);
 
-    const filtered = useMemo(() => {
-        const search = query.trim().toLowerCase();
-        const points = full?.data_points ?? [];
-        if (!search) return points;
-        return points.filter((point) =>
-            `${pointTime(point.ts_utc)} ${pointValues(point, unit).join(' ')}`.toLowerCase().includes(search)
-        );
-    }, [full, query, unit]);
-    const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+    const points = full?.data_points ?? [];
+    const pageCount = Math.max(1, Math.ceil(points.length / PAGE_SIZE));
     const currentPage = Math.min(page, pageCount - 1);
-    const visible = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+    const visible = points.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
 
     function reportError(cause: unknown) {
         if (cause instanceof ApiError && cause.status === 401) {
@@ -197,9 +189,10 @@ export function PointExclusions({
                 {open && (
                     <>
                         <div className="point-editor-heading">
-                            <h2 id="point-editor-dialog-heading">Workout data points</h2>
+                            <h2 ref={heading} id="point-editor-dialog-heading" tabIndex={-1}>
+                                Workout data points
+                            </h2>
                             <button
-                                ref={closeButton}
                                 type="button"
                                 className="icon-btn point-editor-close"
                                 aria-label="Close workout data points"
@@ -267,131 +260,107 @@ export function PointExclusions({
                                             </ul>
                                         </div>
                                     )}
-                                    <div className="point-editor-controls">
-                                        <label>
-                                            <span>Find time or value</span>
-                                            <input
-                                                type="search"
-                                                value={query}
-                                                placeholder="HH:mm:ss or value"
-                                                disabled={busy !== null}
-                                                onChange={(event) => {
-                                                    setQuery(event.target.value);
-                                                    setPage(0);
-                                                }}
-                                            />
-                                        </label>
-                                    </div>
                                     <p className="muted point-editor-count">
-                                        {filtered.length} {filtered.length === 1 ? 'point' : 'points'}
-                                        {query.trim() ? ' found' : ''}. Times are local.
+                                        {points.length} {points.length === 1 ? 'point' : 'points'}. Times are local.
                                     </p>
                                     {visible.length > 0 ? (
-                                        <>
-                                            <table className="point-editor-table">
-                                                <thead>
-                                                    <tr>
-                                                        <th>Time</th>
-                                                        <th>Measurements</th>
-                                                        <th>Use</th>
+                                        <table className="point-editor-table">
+                                            <thead>
+                                                <tr>
+                                                    <th>Time</th>
+                                                    <th>Measurements</th>
+                                                    <th>Use</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {visible.map((point) => (
+                                                    <tr key={point.ts_utc}>
+                                                        <td>{pointTime(point.ts_utc)}</td>
+                                                        <td>
+                                                            <div className="point-editor-values">
+                                                                {pointValues(point, unit).map((value, index) => (
+                                                                    <span key={index}>{value}</span>
+                                                                ))}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <label className="point-editor-toggle">
+                                                                <input
+                                                                    type="checkbox"
+                                                                    className="point-editor-checkbox"
+                                                                    aria-label={`Use point ${pointTime(point.ts_utc)}`}
+                                                                    checked={!(changes[point.ts_utc] ?? point.excluded)}
+                                                                    disabled={busy !== null}
+                                                                    onChange={(event) =>
+                                                                        changePoint(
+                                                                            point.ts_utc,
+                                                                            point.excluded,
+                                                                            !event.target.checked
+                                                                        )
+                                                                    }
+                                                                />
+                                                            </label>
+                                                        </td>
                                                     </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {visible.map((point) => (
-                                                        <tr key={point.ts_utc}>
-                                                            <td>{pointTime(point.ts_utc)}</td>
-                                                            <td>
-                                                                <div className="point-editor-values">
-                                                                    {pointValues(point, unit).map((value, index) => (
-                                                                        <span key={index}>{value}</span>
-                                                                    ))}
-                                                                </div>
-                                                            </td>
-                                                            <td>
-                                                                <label className="point-editor-toggle">
-                                                                    <input
-                                                                        type="checkbox"
-                                                                        className="point-editor-checkbox"
-                                                                        aria-label={`Use point ${pointTime(point.ts_utc)}`}
-                                                                        checked={
-                                                                            !(changes[point.ts_utc] ?? point.excluded)
-                                                                        }
-                                                                        disabled={busy !== null}
-                                                                        onChange={(event) =>
-                                                                            changePoint(
-                                                                                point.ts_utc,
-                                                                                point.excluded,
-                                                                                !event.target.checked
-                                                                            )
-                                                                        }
-                                                                    />
-                                                                </label>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                </tbody>
-                                            </table>
-                                            {pageCount > 1 && (
-                                                <div className="point-editor-pagination">
-                                                    <div
-                                                        className="point-editor-page-buttons"
-                                                        role="group"
-                                                        aria-label="Point pages"
-                                                    >
-                                                        <button
-                                                            type="button"
-                                                            className="nav-btn"
-                                                            aria-label="First page"
-                                                            data-tip={SHOW_TOOLTIPS ? 'First page' : undefined}
-                                                            disabled={busy !== null || currentPage === 0}
-                                                            onClick={() => setPage(0)}
-                                                        >
-                                                            <ChevronFirst size={16} aria-hidden="true" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="nav-btn"
-                                                            aria-label="Previous page"
-                                                            data-tip={SHOW_TOOLTIPS ? 'Previous page' : undefined}
-                                                            disabled={busy !== null || currentPage === 0}
-                                                            onClick={() => setPage(currentPage - 1)}
-                                                        >
-                                                            <ChevronLeft size={16} aria-hidden="true" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="nav-btn"
-                                                            aria-label="Next page"
-                                                            data-tip={SHOW_TOOLTIPS ? 'Next page' : undefined}
-                                                            disabled={busy !== null || currentPage === pageCount - 1}
-                                                            onClick={() => setPage(currentPage + 1)}
-                                                        >
-                                                            <ChevronRight size={16} aria-hidden="true" />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            className="nav-btn"
-                                                            aria-label="Last page"
-                                                            data-tip={SHOW_TOOLTIPS ? 'Last page' : undefined}
-                                                            disabled={busy !== null || currentPage === pageCount - 1}
-                                                            onClick={() => setPage(pageCount - 1)}
-                                                        >
-                                                            <ChevronLast size={16} aria-hidden="true" />
-                                                        </button>
-                                                    </div>
-                                                    <span>
-                                                        Page {currentPage + 1} of {pageCount}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </>
+                                                ))}
+                                            </tbody>
+                                        </table>
                                     ) : (
-                                        <p className="muted">No matching points.</p>
+                                        <p className="muted">No workout points.</p>
                                     )}
                                 </div>
                             )}
                         </div>
                         <div className="point-editor-actions">
+                            {pageCount > 1 && (
+                                <div className="point-editor-pagination">
+                                    <div className="point-editor-page-buttons" role="group" aria-label="Point pages">
+                                        <button
+                                            type="button"
+                                            className="nav-btn"
+                                            aria-label="First page"
+                                            data-tip={SHOW_TOOLTIPS ? 'First page' : undefined}
+                                            disabled={busy !== null || currentPage === 0}
+                                            onClick={() => setPage(0)}
+                                        >
+                                            <ChevronFirst size={16} aria-hidden="true" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="nav-btn"
+                                            aria-label="Previous page"
+                                            data-tip={SHOW_TOOLTIPS ? 'Previous page' : undefined}
+                                            disabled={busy !== null || currentPage === 0}
+                                            onClick={() => setPage(currentPage - 1)}
+                                        >
+                                            <ChevronLeft size={16} aria-hidden="true" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="nav-btn"
+                                            aria-label="Next page"
+                                            data-tip={SHOW_TOOLTIPS ? 'Next page' : undefined}
+                                            disabled={busy !== null || currentPage === pageCount - 1}
+                                            onClick={() => setPage(currentPage + 1)}
+                                        >
+                                            <ChevronRight size={16} aria-hidden="true" />
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className="nav-btn"
+                                            aria-label="Last page"
+                                            data-tip={SHOW_TOOLTIPS ? 'Last page' : undefined}
+                                            disabled={busy !== null || currentPage === pageCount - 1}
+                                            onClick={() => setPage(pageCount - 1)}
+                                        >
+                                            <ChevronLast size={16} aria-hidden="true" />
+                                        </button>
+                                    </div>
+                                    <span>
+                                        Page {currentPage + 1} of {pageCount}
+                                    </span>
+                                </div>
+                            )}
                             <button
                                 type="button"
                                 className="nav-btn"

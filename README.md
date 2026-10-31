@@ -482,8 +482,9 @@ descriptions remain available to screen readers when tooltips are off.
 Full workout points load in the background when a workout opens or refreshes.
 The point editor reuses those points without a second request when opened.
 After a save, points refresh in the background before the editor shows them again.
-Save is at the bottom right of the modal. The top-right X closes the editor
-and discards unsaved changes; Escape and outside clicks preserve unsaved edits.
+Page navigation and Save share the bottom row, with Save at the right. The
+top-right X closes the editor and discards unsaved changes; Escape and outside
+clicks preserve unsaved edits.
 
 ## Theme preferences
 

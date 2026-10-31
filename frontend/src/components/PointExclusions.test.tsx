@@ -2,7 +2,6 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, expect, it, vi } from 'vitest';
 import { api, ApiError } from '../lib/api';
 import type { PointExclusion, WorkoutDetail } from '../lib/api';
-import { formatLocalTime } from '../lib/format';
 import { PointExclusions } from './PointExclusions';
 
 function workout(): WorkoutDetail {
@@ -93,11 +92,8 @@ it('keeps edits across arrow pagination and saves only the final changes togethe
     fireEvent.click(screen.getByRole('checkbox', { name: /Use missing point/ }));
     expect(screen.getByRole('checkbox', { name: /Use missing point/ })).toBeChecked();
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Find time or value' }), {
-        target: { value: formatLocalTime(data.data_points[0].ts_utc, true) },
-    });
-    expect(screen.getByText('1 point found. Times are local.')).toBeInTheDocument();
-    const checkbox = screen.getByRole('checkbox', { name: /Use point/ });
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    const checkbox = within(screen.getByRole('table')).getAllByRole('checkbox')[0];
     expect(checkbox).not.toBeChecked();
     expect(save).not.toHaveBeenCalled();
     expect(exclude).not.toHaveBeenCalled();
@@ -206,7 +202,8 @@ it('loads points in the background and reuses them when the modal opens again', 
     fireEvent.click(screen.getByRole('button', { name: 'Manage points' }));
     const modal = screen.getByRole('dialog');
     const close = within(modal).getByRole('button', { name: 'Close workout data points' });
-    expect(close).toHaveFocus();
+    expect(within(modal).getByRole('heading', { name: 'Workout data points' })).toHaveFocus();
+    expect(close).not.toHaveFocus();
     expect(close.closest('.point-editor-heading')).not.toBeNull();
     expect(close.querySelector('svg')).toBeInTheDocument();
     expect(within(modal).queryByRole('button', { name: 'Cancel' })).not.toBeInTheDocument();
@@ -217,6 +214,10 @@ it('loads points in the background and reuses them when the modal opens again', 
     expect(load).toHaveBeenCalledTimes(1);
     await act(async () => finish(data));
     expect(screen.getByText('85 points. Times are local.')).toBeInTheDocument();
+    expect(screen.getByRole('group', { name: 'Point pages' }).closest('.point-editor-actions')).toBe(
+        modal.lastElementChild
+    );
+    expect(within(modal).getByText('Page 1 of 3').closest('.point-editor-actions')).toBe(modal.lastElementChild);
     for (const name of ['First page', 'Previous page', 'Next page', 'Last page']) {
         const button = screen.getByRole('button', { name });
         expect(button).not.toHaveAttribute('data-tip');
@@ -234,6 +235,19 @@ it('loads points in the background and reuses them when the modal opens again', 
     await waitFor(() => expect(load).toHaveBeenCalledTimes(2));
     fireEvent.click(screen.getByRole('button', { name: 'Manage points' }));
     expect(await screen.findByText('1 point. Times are local.')).toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Point pages' })).not.toBeInTheDocument();
+});
+
+it('shows a disabled save action when a workout has no points', async () => {
+    const data = { ...workout(), data_points: [] };
+    vi.spyOn(api, 'workout').mockResolvedValue(data);
+    render(<PointExclusions workout={data} unit="mi" onChange={vi.fn()} onAuthError={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manage points' }));
+    expect(await screen.findByText('No workout points.')).toBeInTheDocument();
+    expect(screen.queryByRole('searchbox')).not.toBeInTheDocument();
+    expect(screen.queryByRole('group', { name: 'Point pages' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
 });
 
 it('does not reopen stale points after saving while the workout refresh is pending', async () => {

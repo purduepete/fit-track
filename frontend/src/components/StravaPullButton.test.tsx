@@ -27,11 +27,13 @@ describe('Strava pull', () => {
         fireEvent.click(button);
         fireEvent.click(button);
         expect(button).toBeDisabled();
+        expect(button).toHaveClass('is-busy');
         expect(button).toHaveAttribute('aria-busy', 'true');
         expect(screen.getByRole('status')).toHaveTextContent('Pulling Strava data');
         expect(pull).toHaveBeenCalledTimes(1);
         complete({ workouts: 1 });
         await waitFor(() => expect(button).not.toBeDisabled());
+        expect(button).not.toHaveClass('is-busy');
         expect(button).toHaveAttribute('aria-busy', 'false');
         expect(screen.getByRole('status')).toHaveTextContent('Imported 1 Strava ride.');
         expect(triggerRefresh).toHaveBeenCalledOnce();

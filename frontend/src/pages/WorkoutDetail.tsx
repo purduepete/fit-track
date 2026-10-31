@@ -41,6 +41,7 @@ import type { Unit } from '../lib/format';
 import { tooltipProps } from '../lib/chart';
 import { usePageRefresh } from '../lib/refresh';
 import { useFirstLoad } from '../lib/firstLoad';
+import { SHOW_TOOLTIPS } from '../siteSettings';
 
 // Leaflet is heavy and only needed when a workout has a GPS route, so keep it
 // out of the initial bundle and load it lazily on demand.
@@ -146,7 +147,8 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                         onClick={() => data.prev_uuid && navigate(`/workouts/${data.prev_uuid}`)}
                         disabled={!data.prev_uuid}
                         aria-label="Older workout"
-                        data-tip="Older workout (left arrow)"
+                        aria-keyshortcuts="ArrowLeft"
+                        data-tip={SHOW_TOOLTIPS ? 'Older workout (left arrow)' : undefined}
                     >
                         <ChevronLeftIcon /> Older
                     </button>
@@ -155,7 +157,8 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                         onClick={() => data.next_uuid && navigate(`/workouts/${data.next_uuid}`)}
                         disabled={!data.next_uuid}
                         aria-label="Newer workout"
-                        data-tip="Newer workout (right arrow)"
+                        aria-keyshortcuts="ArrowRight"
+                        data-tip={SHOW_TOOLTIPS ? 'Newer workout (right arrow)' : undefined}
                     >
                         Newer <ChevronRightIcon />
                     </button>

@@ -4,6 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { WorkoutDetail } from './WorkoutDetail';
 import { api } from '../lib/api';
 import type { WorkoutDetail as Detail } from '../lib/api';
+import { Tooltip } from '../components/Tooltip';
 
 vi.mock('../components/RouteMap', () => ({
     RouteMap: ({ route }: { route: unknown[] }) => <div data-route-count={route.length}>Route map</div>,
@@ -75,9 +76,12 @@ it('automatically loads sampled data and shows the map without resolution contro
         prev_uuid: null,
         next_uuid: null,
     };
-    const workout = vi.spyOn(api, 'workout').mockResolvedValue(detail);
+    const workout = vi
+        .spyOn(api, 'workout')
+        .mockImplementation((_uuid, full) => (full ? new Promise<Detail>(() => {}) : Promise.resolve(detail)));
     render(
         <MemoryRouter initialEntries={['/workouts/strava:123']}>
+            <Tooltip />
             <Routes>
                 <Route path="/workouts/:uuid" element={<WorkoutDetail onAuthError={() => {}} />} />
             </Routes>
@@ -91,9 +95,22 @@ it('automatically loads sampled data and shows the map without resolution contro
     expect(managePoints).toHaveAttribute('data-tip', 'Manage points');
     expect(managePoints.querySelector('svg')).toBeInTheDocument();
     expect(managePoints).toHaveTextContent('');
+    fireEvent.pointerOver(managePoints);
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(managePoints).toHaveAccessibleDescription('Manage points');
+    const manageHint = screen.getByText('Manage points');
+    expect(manageHint).toHaveClass('visually-hidden');
+    expect(manageHint).not.toHaveAttribute('role');
     expect(screen.queryByRole('heading', { name: 'Workout data points' })).not.toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Original distance samples are unavailable.');
     expect(workout).toHaveBeenCalledWith('strava:123');
+    expect(workout).toHaveBeenCalledWith('strava:123', true);
+    expect(screen.queryByRole('status', { name: 'Loading workout points' })).not.toBeInTheDocument();
+    for (const name of ['Older workout', 'Newer workout']) {
+        const button = screen.getByRole('button', { name });
+        expect(button).not.toHaveAttribute('data-tip');
+        expect(button).not.toHaveAttribute('title');
+    }
     expect(screen.queryByText(/resolution|simplified view|route points/i)).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Virtual Zwift route' })).toBeInTheDocument();
     // One route point with no altitude: no elevation chart and no gain.
@@ -341,7 +358,7 @@ it('opens a fresh point editor when navigating to another workout', async () => 
 
     fireEvent.click(await screen.findByRole('button', { name: 'Manage points' }));
     expect(await screen.findByText('Heart rate 111 bpm')).toBeInTheDocument();
-    const done = screen.getByRole('button', { name: 'Cancel' });
+    const done = screen.getByRole('button', { name: 'Close workout data points' });
     done.focus();
     fireEvent.keyDown(done, { key: 'ArrowRight' });
     expect(screen.queryByRole('heading', { name: /second/ })).not.toBeInTheDocument();

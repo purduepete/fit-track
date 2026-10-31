@@ -37,10 +37,8 @@ describe('Workouts ?date= deep-link', () => {
         expect(screen.getByLabelText('Date range')).toBeDisabled();
         const explanation = screen.getByRole('group', { name: 'Date range disabled reason' });
         fireEvent.focusIn(explanation);
-        expect(screen.getByRole('tooltip')).toHaveTextContent(
-            'Showing a single day — clear the day filter to use ranges'
-        );
-        expect(explanation).toHaveAttribute('aria-describedby', screen.getByRole('tooltip').id);
+        expect(screen.queryByRole('tooltip')).toBeNull();
+        expect(explanation).toHaveAccessibleDescription('Showing a single day — clear the day filter to use ranges');
         expect(document.querySelector('[title]')).toBeNull();
     });
 
@@ -280,13 +278,16 @@ describe('Workouts type dropdown', () => {
             expect(pace).toHaveAttribute('tabindex', '0');
             expect(hr).toHaveAttribute('tabindex', '0');
             fireEvent.focusIn(pace);
-            expect(screen.getByRole('tooltip')).toHaveTextContent(
-                'Total duration / distance for rides with both values'
-            );
+            fireEvent.pointerOver(pace);
+            expect(screen.queryByRole('tooltip')).toBeNull();
+            expect(pace).toHaveAccessibleDescription('Total duration / distance for rides with both values');
+            expect(document.querySelector('.app-tooltip')).toBeNull();
+            const paceHint = screen.getByText('Total duration / distance for rides with both values');
+            expect(paceHint).toHaveClass('visually-hidden');
+            expect(paceHint).not.toHaveAttribute('role');
             fireEvent.focusIn(hr);
-            expect(screen.getByRole('tooltip')).toHaveTextContent(
-                'Duration-weighted average of available workout heart rates'
-            );
+            expect(screen.queryByRole('tooltip')).toBeNull();
+            expect(hr).toHaveAccessibleDescription('Duration-weighted average of available workout heart rates');
             expect(document.querySelector('[title]')).toBeNull();
         });
 

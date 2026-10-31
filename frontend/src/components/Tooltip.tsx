@@ -1,5 +1,6 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { SHOW_TOOLTIPS } from '../siteSettings';
 
 /** One delegated host keeps tooltip triggers, including table cells, in their original DOM. */
 export function Tooltip() {
@@ -74,28 +75,33 @@ export function Tooltip() {
         const { trigger } = active;
         const tokens = (trigger.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
         trigger.setAttribute('aria-describedby', [...new Set([...tokens, id])].join(' '));
-        // The popover top layer clears clipping and modal dialogs; the dialog portal is the fallback.
-        popup.current.setAttribute('popover', 'manual');
-        popup.current.showPopover?.();
-        const anchor = trigger.getBoundingClientRect();
-        const box = popup.current.getBoundingClientRect();
-        const viewport = window.visualViewport;
-        const x = viewport?.offsetLeft ?? 0;
-        const y = viewport?.offsetTop ?? 0;
-        const width = viewport?.width ?? window.innerWidth;
-        const height = viewport?.height ?? window.innerHeight;
-        const left = Math.max(x + 8, Math.min(anchor.left + (anchor.width - box.width) / 2, x + width - box.width - 8));
-        const below = anchor.bottom + 6;
-        const top = Math.max(
-            y + 8,
-            Math.min(
-                below + box.height <= y + height - 8 ? below : anchor.top - box.height - 6,
-                y + height - box.height - 8
-            )
-        );
-        popup.current.style.left = `${left}px`;
-        popup.current.style.top = `${top}px`;
-        popup.current.style.visibility = 'visible';
+        if (SHOW_TOOLTIPS) {
+            // The popover top layer clears clipping and modal dialogs; the dialog portal is the fallback.
+            popup.current.setAttribute('popover', 'manual');
+            popup.current.showPopover?.();
+            const anchor = trigger.getBoundingClientRect();
+            const box = popup.current.getBoundingClientRect();
+            const viewport = window.visualViewport;
+            const x = viewport?.offsetLeft ?? 0;
+            const y = viewport?.offsetTop ?? 0;
+            const width = viewport?.width ?? window.innerWidth;
+            const height = viewport?.height ?? window.innerHeight;
+            const left = Math.max(
+                x + 8,
+                Math.min(anchor.left + (anchor.width - box.width) / 2, x + width - box.width - 8)
+            );
+            const below = anchor.bottom + 6;
+            const top = Math.max(
+                y + 8,
+                Math.min(
+                    below + box.height <= y + height - 8 ? below : anchor.top - box.height - 6,
+                    y + height - box.height - 8
+                )
+            );
+            popup.current.style.left = `${left}px`;
+            popup.current.style.top = `${top}px`;
+            popup.current.style.visibility = 'visible';
+        }
         return () => {
             const remaining = (trigger.getAttribute('aria-describedby') ?? '')
                 .split(/\s+/)
@@ -110,9 +116,9 @@ export function Tooltip() {
         <div
             ref={popup}
             id={id}
-            role="tooltip"
-            className="app-tooltip"
-            style={{ left: 0, top: 0, visibility: 'hidden' }}
+            role={SHOW_TOOLTIPS ? 'tooltip' : undefined}
+            className={SHOW_TOOLTIPS ? 'app-tooltip' : 'visually-hidden'}
+            style={SHOW_TOOLTIPS ? { left: 0, top: 0, visibility: 'hidden' } : undefined}
         >
             {active.text}
         </div>,

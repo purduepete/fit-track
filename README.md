@@ -471,6 +471,20 @@ nothing real.
 - [Database schema](docs/schema.md)
 - [Testing](docs/testing.md)
 
+## Tooltips
+
+`frontend/src/siteSettings.ts` sets `SHOW_TOOLTIPS` to `false` by default.
+Set it to `true` and redeploy to show control hints and chart tooltips. Control
+descriptions remain available to screen readers when tooltips are off.
+
+## Workout data points
+
+Full workout points load in the background when a workout opens or refreshes.
+The point editor reuses those points without a second request when opened.
+After a save, points refresh in the background before the editor shows them again.
+Save is at the bottom right of the modal. The top-right X closes the editor
+and discards unsaved changes; Escape and outside clicks preserve unsaved edits.
+
 ## Theme preferences
 
 Dashboard and Workouts keep their views mounted when switching tabs. Workouts retains filters

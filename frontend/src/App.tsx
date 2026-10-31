@@ -224,6 +224,7 @@ function RefreshButton() {
             }}
             disabled={!canRefresh || loading}
             aria-label={loading ? 'Refreshing' : 'Refresh data'}
+            aria-busy={loading}
         >
             <RefreshCw size={18} aria-hidden="true" />
         </button>

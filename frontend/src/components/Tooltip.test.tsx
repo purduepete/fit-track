@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { Tooltip } from './Tooltip';
 import { FilterSelect } from './FilterSelect';
 
+vi.mock('../siteSettings', () => ({ SHOW_TOOLTIPS: true }));
+
 afterEach(() => {
     cleanup();
     vi.useRealTimers();

@@ -360,3 +360,55 @@ it('opens a fresh point editor when navigating to another workout', async () => 
         })
     );
 });
+
+it('hides the current workout while the next one loads instead of showing it again', async () => {
+    const makeWorkout = (uuid: string): Detail => ({
+        uuid,
+        workout_type: uuid,
+        local_date: '2026-10-23',
+        start_utc: '2026-10-24T00:00:00',
+        end_utc: '2026-10-24T00:10:00',
+        duration_sec: 600,
+        distance_m: null,
+        active_energy_kcal: null,
+        avg_hr: null,
+        max_hr: null,
+        min_hr: null,
+        elevation_gain_m: null,
+        has_route: false,
+        source_name: null,
+        device_name: null,
+        splits: [],
+        route: [],
+        elevation_series: [],
+        hr_series: [],
+        data_points: [],
+        point_exclusions: [],
+        route_total: 0,
+        hr_total: 0,
+        route_downsampled: false,
+        hr_downsampled: false,
+        prev_uuid: uuid === 'second' ? 'first' : null,
+        next_uuid: uuid === 'first' ? 'second' : null,
+    });
+    let releaseSecond: () => void = () => {};
+    vi.spyOn(api, 'workout').mockImplementation((uuid) =>
+        uuid === 'first'
+            ? Promise.resolve(makeWorkout('first'))
+            : new Promise((resolve) => {
+                  releaseSecond = () => resolve(makeWorkout('second'));
+              })
+    );
+    render(
+        <MemoryRouter initialEntries={['/workouts/first']}>
+            <Routes>
+                <Route path="/workouts/:uuid" element={<WorkoutDetail onAuthError={() => {}} />} />
+            </Routes>
+        </MemoryRouter>
+    );
+    expect(await screen.findByRole('heading', { name: /first/ })).toBeInTheDocument();
+    fireEvent.keyDown(document.body, { key: 'ArrowRight' });
+    await waitFor(() => expect(screen.queryByRole('heading', { name: /first/ })).not.toBeInTheDocument());
+    releaseSecond();
+    expect(await screen.findByRole('heading', { name: /second/ })).toBeInTheDocument();
+});

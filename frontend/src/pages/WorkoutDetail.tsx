@@ -51,7 +51,15 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
     const [unit, setUnit] = useState<Unit>('mi');
     // Unit is a pure client-side view choice: the detail response carries splits
     // for both unit systems, so switching mi/km must not refetch the workout.
-    const { data, error, loading, refresh } = useApiResource(() => api.workout(uuid), [uuid, onAuthError], onAuthError);
+    const {
+        data: loaded,
+        error,
+        loading,
+        refresh,
+    } = useApiResource(() => api.workout(uuid), [uuid, onAuthError], onAuthError);
+    // The page stays mounted when moving between workouts, so the previous workout's data is
+    // still held until the next one arrives. Treat it as not loaded rather than fading it back in.
+    const data = loaded?.uuid === uuid ? loaded : null;
     usePageRefresh(refresh, loading);
 
     // Left/right arrow keys move between workouts (ignoring when typing in a field).

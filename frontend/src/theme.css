@@ -421,6 +421,13 @@ textarea {
     background: var(--bg);
 }
 
+.page-loading,
+[role='status'] {
+    caret-color: transparent;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
 .loading-spinner {
     display: inline-flex;
     animation: data-enter 0.6s ease-out;

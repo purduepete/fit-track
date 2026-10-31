@@ -1,5 +1,7 @@
 # fittrack
 
+First entry keeps the mounted shell hidden until the active route and its initial data-backed sections are ready. Shell and content enter together over 600ms; reduced motion skips the fade. Initial content stays visible after the entrance; newly mounted route content retains its own entrance. Refreshes and later navigation retain the shell.
+
 Track your Apple Watch / iPhone **workouts** on Windows — export daily from
 Health, load into Azure SQL, and browse a web dashboard with **mileage splits**,
 a **route map**, and **heart-rate** charts.

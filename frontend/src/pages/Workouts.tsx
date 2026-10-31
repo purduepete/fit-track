@@ -5,6 +5,7 @@ import type { WorkoutSummary } from '../lib/api';
 import { FilterSelect } from '../components/FilterSelect';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useDelayedLoading } from '../hooks/useDelayedLoading';
+import { useFirstLoad } from '../lib/firstLoad';
 import { usePageRefresh } from '../lib/refresh';
 import {
     avgPaceSecPerUnit,
@@ -52,6 +53,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
     const [range, setRange] = useState('week');
     const [search, setSearch] = useState('');
     const [types, setTypes] = useState<string[]>([]);
+    const [typesReady, setTypesReady] = useState(false);
     const [items, setItems] = useState<WorkoutSummary[]>([]);
     const [total, setTotal] = useState(0);
     const [pending, setPending] = useState<'list' | 'revalidate' | 'more' | null>('list');
@@ -61,6 +63,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
     const showMoreSpinner = useDelayedLoading(pending === 'more');
     const showListRefresh = useDelayedLoading(pending === 'list');
     const [error, setError] = useState<string | null>(null);
+    useFirstLoad(loaded && typesReady, Boolean(error), active);
     const [revision, setRevision] = useState(0);
     const refresh = useCallback(() => setRevision((value) => value + 1), []);
     usePageRefresh(refresh, loading, active);
@@ -80,7 +83,11 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
         if (!active) return;
         api.workoutTypes()
             .then(setTypes)
-            .catch(() => setTypes([]));
+            .catch(() => {
+                setTypes([]);
+                setError('Unable to load workout types.');
+            })
+            .finally(() => setTypesReady(true));
     }, [revision, active]);
 
     // Reload from the start on a server-side filter change, refresh, or return to the view.
@@ -208,6 +215,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
         setSearchParams(next);
     }
 
+    if (error && !loaded) return <p className="error">{error}</p>;
     if (!loaded) {
         return (
             <>

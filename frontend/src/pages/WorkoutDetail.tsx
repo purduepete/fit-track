@@ -40,6 +40,7 @@ import {
 import type { Unit } from '../lib/format';
 import { tooltipProps } from '../lib/chart';
 import { usePageRefresh } from '../lib/refresh';
+import { useFirstLoad } from '../lib/firstLoad';
 
 // Leaflet is heavy and only needed when a workout has a GPS route, so keep it
 // out of the initial bundle and load it lazily on demand.
@@ -60,6 +61,19 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
     // The page stays mounted when moving between workouts, so the previous workout's data is
     // still held until the next one arrives. Treat it as not loaded rather than fading it back in.
     const data = loaded?.uuid === uuid ? loaded : null;
+    const [mapReady, setMapReady] = useState(false);
+    const [mapError, setMapError] = useState<string | null>(null);
+    useEffect(() => {
+        if (!data?.route.length) return;
+        let active = true;
+        import('../components/RouteMap')
+            .then(() => active && setMapReady(true))
+            .catch(() => active && setMapError('Unable to load the route map.'));
+        return () => {
+            active = false;
+        };
+    }, [data]);
+    useFirstLoad(Boolean(data) && (!data?.route.length || mapReady), Boolean(error || mapError));
     usePageRefresh(refresh, loading);
 
     // Left/right arrow keys move between workouts (ignoring when typing in a field).
@@ -86,6 +100,7 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
     }, [prevUuid, nextUuid, navigate]);
 
     if (error) return <p className="error">{error}</p>;
+    if (mapError) return <p className="error">{mapError}</p>;
     if (!data) return <PageLoading />;
 
     const splits = data.splits.filter((s) => s.unit_system === unit);

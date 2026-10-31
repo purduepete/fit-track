@@ -16,6 +16,7 @@ import { DashboardProvider, useDashboard } from './lib/dashboard';
 import { LastUpdated } from './components/LastUpdated';
 import { Tooltip } from './components/Tooltip';
 import { PageLoading } from './components/LoadingSpinner';
+import { FirstLoad } from './lib/firstLoad';
 
 // The detail page pulls in Leaflet (map) + extra charts; code-split it so the
 // initial bundle (dashboard + list) stays lean.
@@ -100,36 +101,38 @@ export default function App() {
         <RefreshProvider>
             <DashboardProvider onAuthError={onAuthError}>
                 <Router>
-                    <Tooltip />
-                    <header className="app-bar data-enter">
-                        <div className="brand">
-                            <span className="logo">
-                                <ActivityIcon size={18} />
-                            </span>
-                            <span className="brand-name">Fit Track</span>
-                        </div>
-                        <nav className="nav" aria-label="Main navigation">
-                            <NavLink to="/" end>
-                                Dashboard
-                            </NavLink>
-                            <NavLink to="/workouts">Workouts</NavLink>
-                        </nav>
-                        <div className="spacer" />
-                        <div className="header-actions">
-                            <LastUpdated />
-                            <RefreshButton />
-                            <StravaPullButton onAuthError={onAuthError} />
-                            <AppearanceMenu value={preference} onChange={setPreference} />
-                            {!gateway && (
-                                <button className="icon-btn" onClick={logout} aria-label="Sign out">
-                                    <LogOutIcon />
-                                </button>
-                            )}
-                        </div>
-                    </header>
-                    <main className="container">
-                        <RouteFade onAuthError={onAuthError} />
-                    </main>
+                    <FirstLoad>
+                        <Tooltip />
+                        <header className="app-bar">
+                            <div className="brand">
+                                <span className="logo">
+                                    <ActivityIcon size={18} />
+                                </span>
+                                <span className="brand-name">Fit Track</span>
+                            </div>
+                            <nav className="nav" aria-label="Main navigation">
+                                <NavLink to="/" end>
+                                    Dashboard
+                                </NavLink>
+                                <NavLink to="/workouts">Workouts</NavLink>
+                            </nav>
+                            <div className="spacer" />
+                            <div className="header-actions">
+                                <LastUpdated />
+                                <RefreshButton />
+                                <StravaPullButton onAuthError={onAuthError} />
+                                <AppearanceMenu value={preference} onChange={setPreference} />
+                                {!gateway && (
+                                    <button className="icon-btn" onClick={logout} aria-label="Sign out">
+                                        <LogOutIcon />
+                                    </button>
+                                )}
+                            </div>
+                        </header>
+                        <main className="container">
+                            <RouteFade onAuthError={onAuthError} />
+                        </main>
+                    </FirstLoad>
                 </Router>
             </DashboardProvider>
         </RefreshProvider>

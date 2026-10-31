@@ -474,8 +474,8 @@ nothing real.
 ## Tooltips
 
 `frontend/src/siteSettings.ts` sets `SHOW_TOOLTIPS` to `false` by default.
-Set it to `true` and redeploy to show control hints and chart tooltips. Control
-descriptions remain available to screen readers when tooltips are off.
+Chart tooltips remain enabled. Set it to `true` and redeploy to show control
+hints. Control descriptions remain available to screen readers when hints are off.
 
 ## Workout data points
 

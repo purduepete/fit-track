@@ -7,6 +7,7 @@ export function Tooltip() {
     const id = useId();
     const popup = useRef<HTMLDivElement>(null);
     const [active, setActive] = useState<{ trigger: HTMLElement; text: string } | null>(null);
+    const showTooltip = SHOW_TOOLTIPS || active?.trigger.dataset.chartTip === 'true';
 
     useEffect(() => {
         let timer: ReturnType<typeof setTimeout> | undefined;
@@ -73,14 +74,15 @@ export function Tooltip() {
     useLayoutEffect(() => {
         if (!active || !popup.current) return;
         const { trigger } = active;
+        const element = popup.current;
         const tokens = (trigger.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
         trigger.setAttribute('aria-describedby', [...new Set([...tokens, id])].join(' '));
-        if (SHOW_TOOLTIPS) {
+        if (showTooltip) {
             // The popover top layer clears clipping and modal dialogs; the dialog portal is the fallback.
-            popup.current.setAttribute('popover', 'manual');
-            popup.current.showPopover?.();
+            element.setAttribute('popover', 'manual');
+            element.showPopover?.();
             const anchor = trigger.getBoundingClientRect();
-            const box = popup.current.getBoundingClientRect();
+            const box = element.getBoundingClientRect();
             const viewport = window.visualViewport;
             const x = viewport?.offsetLeft ?? 0;
             const y = viewport?.offsetTop ?? 0;
@@ -98,27 +100,31 @@ export function Tooltip() {
                     y + height - box.height - 8
                 )
             );
-            popup.current.style.left = `${left}px`;
-            popup.current.style.top = `${top}px`;
-            popup.current.style.visibility = 'visible';
+            element.style.left = `${left}px`;
+            element.style.top = `${top}px`;
+            element.style.visibility = 'visible';
         }
         return () => {
+            if (showTooltip) {
+                element.hidePopover?.();
+                element.removeAttribute('popover');
+            }
             const remaining = (trigger.getAttribute('aria-describedby') ?? '')
                 .split(/\s+/)
                 .filter((token) => token && token !== id);
             if (remaining.length) trigger.setAttribute('aria-describedby', remaining.join(' '));
             else trigger.removeAttribute('aria-describedby');
         };
-    }, [active, id]);
+    }, [active, id, showTooltip]);
 
     if (!active) return null;
     return createPortal(
         <div
             ref={popup}
             id={id}
-            role={SHOW_TOOLTIPS ? 'tooltip' : undefined}
-            className={SHOW_TOOLTIPS ? 'app-tooltip' : 'visually-hidden'}
-            style={SHOW_TOOLTIPS ? { left: 0, top: 0, visibility: 'hidden' } : undefined}
+            role={showTooltip ? 'tooltip' : undefined}
+            className={showTooltip ? 'app-tooltip' : 'visually-hidden'}
+            style={showTooltip ? { left: 0, top: 0, visibility: 'hidden' } : undefined}
         >
             {active.text}
         </div>,

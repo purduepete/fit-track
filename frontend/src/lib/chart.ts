@@ -1,5 +1,3 @@
-import { SHOW_TOOLTIPS } from '../siteSettings';
-
 /** Shared recharts styling so tooltips respect the light/dark theme.
  *
  * Spread into a <Tooltip {...tooltipProps} /> so its popup uses the same
@@ -7,9 +5,6 @@ import { SHOW_TOOLTIPS } from '../siteSettings';
  * recharts tooltip is a hard-coded white box that is unreadable in dark mode).
  */
 export const tooltipProps = {
-    // Keep the Tooltip mounted for chart events while preventing its popup from rendering.
-    active: SHOW_TOOLTIPS ? undefined : false,
-    content: SHOW_TOOLTIPS ? undefined : () => null,
     contentStyle: {
         background: 'var(--surface)',
         border: '1px solid var(--border)',

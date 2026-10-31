@@ -69,6 +69,7 @@ function SleepQuality({ band, hours }: { band: SleepBand; hours: number }) {
                             className={'vo2-seg' + (i === band.category_index ? ' current' : '')}
                             style={{ background: SLEEP_COLORS[i] }}
                             data-tip={tier}
+                            data-chart-tip="true"
                             tabIndex={0}
                             role="img"
                             aria-label={tier}
@@ -104,6 +105,7 @@ function CardioFitness({ band, value }: { band: Vo2MaxBand; value: number }) {
                             className={'vo2-seg' + (i === band.category_index ? ' current' : '')}
                             style={{ background: VO2_COLORS[i] }}
                             data-tip={tier}
+                            data-chart-tip="true"
                             tabIndex={0}
                             role="img"
                             aria-label={tier}

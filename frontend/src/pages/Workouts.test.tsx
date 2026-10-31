@@ -99,7 +99,10 @@ describe('Workouts current week', () => {
         vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
         renderAt('/workouts');
 
-        expect(await screen.findByText('Error: Could not load workouts')).toBeInTheDocument();
+        await waitFor(() => {
+            expect(screen.getByRole('searchbox', { name: 'Search workouts' })).toBeInTheDocument();
+            expect(screen.getByText('Error: Could not load workouts')).toBeInTheDocument();
+        });
         expect(screen.queryByRole('status', { name: 'Loading workouts' })).not.toBeInTheDocument();
     });
 
@@ -240,7 +243,7 @@ describe('Workouts type dropdown', () => {
         it('groups thousands in row and total distances and calories', async () => {
             setup([workout({ distance_m: 1609344, active_energy_kcal: 1396 })]);
             renderAt('/workouts');
-            await screen.findByText('Visible totals');
+            await screen.findByText('Total');
             expect(screen.getAllByText('1,000.00 mi')).toHaveLength(2);
             expect(screen.getAllByText('1,396')).toHaveLength(2);
         });
@@ -258,21 +261,11 @@ describe('Workouts type dropdown', () => {
                 }),
             ]);
             renderAt('/workouts');
-            const row = (await screen.findByText('Visible totals')).closest('tr')!;
+            const row = (await screen.findByText('Total')).closest('tr')!;
             const cells = within(row)
                 .getAllByRole('cell')
                 .map((cell) => cell.textContent);
-            expect(cells).toEqual([
-                'Visible totals',
-                '2 workouts',
-                '40m',
-                '6.00 mi',
-                '6:40/mi',
-                '400',
-                '130',
-                '160',
-                '328 ft',
-            ]);
+            expect(cells).toEqual(['Total', '2 workouts', '40m', '6.00 mi', '6:40/mi', '400', '130', '160', '328 ft']);
             const pace = row.querySelector<HTMLElement>('[data-label="Avg pace"]')!;
             const hr = row.querySelector<HTMLElement>('[data-label="Avg HR"]')!;
             expect(pace).toHaveAttribute('tabindex', '0');
@@ -294,13 +287,13 @@ describe('Workouts type dropdown', () => {
         it('follows the visible search results and hides when nothing matches', async () => {
             setup([workout(), workout({ uuid: 'two', workout_type: 'Walking', duration_sec: 60 })]);
             renderAt('/workouts');
-            await screen.findByText('Visible totals');
+            await screen.findByText('Total');
             fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Walking' } });
-            const row = screen.getByText('Visible totals').closest('tr')!;
+            const row = screen.getByText('Total').closest('tr')!;
             expect(within(row).getByText('1 workout')).toBeInTheDocument();
             expect(within(row).getByText('1m')).toBeInTheDocument();
             fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'missing' } });
-            expect(screen.queryByText('Visible totals')).not.toBeInTheDocument();
+            expect(screen.queryByText('Total')).not.toBeInTheDocument();
         });
 
         it('includes only loaded rows and updates when more are loaded', async () => {
@@ -309,11 +302,11 @@ describe('Workouts type dropdown', () => {
                 .mockResolvedValueOnce({ items: [workout()], total: 2 })
                 .mockResolvedValueOnce({ items: [workout({ uuid: 'two' })], total: 2 });
             renderAt('/workouts');
-            let row = (await screen.findByText('Visible totals')).closest('tr')!;
+            let row = (await screen.findByText('Total')).closest('tr')!;
             expect(within(row).getByText('1 workout')).toBeInTheDocument();
             fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
             await waitFor(() => {
-                row = screen.getByText('Visible totals').closest('tr')!;
+                row = screen.getByText('Total').closest('tr')!;
                 expect(within(row).getByText('2 workouts')).toBeInTheDocument();
             });
             expect(within(row).getByText('20m')).toBeInTheDocument();
@@ -325,30 +318,30 @@ describe('Workouts type dropdown', () => {
                 workout({ uuid: 'two', distance_m: null, avg_hr: null, max_hr: null, active_energy_kcal: null }),
             ]);
             renderAt('/workouts');
-            const row = (await screen.findByText('Visible totals')).closest('tr')!;
+            const row = (await screen.findByText('Total')).closest('tr')!;
             expect(
                 within(row)
                     .getAllByRole('cell')
                     .map((cell) => cell.textContent)
-            ).toEqual(['Visible totals', '2 workouts', '10m', '1.00 mi', '—', '—', '—', '—', '—']);
+            ).toEqual(['Total', '2 workouts', '10m', '1.00 mi', '—', '—', '—', '—', '—']);
         });
 
         it('preserves zero totals and does not divide by zero', async () => {
             setup([workout({ duration_sec: 0, distance_m: 0, active_energy_kcal: 0, elevation_gain_m: 0 })]);
             renderAt('/workouts');
-            const row = (await screen.findByText('Visible totals')).closest('tr')!;
+            const row = (await screen.findByText('Total')).closest('tr')!;
             expect(
                 within(row)
                     .getAllByRole('cell')
                     .map((cell) => cell.textContent)
-            ).toEqual(['Visible totals', '1 workout', '0s', '0.00 mi', '—', '0', '—', '140', '0 ft']);
+            ).toEqual(['Total', '1 workout', '0s', '0.00 mi', '—', '0', '—', '140', '0 ft']);
         });
 
         it('does not show a totals row for an empty range', async () => {
             setup([]);
             renderAt('/workouts');
             await screen.findByText(/No workouts in this range/);
-            expect(screen.queryByText('Visible totals')).not.toBeInTheDocument();
+            expect(screen.queryByText('Total')).not.toBeInTheDocument();
         });
     });
 });

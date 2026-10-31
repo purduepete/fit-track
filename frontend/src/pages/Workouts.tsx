@@ -343,7 +343,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                 {filtered.length > 0 && (
                                     <tfoot>
                                         <tr className="summary-row">
-                                            <td data-label="Summary">Visible totals</td>
+                                            <td data-label="Summary">Total</td>
                                             <td data-label="Workouts">
                                                 {filtered.length} {filtered.length === 1 ? 'workout' : 'workouts'}
                                             </td>

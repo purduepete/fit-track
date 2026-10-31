@@ -32,3 +32,33 @@ it('defaults to hiding control tooltips while retaining their descriptions', () 
     expect(screen.queryByRole('tooltip')).toBeNull();
     expect(trigger).toHaveAccessibleDescription('Existing description Re-center route');
 });
+
+it('shows chart scale tooltips on hover and focus while control hints remain hidden', () => {
+    render(
+        <>
+            <Tooltip />
+            <div role="img" aria-label="Good" data-tip="Good" data-chart-tip="true" tabIndex={0} />
+            <button data-tip="Refresh data">Refresh</button>
+        </>
+    );
+    const scale = screen.getByRole('img', { name: 'Good' });
+    const refresh = screen.getByRole('button', { name: 'Refresh' });
+
+    fireEvent.pointerOver(scale);
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip).toBeVisible();
+    expect(tooltip).toHaveTextContent('Good');
+    expect(tooltip).toHaveAttribute('popover', 'manual');
+    expect(scale).toHaveAccessibleDescription('Good');
+
+    fireEvent.pointerOver(refresh);
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(tooltip).not.toHaveAttribute('popover');
+    expect(refresh).toHaveAccessibleDescription('Refresh data');
+
+    fireEvent.focusIn(scale);
+    expect(screen.getByRole('tooltip')).toBeVisible();
+    fireEvent.keyDown(document, { key: 'Escape' });
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(scale).not.toHaveAttribute('aria-describedby');
+});

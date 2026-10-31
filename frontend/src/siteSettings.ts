@@ -1,2 +1,2 @@
-// Site-wide settings that are not exposed in the UI. Change the value here and redeploy.
+// Control-hint setting is not exposed in the UI. Chart tooltips remain enabled.
 export const SHOW_TOOLTIPS: boolean = false;

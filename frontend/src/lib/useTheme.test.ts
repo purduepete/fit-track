@@ -32,6 +32,15 @@ function expectTheme(dark: boolean) {
     expect(document.querySelector('meta')?.content).toBe(dark ? '#020617' : '#ffffff');
 }
 describe('theme preference', () => {
+    it('sets the theme, launch styles and iOS mask before the font stylesheet', () => {
+        const font = html.indexOf('https://fonts.googleapis.com/css2');
+        for (const marker of ['<script>', '<style>', '// iOS standalone cold-launch mask']) {
+            const position = html.indexOf(marker);
+            expect(position).toBeGreaterThanOrEqual(0);
+            expect(font).toBeGreaterThan(position);
+        }
+    });
+
     it.each([null, 'dark', 'midnight', 'light', 'system', 'invalid'])(
         'keeps prepaint/runtime coherent for %s',
         (saved) => {

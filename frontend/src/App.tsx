@@ -3,7 +3,7 @@ import { NavLink, Route, HashRouter as Router, Routes, useLocation, type Locatio
 import { getToken, restoreToken } from './lib/api';
 import { sitedockOrigin } from './lib/sitedock';
 import { useTheme } from './lib/useTheme';
-import { ActivityIcon, LogOutIcon } from './components/Icons';
+import { BrandMark, LogOutIcon } from './components/Icons';
 import { RefreshCw } from 'lucide-react';
 import { AccessGate, TokenGate } from './components/TokenGate';
 import { AppearanceMenu } from './components/AppearanceMenu';
@@ -105,9 +105,7 @@ export default function App() {
                         <Tooltip />
                         <header className="app-bar">
                             <div className="brand">
-                                <span className="logo">
-                                    <ActivityIcon size={18} />
-                                </span>
+                                <BrandMark />
                                 <span className="brand-name">Fit Track</span>
                             </div>
                             <nav className="nav" aria-label="Main navigation">

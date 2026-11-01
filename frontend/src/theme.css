@@ -171,16 +171,6 @@ textarea {
     font-size: 1.15rem;
 }
 
-.brand .logo {
-    width: 28px;
-    height: 28px;
-    display: grid;
-    place-items: center;
-    background: var(--accent-grad);
-    color: var(--on-accent);
-    border-radius: var(--radius);
-}
-
 .nav {
     position: relative;
     isolation: isolate;

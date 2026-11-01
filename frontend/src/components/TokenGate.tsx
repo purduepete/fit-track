@@ -1,15 +1,13 @@
 import { useState } from 'react';
 import { setToken } from '../lib/api';
-import { ActivityIcon } from './Icons';
+import { BrandMark } from './Icons';
 
 /** Shown when Cloudflare Access has no session for this browser or frame. */
 export function AccessGate() {
     return (
         <div className="gate">
             <div className="brand" style={{ justifyContent: 'center', fontSize: '1.5rem' }}>
-                <span className="logo">
-                    <ActivityIcon size={20} />
-                </span>
+                <BrandMark size={34} />
                 Fit Track
             </div>
             <p className="muted">
@@ -35,9 +33,7 @@ export function TokenGate({ onSaved }: { onSaved: () => void }) {
     return (
         <div className="gate">
             <div className="brand" style={{ justifyContent: 'center', fontSize: '1.5rem' }}>
-                <span className="logo">
-                    <ActivityIcon size={20} />
-                </span>
+                <BrandMark size={34} />
                 Fit Track
             </div>
             <p className="muted">Enter your read access token to view your workouts.</p>

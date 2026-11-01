@@ -18,6 +18,24 @@ const base = (size: number, style?: CSSProperties) => ({
     style,
 });
 
+/** App icon from public/favicon.svg. Keep both in sync. */
+export function BrandMark({ size = 28, style }: IconProps) {
+    return (
+        <svg width={size} height={size} viewBox="0 0 64 64" style={{ flexShrink: 0, ...style }} aria-hidden="true">
+            <rect width="64" height="64" rx="6" fill="#e11d48" />
+            <path
+                d="M32 55C14 43 5 33 5 21.5 5 13.5 11 8 18.5 8 24.5 8 29 11.5 32 16.5 35 11.5 39.5 8 45.5 8 53 8 59 13.5 59 21.5 59 33 50 43 32 55Z"
+                fill="#ffffff"
+            />
+            <g fill="#e11d48">
+                <rect x="20" y="29" width="6" height="10" />
+                <rect x="29" y="23" width="6" height="16" />
+                <rect x="38" y="17" width="6" height="22" />
+            </g>
+        </svg>
+    );
+}
+
 export function ActivityIcon({ size = 18, style }: IconProps) {
     return (
         <svg {...base(size, style)}>

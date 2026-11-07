@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { WorkoutDetail } from './WorkoutDetail';
 import { api } from '../lib/api';
@@ -21,6 +21,7 @@ vi.mock('recharts', async (importOriginal) => ({
 afterEach(() => {
     vi.restoreAllMocks();
     localStorage.removeItem('fittrack:full-res');
+    localStorage.removeItem('fittrack_unit');
 });
 
 it('skips the spinner when a workout fails quickly and shows the error', async () => {
@@ -91,6 +92,11 @@ it('automatically loads sampled data and shows the map without resolution contro
     const title = screen.getByRole('heading', { name: /Indoor Cycling/, level: 1 });
     const managePoints = screen.getByRole('button', { name: 'Manage points' });
     expect(title.closest('.workout-title-row')).toContainElement(managePoints);
+    const units = screen.getByRole('group', { name: 'Distance units' });
+    expect(title.closest('.workout-title-row')).toContainElement(units);
+    expect(screen.getAllByRole('button', { name: 'mi' })).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'mi' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'km' })).toHaveAttribute('aria-pressed', 'false');
     expect(managePoints).toHaveClass('icon-btn');
     expect(managePoints).toHaveAttribute('data-tip', 'Manage points');
     expect(managePoints.querySelector('svg')).toBeInTheDocument();
@@ -119,6 +125,7 @@ it('automatically loads sampled data and shows the map without resolution contro
 });
 
 it('shows elevation gain in feet and switches to meters with the km toggle', async () => {
+    vi.spyOn(api, 'saveUnit').mockResolvedValue({ unit: 'km' });
     const split = (unit_system: string, split_index: number, elevation_gain_m: number | null) => ({
         split_index,
         unit_system,
@@ -188,7 +195,9 @@ it('shows elevation gain in feet and switches to meters with the km toggle', asy
     expect(screen.getByRole('columnheader', { name: 'Elev' })).toBeInTheDocument();
     expect(screen.getByText('197 ft')).toBeInTheDocument();
     expect(screen.getByText(/Pace and elevation gain per mile/)).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'km' }));
+    await act(async () => fireEvent.click(screen.getByRole('button', { name: 'km' })));
+    expect(screen.getByRole('button', { name: 'km' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'mi' })).toHaveAttribute('aria-pressed', 'false');
     expect(screen.getByText('Elevation gain').closest('.card')).toHaveTextContent('100 m');
     expect(screen.getByText('30 m')).toBeInTheDocument();
 });

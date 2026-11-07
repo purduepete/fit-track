@@ -554,7 +554,6 @@ textarea {
 
 .workout-title-row {
     align-items: flex-start;
-    flex-wrap: nowrap;
     margin-top: 4px;
 }
 
@@ -564,11 +563,15 @@ textarea {
     overflow-wrap: anywhere;
 }
 
-.workout-title-row > .point-editor {
+.workout-title-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
     flex-shrink: 0;
 }
 
-.workout-title-row > .point-editor > .nav-btn {
+.workout-title-actions > .point-editor > .nav-btn {
     white-space: nowrap;
 }
 
@@ -1019,6 +1022,42 @@ tbody tr:hover {
 .toggle-group button.active {
     background: var(--accent-grad);
     color: var(--on-accent);
+}
+
+.workout-unit-selector {
+    position: relative;
+    isolation: isolate;
+    height: var(--header-control-height);
+}
+
+.workout-unit-selector::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    inset: 0 auto 0 0;
+    width: 50%;
+    background: var(--accent-grad);
+    transition: transform 0.25s ease-out;
+}
+
+.workout-unit-selector:has(button:last-child[aria-pressed='true'])::before {
+    transform: translateX(100%);
+}
+
+.workout-unit-selector button {
+    width: 48px;
+    padding: 0;
+    background: transparent;
+}
+
+.workout-unit-selector button[aria-pressed='true'] {
+    color: var(--on-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .workout-unit-selector::before {
+        transition: none;
+    }
 }
 
 .linklike {

@@ -16,6 +16,7 @@ import { api } from '../lib/api';
 import { useApiResource } from '../lib/useApiResource';
 import { StatCard } from '../components/StatCard';
 import { PointExclusions } from '../components/PointExclusions';
+import { UnitSelector } from '../components/UnitSelector';
 import { LoadingSpinner, PageLoading } from '../components/LoadingSpinner';
 import {
     ActivityIcon,
@@ -37,7 +38,7 @@ import {
     metersToElevation,
     round,
 } from '../lib/format';
-import type { Unit } from '../lib/format';
+import { useUnit } from '../lib/useUnit';
 import { tooltipProps } from '../lib/chart';
 import { usePageRefresh } from '../lib/refresh';
 import { useFirstLoad } from '../lib/firstLoad';
@@ -50,7 +51,7 @@ const RouteMap = lazy(() => import('../components/RouteMap').then((m) => ({ defa
 export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
     const { uuid = '' } = useParams();
     const navigate = useNavigate();
-    const [unit, setUnit] = useState<Unit>('mi');
+    const { unit, setUnit, saveError } = useUnit();
     // Unit is a pure client-side view choice: the detail response carries splits
     // for both unit systems, so switching mi/km must not refetch the workout.
     const {
@@ -171,13 +172,16 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                             · {formatLocalDateTime(data.start_utc)}
                         </span>
                     </h1>
-                    <PointExclusions
-                        key={data.uuid}
-                        workout={data}
-                        unit={unit}
-                        onChange={refresh}
-                        onAuthError={onAuthError}
-                    />
+                    <div className="workout-title-actions">
+                        <UnitSelector unit={unit} onChange={setUnit} saveError={saveError} />
+                        <PointExclusions
+                            key={data.uuid}
+                            workout={data}
+                            unit={unit}
+                            onChange={refresh}
+                            onAuthError={onAuthError}
+                        />
+                    </div>
                 </div>
 
                 {data.point_exclusion_warning && (
@@ -205,17 +209,6 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                         label="Elevation gain"
                         value={formatElevation(data.elevation_gain_m, unit)}
                     />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
-                    <div className="toggle-group">
-                        <button className={unit === 'mi' ? 'active' : ''} onClick={() => setUnit('mi')}>
-                            mi
-                        </button>
-                        <button className={unit === 'km' ? 'active' : ''} onClick={() => setUnit('km')}>
-                            km
-                        </button>
-                    </div>
                 </div>
 
                 {data.route.length > 0 && (

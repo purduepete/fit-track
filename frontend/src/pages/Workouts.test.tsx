@@ -7,6 +7,8 @@ import type { WorkoutSummary } from '../lib/api';
 import { currentPacificWeek } from '../lib/format';
 import { Tooltip } from '../components/Tooltip';
 
+afterEach(() => localStorage.removeItem('fittrack_unit'));
+
 function renderAt(entry: string) {
     return render(
         <MemoryRouter initialEntries={[entry]}>
@@ -246,6 +248,27 @@ describe('Workouts type dropdown', () => {
             await screen.findByText('Total');
             expect(screen.getAllByText('1,000.00 mi')).toHaveLength(2);
             expect(screen.getAllByText('1,396')).toHaveLength(2);
+        });
+
+        it('switches row and total distance, pace and elevation without refetching', async () => {
+            vi.spyOn(api, 'saveUnit').mockResolvedValue({ unit: 'km' });
+            const fetch = setup([workout({ elevation_gain_m: 100 })]);
+            renderAt('/workouts');
+            await screen.findByText('Total');
+            const units = screen.getByRole('group', { name: 'Distance units' });
+            expect(screen.getByRole('heading', { name: 'Workouts' }).closest('.page-head')).toContainElement(units);
+            expect(screen.getAllByText('1.00 mi')).toHaveLength(2);
+            expect(screen.getAllByText('10:00/mi')).toHaveLength(2);
+            expect(screen.getAllByText('328 ft')).toHaveLength(2);
+            const requests = fetch.mock.calls.length;
+            await act(async () => fireEvent.click(within(units).getByRole('button', { name: 'km' })));
+            expect(screen.getAllByText('1.61 km')).toHaveLength(2);
+            expect(screen.getAllByText('6:13/km')).toHaveLength(2);
+            expect(screen.getAllByText('100 m')).toHaveLength(2);
+            expect(within(units).getByRole('button', { name: 'km' })).toHaveAttribute('aria-pressed', 'true');
+            expect(fetch).toHaveBeenCalledTimes(requests);
+            await act(async () => fireEvent.click(within(units).getByRole('button', { name: 'mi' })));
+            expect(screen.getAllByText('1.00 mi')).toHaveLength(2);
         });
 
         it('sums totals and calculates overall pace, duration-weighted HR and highest HR', async () => {

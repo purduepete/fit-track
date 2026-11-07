@@ -32,6 +32,25 @@ WORKOUT_PAYLOAD = {
 def test_health_endpoint_is_open(client):
     assert client.get("/api/health").json() == {"status": "ok"}
 
+def test_unit_preference_cookie(client, monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "gateway_read_auth", True)
+    response = client.post("/api/preferences/units", json={"unit": "km"})
+    assert response.status_code == 200
+    assert response.json() == {"unit": "km"}
+    assert response.cookies["fittrack_unit"] == "km"
+    assert "Max-Age=31536000" in response.headers["set-cookie"]
+    assert "SameSite=lax" in response.headers["set-cookie"]
+    assert response.headers["cache-control"] == "no-store"
+    assert client.post("/api/preferences/units", json={"unit": "invalid"}).status_code == 422
+    secure = client.post("https://testserver/api/preferences/units", json={"unit": "mi"})
+    assert "Secure" in secure.headers["set-cookie"]
+
+
+def test_unit_preference_requires_read_access(client):
+    assert client.post("/api/preferences/units", json={"unit": "km"}).status_code == 401
+
 
 def test_ingest_requires_token(client):
     r = client.post("/api/ingest/health-auto-export", json=WORKOUT_PAYLOAD)

@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api, ApiError, clearToken } from '../lib/api';
 import type { WorkoutSummary } from '../lib/api';
 import { FilterSelect } from '../components/FilterSelect';
+import { UnitSelector } from '../components/UnitSelector';
+import { useUnit } from '../lib/useUnit';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useDelayedLoading } from '../hooks/useDelayedLoading';
 import { useFirstLoad } from '../lib/firstLoad';
@@ -50,6 +52,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
     const rawDate = searchParams.get('date');
     const dateParam = rawDate && /^\d{4}-\d{2}-\d{2}$/.test(rawDate) ? rawDate : null;
     const [type, setType] = useState('');
+    const { unit, setUnit, saveError } = useUnit();
     const [range, setRange] = useState('week');
     const [search, setSearch] = useState('');
     const [types, setTypes] = useState<string[]>([]);
@@ -183,12 +186,12 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
             duration,
             distance,
             calories,
-            pace: avgPaceSecPerUnit(paceDistance, paceDuration, 'mi'),
+            pace: avgPaceSecPerUnit(paceDistance, paceDuration, unit),
             avgHr: hrDuration > 0 ? hrTotal / hrDuration : null,
             maxHr,
             elevation,
         };
-    }, [filtered]);
+    }, [filtered, unit]);
 
     // Group consecutive rows by day (the list is already newest-first).
     const groups = useMemo(() => {
@@ -229,8 +232,10 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
 
     return (
         <>
-            <h1 className="page-title">Workouts</h1>
-
+            <div className="page-head">
+                <h1 className="page-title">Workouts</h1>
+                <UnitSelector unit={unit} onChange={setUnit} saveError={saveError} />
+            </div>
             <div className="data-enter">
                 <div className="toolbar">
                     <FilterSelect ariaLabel="Workout type" options={typeOptions} value={type} onChange={setType} />
@@ -309,18 +314,18 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                                         <span className="chip">{w.workout_type}</span>
                                                     </td>
                                                     <td data-label="Duration">{formatHms(w.duration_sec)}</td>
-                                                    <td data-label="Distance">{formatDistance(w.distance_m, 'mi')}</td>
+                                                    <td data-label="Distance">{formatDistance(w.distance_m, unit)}</td>
                                                     <td data-label="Avg pace">
                                                         {formatPace(
-                                                            avgPaceSecPerUnit(w.distance_m, w.duration_sec, 'mi'),
-                                                            'mi'
+                                                            avgPaceSecPerUnit(w.distance_m, w.duration_sec, unit),
+                                                            unit
                                                         )}
                                                     </td>
                                                     <td data-label="Active kcal">{round(w.active_energy_kcal)}</td>
                                                     <td data-label="Avg HR">{round(w.avg_hr)}</td>
                                                     <td data-label="Max HR">{round(w.max_hr)}</td>
                                                     <td data-label="Elev gain">
-                                                        {formatElevation(w.elevation_gain_m, 'mi')}
+                                                        {formatElevation(w.elevation_gain_m, unit)}
                                                     </td>
                                                 </tr>
                                             ))}
@@ -348,13 +353,13 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                                 {filtered.length} {filtered.length === 1 ? 'workout' : 'workouts'}
                                             </td>
                                             <td data-label="Duration">{formatHms(summary.duration)}</td>
-                                            <td data-label="Distance">{formatDistance(summary.distance, 'mi')}</td>
+                                            <td data-label="Distance">{formatDistance(summary.distance, unit)}</td>
                                             <td
                                                 data-label="Avg pace"
                                                 data-tip="Total duration / distance for rides with both values"
                                                 tabIndex={0}
                                             >
-                                                {formatPace(summary.pace, 'mi')}
+                                                {formatPace(summary.pace, unit)}
                                             </td>
                                             <td data-label="Active kcal">{round(summary.calories)}</td>
                                             <td
@@ -365,7 +370,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                                 {round(summary.avgHr)}
                                             </td>
                                             <td data-label="Max HR">{round(summary.maxHr)}</td>
-                                            <td data-label="Elev gain">{formatElevation(summary.elevation, 'mi')}</td>
+                                            <td data-label="Elev gain">{formatElevation(summary.elevation, unit)}</td>
                                         </tr>
                                     </tfoot>
                                 )}

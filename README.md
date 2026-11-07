@@ -23,7 +23,11 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
 - **Daily pickup** — drop the Health Auto Export `.zip` in `upload/`; the
   watcher extracts the JSON, POSTs it to the API, and archives the file.
 - **Mileage splits** — per-mile / per-km pace + avg HR, computed from the GPS
-  route (with a distance-sample fallback for indoor workouts). mi/km toggle.
+  route (with a distance-sample fallback for indoor workouts). The mi/km selector
+  stays in the Workouts and workout detail headers on phone, tablet and desktop,
+  converting distance, pace and elevation, including the Workouts totals.
+  The shared unit choice survives browser sessions on the same site, with a
+  server-set cookie fallback when Safari clears local storage.
 - **Route map** — the GPS track drawn on OpenStreetMap (no API key).
 - **Heart-rate chart** — HR over the course of the workout.
 - **Workout date filter**: defaults to Current week, Monday through Sunday in

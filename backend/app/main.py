@@ -10,12 +10,15 @@ from asyncio import to_thread
 from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Event, Thread
+from typing import Literal
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 from sqlalchemy import select, text
 
+from .auth import require_read
 from .config import get_settings
 from .db import SessionLocal
 from .models import ApiToken
@@ -109,6 +112,19 @@ def health() -> dict:
 @app.get("/api/auth-mode", tags=["meta"])
 def auth_mode() -> dict:
     return {"gateway": settings.gateway_read_auth}
+
+class UnitPreference(BaseModel):
+    unit: Literal["mi", "km"]
+
+
+@app.post("/api/preferences/units", tags=["meta"], dependencies=[Depends(require_read)])
+def save_unit(preference: UnitPreference, request: Request, response: Response) -> dict:
+    response.set_cookie(
+        "fittrack_unit", preference.unit, max_age=31536000, path="/",
+        secure=request.url.scheme == "https", samesite="lax",
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return {"unit": preference.unit}
 
 
 @app.get("/api/ready", tags=["meta"])

@@ -199,6 +199,12 @@ async function apiGet<T>(path: string, options: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+    saveUnit: (unit: 'mi' | 'km') =>
+        apiGet<{ unit: 'mi' | 'km' }>('/api/preferences/units', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ unit }),
+        }),
     pullStrava: () =>
         apiGet<{ workouts: number }>('/api/strava/pull', { method: 'POST', headers: { 'X-FitTrack-Sync': '1' } }),
     dashboard: () => apiGet<DashboardSummary>('/api/dashboard'),

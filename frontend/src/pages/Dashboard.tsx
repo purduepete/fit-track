@@ -6,6 +6,7 @@ import {
     ComposedChart,
     Line,
     LineChart,
+    LabelList,
     ReferenceArea,
     ReferenceLine,
     ResponsiveContainer,
@@ -31,6 +32,7 @@ import { barCursor, tooltipProps } from '../lib/chart';
 import { usePageRefresh } from '../lib/refresh';
 import { PageLoading } from '../components/LoadingSpinner';
 import { useFirstLoad } from '../lib/firstLoad';
+import { addWeeklyStepTotals } from '../lib/steps';
 
 // Red -> green scale, indexed by VO2 max category (0=Very Poor .. 5=Superior).
 const VO2_COLORS = ['#dc2626', '#f97316', '#f59e0b', '#84cc16', '#22c55e', '#16a34a'];
@@ -189,11 +191,12 @@ export function Dashboard({ active = true }: { active?: boolean }) {
     // Scatter its own `data` prop hijacks the category axis and hides the bars/line.
     const stepsAvgByDate = new Map(data.steps_avg7_trend.map((p) => [p.local_date, p.value]));
     const workoutDaySet = new Set(data.workout_days);
-    const stepsChartData = data.steps_trend.map((p) => ({
+    const stepsChartData = addWeeklyStepTotals(data.steps_trend).map((p) => ({
         local_date: p.local_date,
         value: p.value,
         avg: stepsAvgByDate.get(p.local_date) ?? null,
         workout: workoutDaySet.has(p.local_date) && p.value != null ? p.value : null,
+        weeklyTotal: p.weeklyTotal,
     }));
     const hasStepData = data.steps_trend.some((p) => p.value != null);
 
@@ -250,7 +253,8 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                         <h2>Daily steps</h2>
                         <p className="muted chart-caption">
                             Last 30 days. Dashed line = 10k goal, amber = weekly average. Green bars have a workout —
-                            tap to view it.
+                            tap to view it. Weekly totals (Mon–Sun) appear on Sundays, or on the last recorded day for
+                            incomplete weeks. Totals include only recorded days visible in the chart.
                         </p>
                         {hasStepData ? (
                             <>
@@ -322,6 +326,15 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                             }}
                                         />
                                         <Bar dataKey="value" radius={[2, 2, 0, 0]}>
+                                            <LabelList
+                                                dataKey="weeklyTotal"
+                                                position="top"
+                                                formatter={(value: unknown) =>
+                                                    typeof value === 'number' ? formatSteps(value) : ''
+                                                }
+                                                fill="var(--text-dim)"
+                                                fontSize={10}
+                                            />
                                             {stepsChartData.map((d) => (
                                                 <Cell
                                                     key={d.local_date}

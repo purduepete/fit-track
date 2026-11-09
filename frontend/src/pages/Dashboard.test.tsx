@@ -5,6 +5,7 @@ import { Tooltip } from '../components/Tooltip';
 import { api } from '../lib/api';
 import { DashboardProvider } from '../lib/dashboard';
 import { SHOW_TOOLTIPS } from '../siteSettings';
+import { addWeeklyStepTotals } from '../lib/steps';
 import { Dashboard } from './Dashboard';
 
 vi.mock('recharts', async (importOriginal) => ({
@@ -15,6 +16,56 @@ vi.mock('recharts', async (importOriginal) => ({
 afterEach(() => {
     cleanup();
     vi.restoreAllMocks();
+});
+
+it('shows full weekly step totals on Sunday and an in-progress total on the latest recorded day', () => {
+    const points = [
+        ...[1, 2, 3, 4, 5, 6, 7].map((value, index) => ({
+            local_date: `2026-11-${String(index + 2).padStart(2, '0')}`,
+            value,
+        })),
+        { local_date: '2026-11-09', value: 8 },
+        { local_date: '2026-11-10', value: 9 },
+    ];
+
+    const result = addWeeklyStepTotals(points);
+
+    expect(result.filter((point) => point.weeklyTotal != null)).toEqual([
+        { local_date: '2026-11-08', value: 7, weeklyTotal: 28 },
+        { local_date: '2026-11-10', value: 9, weeklyTotal: 17 },
+    ]);
+});
+
+it('shows the available total on 10/18 when the chart begins partway through that week', () => {
+    const points = [
+        ...[6000, 7000, 8000, 9000, 10000, 11000].map((value, index) => ({
+            local_date: `2026-10-${index + 13}`,
+            value,
+        })),
+        { local_date: '2026-10-19', value: 12000 },
+    ];
+
+    expect(addWeeklyStepTotals(points).filter((point) => point.weeklyTotal !== null)).toEqual([
+        { local_date: '2026-10-18', value: 11000, weeklyTotal: 51000 },
+        { local_date: '2026-10-19', value: 12000, weeklyTotal: 12000 },
+    ]);
+});
+
+it('uses the last recorded day with missing Sunday data and preserves zero totals', () => {
+    const points = [
+        { local_date: '2026-11-06', value: 1000 },
+        { local_date: '2026-11-07', value: 2000 },
+        { local_date: '2026-11-08', value: null },
+        { local_date: '2026-11-09', value: 0 },
+        { local_date: '2026-11-10', value: null },
+        { local_date: '2026-11-16', value: null },
+    ];
+
+    expect(addWeeklyStepTotals(points).filter((point) => point.weeklyTotal !== null)).toEqual([
+        { local_date: '2026-11-07', value: 2000, weeklyTotal: 3000 },
+        { local_date: '2026-11-09', value: 0, weeklyTotal: 0 },
+    ]);
+    expect(addWeeklyStepTotals([])).toEqual([]);
 });
 
 it('shows the sleep and cardio scale tooltips while control hints are disabled', async () => {

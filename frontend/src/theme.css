@@ -1492,6 +1492,39 @@ tbody tr:hover {
     visibility: hidden;
 }
 
+@media (max-width: 820px) {
+    .grid-cards {
+        gap: 8px;
+    }
+
+    .grid-cards > .stat {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    .stat .label {
+        font-size: clamp(0.58rem, 2.6vw, 0.68rem);
+        letter-spacing: 0.02em;
+        gap: 4px;
+    }
+
+    .stat .label svg {
+        width: 12px;
+        height: 12px;
+    }
+
+    .stat .value {
+        font-size: clamp(0.875rem, calc(8vw - 0.725rem), 1.35rem);
+    }
+
+    .vo2-badge {
+        font-size: clamp(0.55rem, 2.4vw, 0.7rem);
+        margin-left: 3px;
+        padding-left: 3px;
+        padding-right: 3px;
+    }
+}
+
 /* Narrow-screen (phone) tweaks: reclaim horizontal space and turn wide data
    tables into stacked cards so the Workouts list is readable on an iPhone. */
 @media (max-width: 640px) {
@@ -1527,30 +1560,6 @@ tbody tr:hover {
     .page-title {
         font-size: 1.35rem;
         margin-bottom: 18px;
-    }
-
-    /* Keep each stat-card label on a single line at phone widths: shrink the
-     label font/icon just enough that the longest labels (e.g. "Active energy
-     (7d)", "Sleep (last night)") fit without wrapping. */
-    .stat .label {
-        font-size: 0.68rem;
-        letter-spacing: 0.02em;
-        gap: 6px;
-    }
-
-    .stat .label svg {
-        width: 15px;
-        height: 15px;
-    }
-
-    /* Keep the metric value + its category badge (e.g. "6h 30m  FAIR",
-     "42.3  GOOD") on one line by shrinking the value at phone widths. */
-    .stat .value {
-        font-size: 1.35rem;
-    }
-
-    .vo2-badge {
-        margin-left: 6px;
     }
 
     /* Only tables opted-in via .stack-table restructure; others (e.g. the splits

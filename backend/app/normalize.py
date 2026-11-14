@@ -189,6 +189,8 @@ class ParsedWorkout:
     hr_samples: list[HrSample] = field(default_factory=list)
     distance_samples: list[DistanceSample] = field(default_factory=list)
     elevation_gain_m: float | None = None
+    average_watts: float | None = None
+    average_cadence: float | None = None
 
 
 @dataclass
@@ -305,6 +307,8 @@ def build_workout(
     hr_samples: list[HrSample] | None = None,
     distance_samples: list[DistanceSample] | None = None,
     elevation_gain_m: float | None = None,
+    average_watts: float | None = None,
+    average_cadence: float | None = None,
 ) -> ParsedWorkout:
     """Assemble a :class:`ParsedWorkout` from already-extracted primitive fields.
 
@@ -331,6 +335,8 @@ def build_workout(
         hr_samples=hr_samples or [],
         distance_samples=distance_samples or [],
         elevation_gain_m=elevation_gain_m,
+        average_watts=average_watts,
+        average_cadence=average_cadence,
     )
 
 
@@ -560,6 +566,16 @@ def _bulk_insert(db: Session, model: type, rows: list[dict], chunk: int | None =
         db.execute(insert(model), batch)
 
 
+_UNSET = object()
+
+
+def _current_weight_kg(db: Session) -> float | None:
+    profile = db.get(models.AthleteProfile, 1)
+    if profile is None or not math.isfinite(profile.weight_kg) or profile.weight_kg <= 0:
+        return None
+    return profile.weight_kg
+
+
 def _cross_source_zwift_duplicate(pw: ParsedWorkout, db: Session) -> bool:
     is_direct = pw.uuid.startswith("strava:") and pw.source_name == "Strava"
     is_health = (pw.source_name or "").strip().casefold() == "zwift"
@@ -626,6 +642,7 @@ def persist_payload(
     route_rows: list[dict] = []
     sample_rows: list[dict] = []
     split_rows: list[dict] = []
+    weight_kg: float | None | object = _UNSET
 
     for pw in workouts:
         existing = existing_workouts.get(pw.uuid)
@@ -654,6 +671,14 @@ def persist_payload(
         existing.max_hr = pw.max_hr
         existing.min_hr = pw.min_hr
         existing.elevation_gain_m = pw.elevation_gain_m
+        existing.average_watts = pw.average_watts
+        existing.average_cadence = pw.average_cadence
+        # W/kg is fixed once set; re-imports and replays never recalculate it.
+        if existing.watts_per_kg is None and pw.average_watts is not None:
+            if weight_kg is _UNSET:
+                weight_kg = _current_weight_kg(db)
+            if weight_kg:
+                existing.watts_per_kg = round(pw.average_watts / weight_kg, 2)
         existing.has_route = has_route
         existing.updated_utc = now
         counts["workouts"] += 1

@@ -22,7 +22,7 @@ from .auth import require_read
 from .config import get_settings
 from .db import SessionLocal
 from .models import ApiToken
-from .routers import dashboard, ingest, strava, workouts
+from .routers import dashboard, ingest, profile, strava, workouts
 from .strava import run_sync
 
 logger = logging.getLogger("fittrack")
@@ -89,6 +89,7 @@ app.include_router(ingest.router)
 app.include_router(workouts.router)
 app.include_router(dashboard.router)
 app.include_router(strava.router)
+app.include_router(profile.router)
 
 
 @app.middleware("http")

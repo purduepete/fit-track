@@ -102,7 +102,14 @@ Behavior:
   route**. Coordinates describe Zwift's virtual geography, not the rider's physical
   location. Missing coordinates leave the map hidden. Real-world GPS outlier
   filtering is skipped for these points; splits still use the distance stream.
-  Power and cadence are not imported.
+  Cadence streams are not imported.
+- Power, cadence and W/kg: the activity's `average_watts` and `average_cadence`
+  (rpm) are stored on the workout. W/kg is `average_watts` divided by the weight
+  entered on the Workouts page (stored in `athlete_profile`), rounded to 2 decimals.
+  It is set the first time a ride has power and a weight is saved, and never
+  recalculated: later weight changes, changed-summary re-imports and raw-event
+  replays keep the stored value. The 15 rides imported before 11/13/2026 were
+  backfilled from their retained raw events with 84.2 kg.
 - Elevation: the activity's `total_elevation_gain` is stored as the workout's
   elevation gain (Strava's smoothed total), and the `altitude` stream fills each
   route point's `elevation_m` for the elevation chart. Splits take per-split

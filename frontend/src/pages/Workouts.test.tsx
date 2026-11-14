@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { Workouts } from './Workouts';
@@ -8,6 +8,17 @@ import { currentPacificWeek } from '../lib/format';
 import { Tooltip } from '../components/Tooltip';
 
 afterEach(() => localStorage.removeItem('fittrack_unit'));
+beforeEach(() => {
+    vi.spyOn(api, 'weight').mockResolvedValue({ weight_kg: 84.2 });
+});
+
+function getFooter() {
+    const row = document.querySelector<HTMLTableRowElement>('tr.summary-row');
+    if (!row) throw new Error('No totals footer');
+    return row;
+}
+
+const findFooter = () => waitFor(getFooter);
 
 function renderAt(entry: string) {
     return render(
@@ -245,7 +256,7 @@ describe('Workouts type dropdown', () => {
         it('groups thousands in row and total distances and calories', async () => {
             setup([workout({ distance_m: 1609344, active_energy_kcal: 1396 })]);
             renderAt('/workouts');
-            await screen.findByText('Total');
+            await findFooter();
             expect(screen.getAllByText('1,000.00 mi')).toHaveLength(2);
             expect(screen.getAllByText('1,396')).toHaveLength(2);
         });
@@ -254,7 +265,7 @@ describe('Workouts type dropdown', () => {
             vi.spyOn(api, 'saveUnit').mockResolvedValue({ unit: 'km' });
             const fetch = setup([workout({ elevation_gain_m: 100 })]);
             renderAt('/workouts');
-            await screen.findByText('Total');
+            await findFooter();
             const units = screen.getByRole('group', { name: 'Distance units' });
             expect(screen.getByRole('heading', { name: 'Workouts' }).closest('.page-head')).toContainElement(units);
             expect(screen.getAllByText('1.00 mi')).toHaveLength(2);
@@ -284,11 +295,24 @@ describe('Workouts type dropdown', () => {
                 }),
             ]);
             renderAt('/workouts');
-            const row = (await screen.findByText('Total')).closest('tr')!;
+            const row = await findFooter();
             const cells = within(row)
                 .getAllByRole('cell')
                 .map((cell) => cell.textContent);
-            expect(cells).toEqual(['Total', '2 workouts', '40m', '6.00 mi', '6:40/mi', '400', '130', '160', '328 ft']);
+            expect(cells).toEqual([
+                'Total',
+                '2 workouts',
+                '40m',
+                '6.00 mi',
+                '6:40/mi',
+                '400',
+                '130',
+                '160',
+                '—',
+                '—',
+                '—',
+                '328 ft',
+            ]);
             const pace = row.querySelector<HTMLElement>('[data-label="Avg pace"]')!;
             const hr = row.querySelector<HTMLElement>('[data-label="Avg HR"]')!;
             expect(pace).toHaveAttribute('tabindex', '0');
@@ -310,13 +334,13 @@ describe('Workouts type dropdown', () => {
         it('follows the visible search results and hides when nothing matches', async () => {
             setup([workout(), workout({ uuid: 'two', workout_type: 'Walking', duration_sec: 60 })]);
             renderAt('/workouts');
-            await screen.findByText('Total');
+            await findFooter();
             fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Walking' } });
-            const row = screen.getByText('Total').closest('tr')!;
+            const row = getFooter();
             expect(within(row).getByText('1 workout')).toBeInTheDocument();
             expect(within(row).getByText('1m')).toBeInTheDocument();
             fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'missing' } });
-            expect(screen.queryByText('Total')).not.toBeInTheDocument();
+            expect(document.querySelector('.summary-row')).toBeNull();
         });
 
         it('includes only loaded rows and updates when more are loaded', async () => {
@@ -325,11 +349,11 @@ describe('Workouts type dropdown', () => {
                 .mockResolvedValueOnce({ items: [workout()], total: 2 })
                 .mockResolvedValueOnce({ items: [workout({ uuid: 'two' })], total: 2 });
             renderAt('/workouts');
-            let row = (await screen.findByText('Total')).closest('tr')!;
+            let row = await findFooter();
             expect(within(row).getByText('1 workout')).toBeInTheDocument();
             fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
             await waitFor(() => {
-                row = screen.getByText('Total').closest('tr')!;
+                row = getFooter();
                 expect(within(row).getByText('2 workouts')).toBeInTheDocument();
             });
             expect(within(row).getByText('20m')).toBeInTheDocument();
@@ -341,30 +365,125 @@ describe('Workouts type dropdown', () => {
                 workout({ uuid: 'two', distance_m: null, avg_hr: null, max_hr: null, active_energy_kcal: null }),
             ]);
             renderAt('/workouts');
-            const row = (await screen.findByText('Total')).closest('tr')!;
+            const row = await findFooter();
             expect(
                 within(row)
                     .getAllByRole('cell')
                     .map((cell) => cell.textContent)
-            ).toEqual(['Total', '2 workouts', '10m', '1.00 mi', '—', '—', '—', '—', '—']);
+            ).toEqual(['Total', '2 workouts', '10m', '1.00 mi', '—', '—', '—', '—', '—', '—', '—', '—']);
         });
 
         it('preserves zero totals and does not divide by zero', async () => {
             setup([workout({ duration_sec: 0, distance_m: 0, active_energy_kcal: 0, elevation_gain_m: 0 })]);
             renderAt('/workouts');
-            const row = (await screen.findByText('Total')).closest('tr')!;
+            const row = await findFooter();
             expect(
                 within(row)
                     .getAllByRole('cell')
                     .map((cell) => cell.textContent)
-            ).toEqual(['Total', '1 workout', '0s', '0.00 mi', '—', '0', '—', '140', '0 ft']);
+            ).toEqual(['Total', '1 workout', '0s', '0.00 mi', '—', '0', '—', '140', '—', '—', '—', '0 ft']);
         });
 
+        it('shows power, W/kg and cadence and averages them by duration in the footer', async () => {
+            setup([
+                workout({ average_watts: 200, watts_per_kg: 2.38, average_cadence: 90 }),
+                workout({
+                    uuid: 'two',
+                    workout_type: 'Walking',
+                    duration_sec: 1800,
+                    average_watts: 100,
+                    watts_per_kg: 1.19,
+                    average_cadence: 80,
+                }),
+                workout({ uuid: 'three', workout_type: 'Running' }),
+            ]);
+            renderAt('/workouts');
+            const footer = await findFooter();
+            expect(footer.querySelector('[data-label="Avg power"]')).toHaveTextContent('125 W');
+            expect(footer.querySelector('[data-label="W/kg"]')).toHaveTextContent('1.49');
+            expect(footer.querySelector('[data-label="Cadence"]')).toHaveTextContent('83 rpm');
+            expect(screen.getByText('200 W')).toBeInTheDocument();
+            expect(screen.getByText('2.38')).toBeInTheDocument();
+            const running = screen.getByText('Running').closest('tr')!;
+            expect(running.querySelector('[data-label="Avg power"]')).toHaveClass('metric-empty');
+        });
+
+        it('adds a daily subtotal only for types with 2 or more workouts that day', async () => {
+            setup([
+                workout({ average_watts: 200, average_cadence: 90 }),
+                workout({ uuid: 'two', duration_sec: 1800, average_watts: 100, average_cadence: 80 }),
+                workout({ uuid: 'three', workout_type: 'Walking' }),
+                workout({ uuid: 'four', local_date: '2026-10-22', start_utc: '2026-10-22T18:00:00' }),
+            ]);
+            renderAt('/workouts');
+            await findFooter();
+            const subtotals = document.querySelectorAll('tr.subtotal-row');
+            expect(subtotals).toHaveLength(1);
+            expect(
+                within(subtotals[0] as HTMLElement)
+                    .getAllByRole('cell')
+                    .map((cell) => cell.textContent)
+            ).toEqual([
+                'Total',
+                'Indoor Cycling × 2',
+                '40m',
+                '2.00 mi',
+                '20:00/mi',
+                '200',
+                '100',
+                '140',
+                '125 W',
+                '—',
+                '83 rpm',
+                '—',
+            ]);
+            fireEvent.click(subtotals[0]);
+            expect(screen.getByRole('heading', { name: 'Workouts' })).toBeInTheDocument();
+        });
+
+        it('skips subtotals for the oldest loaded day while it may continue on the next page, even when searching', async () => {
+            setup([workout(), workout({ uuid: 'two' })], 3);
+            renderAt('/workouts');
+            await findFooter();
+            expect(document.querySelector('tr.subtotal-row')).toBeNull();
+            fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Cycling' } });
+            expect(document.querySelector('tr.subtotal-row')).toBeNull();
+        });
         it('does not show a totals row for an empty range', async () => {
             setup([]);
             renderAt('/workouts');
             await screen.findByText(/No workouts in this range/);
-            expect(screen.queryByText('Total')).not.toBeInTheDocument();
+            expect(document.querySelector('.summary-row')).toBeNull();
         });
+    });
+});
+
+describe('Workouts weight', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    it('loads the saved weight and saves a valid change on Enter only once', async () => {
+        vi.spyOn(api, 'workouts').mockResolvedValue({ items: [], total: 0 });
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        const save = vi.spyOn(api, 'saveWeight').mockResolvedValue({ weight_kg: 85 });
+        renderAt('/workouts');
+        const input = await screen.findByRole('textbox', { name: 'Weight' });
+        await waitFor(() => expect(input).toHaveValue('84.2'));
+        fireEvent.change(input, { target: { value: '85' } });
+        await act(async () => fireEvent.keyDown(input, { key: 'Enter' }));
+        expect(save).toHaveBeenCalledWith(85);
+        await act(async () => fireEvent.blur(input));
+        expect(save).toHaveBeenCalledTimes(1);
+    });
+
+    it('rejects an invalid weight without saving', async () => {
+        vi.spyOn(api, 'workouts').mockResolvedValue({ items: [], total: 0 });
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        const save = vi.spyOn(api, 'saveWeight');
+        renderAt('/workouts');
+        const input = await screen.findByRole('textbox', { name: 'Weight' });
+        fireEvent.change(input, { target: { value: '0' } });
+        fireEvent.blur(input);
+        expect(await screen.findByRole('alert')).toHaveTextContent('Enter a weight between 0 and 400 kg.');
+        expect(save).not.toHaveBeenCalled();
     });
 });

@@ -364,6 +364,128 @@ textarea {
     font-weight: 700;
 }
 
+.subtotal-row td {
+    background: var(--surface-2);
+    color: var(--text-dim);
+    font-weight: 600;
+    cursor: default;
+}
+
+tbody tr.subtotal-row:hover {
+    cursor: default;
+}
+
+.page-head-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.weight-field {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+}
+
+.weight-field-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.weight-field-input {
+    display: flex;
+    align-items: center;
+    height: 36px;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--surface);
+    color: var(--text-dim);
+    padding-right: 10px;
+}
+
+.weight-field-input:focus-within {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.weight-field-input input {
+    width: 56px;
+    height: 100%;
+    padding: 0 6px 0 10px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 0.9rem;
+    text-align: right;
+}
+
+.weight-field-error {
+    flex-basis: 100%;
+    margin: 4px 0 0;
+    font-size: 0.8rem;
+}
+
+.info-hint {
+    position: relative;
+    display: inline-flex;
+}
+
+.info-hint-trigger {
+    display: inline-grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text-dim);
+    cursor: pointer;
+}
+
+.info-hint-trigger:hover,
+.info-hint-trigger[aria-expanded='true'] {
+    color: var(--accent);
+}
+
+.info-hint-trigger:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+}
+
+.info-hint-box {
+    position: absolute;
+    top: calc(100% + 6px);
+    right: 0;
+    z-index: 50;
+    display: grid;
+    gap: 4px;
+    width: max-content;
+    max-width: min(260px, calc(100vw - 32px));
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 0;
+    background: var(--surface);
+    color: var(--text);
+    box-shadow: var(--shadow);
+    font: 400 12px / 1.5 var(--font);
+    white-space: normal;
+}
+
+@media (pointer: coarse) {
+    .weight-field-input input {
+        font-size: 16px;
+    }
+}
+
 .strava-pull-message {
     position: fixed;
     right: max(14px, env(safe-area-inset-right));
@@ -1638,6 +1760,10 @@ tbody tr:hover {
 
     .stack-table tr.group-row td::before {
         content: '';
+    }
+
+    .stack-table td.metric-empty {
+        display: none;
     }
 }
 

@@ -131,6 +131,13 @@ def _optional_number(activity: dict, key: str) -> float | None:
     return None if value is None else _number(value, key)
 
 
+def _optional_nonnegative(activity: dict, key: str) -> float | None:
+    value = _optional_number(activity, key)
+    if value is not None and value < 0:
+        raise StravaError(f"Strava returned a negative {key}.")
+    return value
+
+
 def is_zwift_ride(activity: dict) -> bool:
     device = activity.get("device_name")
     return (
@@ -233,6 +240,8 @@ def parse_strava_payload(payload: dict) -> ParsedPayload:
         max_hr=_optional_number(activity, "max_heartrate"), min_hr=None,
         hr_samples=hr_samples, distance_samples=samples, route=route,
         elevation_gain_m=elevation_gain,
+        average_watts=_optional_nonnegative(activity, "average_watts"),
+        average_cadence=_optional_nonnegative(activity, "average_cadence"),
     )
     return ParsedPayload(workouts=[workout])
 

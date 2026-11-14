@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    SmallInteger,
     String,
     Unicode,
     UniqueConstraint,
@@ -101,6 +102,10 @@ class Workout(Base):
     max_hr: Mapped[float | None] = mapped_column(Float, nullable=True)
     min_hr: Mapped[float | None] = mapped_column(Float, nullable=True)
     elevation_gain_m: Mapped[float | None] = mapped_column(Float, nullable=True)
+    average_watts: Mapped[float | None] = mapped_column(Float, nullable=True)
+    average_cadence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Fixed when first calculated so later weight changes leave history unchanged.
+    watts_per_kg: Mapped[float | None] = mapped_column(Float, nullable=True)
     point_exclusions: Mapped[list[dict[str, Any]]] = mapped_column(
         JSON().with_variant(postgresql.JSONB(), "postgresql"),
         nullable=False,
@@ -207,3 +212,13 @@ class DailyMetric(Base):
     source_name: Mapped[str | None] = mapped_column(Unicode(120), nullable=True)
     updated_utc: Mapped[datetime] = mapped_column(DateTime, nullable=False)
 
+
+class AthleteProfile(Base):
+    """Single row (id 1) holding the weight used for new W/kg calculations."""
+
+    __tablename__ = "athlete_profile"
+    __table_args__ = {"schema": SCHEMA}
+
+    id: Mapped[int] = mapped_column(SmallInteger, primary_key=True, autoincrement=False)
+    weight_kg: Mapped[float] = mapped_column(Float, nullable=False)
+    updated_utc: Mapped[datetime] = mapped_column(DateTime, nullable=False)

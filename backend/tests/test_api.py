@@ -944,3 +944,16 @@ def test_received_event_is_reprocessed(client, auth_headers, db_session):
     assert r.json()["duplicate"] is False
     assert r.json()["workouts"] == 1
     assert db_session.query(Workout).count() == 1
+
+def test_weight_endpoints_require_auth_header_and_valid_values(client, auth_headers):
+    assert client.get("/api/profile/weight").status_code == 401
+    assert client.get("/api/profile/weight", headers=auth_headers).json() == {"weight_kg": None}
+    edit = {**auth_headers, "X-FitTrack-Edit": "1"}
+    assert client.put("/api/profile/weight", json={"weight_kg": 84.2}, headers=auth_headers).status_code == 403
+    unauthenticated = client.put("/api/profile/weight", json={"weight_kg": 84.2}, headers={"X-FitTrack-Edit": "1"})
+    assert unauthenticated.status_code == 401
+    for bad in (0, -5, 400, "nan"):
+        assert client.put("/api/profile/weight", json={"weight_kg": bad}, headers=edit).status_code == 422
+    assert client.put("/api/profile/weight", json={"weight_kg": 84.2}, headers=edit).json() == {"weight_kg": 84.2}
+    assert client.put("/api/profile/weight", json={"weight_kg": 83.5}, headers=edit).json() == {"weight_kg": 83.5}
+    assert client.get("/api/profile/weight", headers=auth_headers).json() == {"weight_kg": 83.5}

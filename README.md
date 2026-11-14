@@ -40,6 +40,13 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   across workouts with HR and positive duration. Max HR is the highest available
   value. Missing measurements stay empty; loading more updates the totals.
   Distances and calories use comma thousands separators; distances retain 2 decimal places.
+- **Daily subtotals**: on a day with 2 or more workouts of one type, a subtotal row
+  follows that day's workouts, using the same rules as the bottom row. The oldest
+  loaded day gets none while more rows remain to load.
+- **Power, W/kg and cadence**: Strava rides show average power, W/kg and cadence
+  (rpm). Enter your weight in kg on the Workouts page; W/kg is fixed when a ride
+  is imported, so a later weight change affects only new rides. Totals average
+  these by duration. On phones, empty power cells are hidden.
 - **Dashboard** — 7-day workout count / minutes / active energy, resting-HR,
   VO₂ max and sleep trends, plus a 30-day daily-steps chart with a 10k goal line,
   a stepped 7-day block-average line, and green bars on days with a logged

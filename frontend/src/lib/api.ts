@@ -12,6 +12,9 @@ export interface WorkoutSummary {
     avg_hr: number | null;
     max_hr: number | null;
     elevation_gain_m: number | null;
+    average_watts?: number | null;
+    average_cadence?: number | null;
+    watts_per_kg?: number | null;
     point_exclusion_warning?: string | null;
     has_route: boolean;
 }
@@ -207,6 +210,13 @@ export const api = {
         }),
     pullStrava: () =>
         apiGet<{ workouts: number }>('/api/strava/pull', { method: 'POST', headers: { 'X-FitTrack-Sync': '1' } }),
+    weight: () => apiGet<{ weight_kg: number | null }>('/api/profile/weight'),
+    saveWeight: (weightKg: number) =>
+        apiGet<{ weight_kg: number }>('/api/profile/weight', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-FitTrack-Edit': '1' },
+            body: JSON.stringify({ weight_kg: weightKg }),
+        }),
     dashboard: () => apiGet<DashboardSummary>('/api/dashboard'),
     workouts: (q: WorkoutQuery = {}) => {
         const p = new URLSearchParams();

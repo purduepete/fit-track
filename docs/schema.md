@@ -48,6 +48,8 @@ One row per workout. `uuid` is the Apple workout id or `strava:<activity_id>`
 | `avg_hr`, `max_hr`, `min_hr` | float | |
 | `elevation_gain_m` | float, null | Strava `total_elevation_gain`; null for Apple workouts (migration `002_elevation.sql`) |
 | `point_exclusions` | JSON array | Reversible per-workout timestamp exclusions (migration `003_point_exclusions.sql`); original samples remain unchanged |
+| `average_watts`, `average_cadence` | float, null | Strava `average_watts` and `average_cadence` (rpm); null for Apple workouts (migration `004_power_cadence_weight.sql`) |
+| `watts_per_kg` | float, null | `average_watts` / `athlete_profile.weight_kg`, set once and never recalculated (migration 004) |
 | `has_route` | bit | |
 | `created_utc`, `updated_utc` | datetime2 | |
 
@@ -82,6 +84,12 @@ Computed per-unit splits (stored for both `mi` and `km`).
 `distance_m` · `duration_sec` · `pace_sec_per_unit` · `avg_hr` · `elevation_gain_m`
 (climbing only, from route elevation; null without elevation) · `source`
 (`gps`\|`sample`). Unique `(workout_uuid, unit_system, split_index)`.
+
+## `public.athlete_profile`
+Single row (`id = 1`) with the weight used for new W/kg values (migration 004,
+seeded with 84.2). `weight_kg` float, checked `0 < weight_kg < 400` ·
+`updated_utc`. The runtime role has SELECT/INSERT/UPDATE. Read and changed through
+`GET`/`PUT /api/profile/weight`.
 
 ## `public.daily_metrics`
 Per-day aggregate metrics (steps, resting HR, VO₂ max, …).

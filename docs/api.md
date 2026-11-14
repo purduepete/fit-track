@@ -22,6 +22,16 @@ return `409`. An unconfigured connection returns `503`; Strava authorization,
 rate-limit and network failures return `502` with a safe `detail` message.
 Previously committed rides remain imported if a later ride fails.
 
+## `GET /api/profile/weight` / `PUT /api/profile/weight`
+
+`GET` (read access) → `{"weight_kg": 84.2}` (`null` before one is saved).
+`PUT` needs control access plus `X-FitTrack-Edit: 1`, body `{"weight_kg": 85.0}`,
+with `0 < weight_kg < 400`. The new weight applies only to rides that do not yet
+have a W/kg; stored values never change.
+
+Workout list and detail summaries include `average_watts`, `average_cadence` and
+`watts_per_kg` (null when absent).
+
 ## `POST /api/ingest/health-auto-export` _(ingest scope)_
 
 Body: a raw Health Auto Export JSON payload (`{"data": {...}}`). The raw body is

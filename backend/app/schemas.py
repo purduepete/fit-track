@@ -26,6 +26,9 @@ class WorkoutSummary(BaseModel):
     max_hr: float | None
     has_route: bool
     elevation_gain_m: float | None = None
+    average_watts: float | None = None
+    average_cadence: float | None = None
+    watts_per_kg: float | None = None
     point_exclusion_warning: str | None = None
 
 
@@ -170,3 +173,11 @@ class DashboardSummary(BaseModel):
     steps_trend: list[MetricPoint] = Field(default_factory=list)
     steps_avg7_trend: list[MetricPoint] = Field(default_factory=list)
     workout_days: list[str] = Field(default_factory=list)
+
+
+class AthleteWeight(BaseModel):
+    weight_kg: float | None = None
+
+
+class AthleteWeightUpdate(BaseModel):
+    weight_kg: float = Field(gt=0, lt=400, allow_inf_nan=False)

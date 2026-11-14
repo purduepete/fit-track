@@ -7,6 +7,8 @@ import { UnitSelector } from '../components/UnitSelector';
 import { useUnit } from '../lib/useUnit';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useDelayedLoading } from '../hooks/useDelayedLoading';
+import { WeightField } from '../components/WeightField';
+import { groupWorkoutDays, totalWorkouts, type WorkoutTotals } from '../lib/workoutTotals';
 import { useFirstLoad } from '../lib/firstLoad';
 import { usePageRefresh } from '../lib/refresh';
 import {
@@ -19,6 +21,7 @@ import {
     formatLocalTime,
     formatPace,
     round,
+    type Unit,
 } from '../lib/format';
 
 const PAGE_SIZE = 25;
@@ -156,54 +159,11 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
         );
     }, [items, search]);
 
-    const summary = useMemo(() => {
-        let duration: number | null = null;
-        let distance: number | null = null;
-        let calories: number | null = null;
-        let maxHr: number | null = null;
-        let elevation: number | null = null;
-        let paceDuration = 0;
-        let paceDistance = 0;
-        let hrDuration = 0;
-        let hrTotal = 0;
-        for (const workout of filtered) {
-            if (workout.duration_sec != null) duration = (duration ?? 0) + workout.duration_sec;
-            if (workout.distance_m != null) distance = (distance ?? 0) + workout.distance_m;
-            if (workout.active_energy_kcal != null) calories = (calories ?? 0) + workout.active_energy_kcal;
-            if (workout.max_hr != null) maxHr = Math.max(maxHr ?? workout.max_hr, workout.max_hr);
-            if (workout.elevation_gain_m != null) elevation = (elevation ?? 0) + workout.elevation_gain_m;
-            // Only pair known distance/duration values when deriving pace.
-            if (workout.distance_m != null && workout.distance_m > 0 && workout.duration_sec != null) {
-                paceDuration += workout.duration_sec;
-                paceDistance += workout.distance_m;
-            }
-            if (workout.avg_hr != null && workout.duration_sec != null && workout.duration_sec > 0) {
-                hrTotal += workout.avg_hr * workout.duration_sec;
-                hrDuration += workout.duration_sec;
-            }
-        }
-        return {
-            duration,
-            distance,
-            calories,
-            pace: avgPaceSecPerUnit(paceDistance, paceDuration, unit),
-            avgHr: hrDuration > 0 ? hrTotal / hrDuration : null,
-            maxHr,
-            elevation,
-        };
-    }, [filtered, unit]);
+    const summary = useMemo(() => totalWorkouts(filtered), [filtered]);
 
-    // Group consecutive rows by day (the list is already newest-first).
-    const groups = useMemo(() => {
-        const out: { date: string; rows: WorkoutSummary[] }[] = [];
-        for (const w of filtered) {
-            const last = out[out.length - 1];
-            if (last && last.date === w.local_date) last.rows.push(w);
-            else out.push({ date: w.local_date, rows: [w] });
-        }
-        return out;
-    }, [filtered]);
-
+    // The list is newest-first, so only the oldest loaded day can continue on the next page.
+    const partialDate = items.length < total && items.length > 0 ? items[items.length - 1].local_date : null;
+    const groups = useMemo(() => groupWorkoutDays(filtered, partialDate), [filtered, partialDate]);
     const hasMore = items.length < total && !search;
 
     const typeOptions = useMemo(
@@ -234,7 +194,10 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
         <>
             <div className="page-head">
                 <h1 className="page-title">Workouts</h1>
-                <UnitSelector unit={unit} onChange={setUnit} saveError={saveError} />
+                <div className="page-head-controls">
+                    <WeightField />
+                    <UnitSelector unit={unit} onChange={setUnit} saveError={saveError} />
+                </div>
             </div>
             <div className="data-enter">
                 <div className="toolbar">
@@ -293,6 +256,9 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                         <th>Active kcal</th>
                                         <th>Avg HR</th>
                                         <th>Max HR</th>
+                                        <th>Avg power</th>
+                                        <th>W/kg</th>
+                                        <th>Cadence</th>
                                         <th>Elev gain</th>
                                     </tr>
                                 </thead>
@@ -300,7 +266,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                     {groups.map((g) => (
                                         <Fragment key={g.date}>
                                             <tr className="group-row">
-                                                <td colSpan={9}>
+                                                <td colSpan={COLUMNS}>
                                                     {formatLocalDate(g.date)}
                                                     <span className="group-count">
                                                         {g.rows.length} {g.rows.length === 1 ? 'workout' : 'workouts'}
@@ -324,9 +290,25 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                                     <td data-label="Active kcal">{round(w.active_energy_kcal)}</td>
                                                     <td data-label="Avg HR">{round(w.avg_hr)}</td>
                                                     <td data-label="Max HR">{round(w.max_hr)}</td>
+                                                    <PowerCells
+                                                        power={w.average_watts}
+                                                        wkg={w.watts_per_kg}
+                                                        cadence={w.average_cadence}
+                                                    />
                                                     <td data-label="Elev gain">
                                                         {formatElevation(w.elevation_gain_m, unit)}
                                                     </td>
+                                                </tr>
+                                            ))}
+                                            {g.subtotals.map(({ type: subtotalType, totals }) => (
+                                                <tr key={`${g.date}-${subtotalType}-total`} className="subtotal-row">
+                                                    <td data-label="Subtotal">Total</td>
+                                                    <td data-label="Type">
+                                                        <span>
+                                                            {subtotalType} × {totals.count}
+                                                        </span>
+                                                    </td>
+                                                    <TotalCells totals={totals} unit={unit} />
                                                 </tr>
                                             ))}
                                         </Fragment>
@@ -334,7 +316,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                     {!loading && filtered.length === 0 && (
                                         <tr>
                                             <td
-                                                colSpan={9}
+                                                colSpan={COLUMNS}
                                                 className="muted"
                                                 style={{ textAlign: 'center', padding: 32 }}
                                             >
@@ -352,25 +334,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                             <td data-label="Workouts">
                                                 {filtered.length} {filtered.length === 1 ? 'workout' : 'workouts'}
                                             </td>
-                                            <td data-label="Duration">{formatHms(summary.duration)}</td>
-                                            <td data-label="Distance">{formatDistance(summary.distance, unit)}</td>
-                                            <td
-                                                data-label="Avg pace"
-                                                data-tip="Total duration / distance for rides with both values"
-                                                tabIndex={0}
-                                            >
-                                                {formatPace(summary.pace, unit)}
-                                            </td>
-                                            <td data-label="Active kcal">{round(summary.calories)}</td>
-                                            <td
-                                                data-label="Avg HR"
-                                                data-tip="Duration-weighted average of available workout heart rates"
-                                                tabIndex={0}
-                                            >
-                                                {round(summary.avgHr)}
-                                            </td>
-                                            <td data-label="Max HR">{round(summary.maxHr)}</td>
-                                            <td data-label="Elev gain">{formatElevation(summary.elevation, unit)}</td>
+                                            <TotalCells totals={summary} unit={unit} hints />
                                         </tr>
                                     </tfoot>
                                 )}
@@ -399,6 +363,67 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                     </div>
                 )}
             </div>
+        </>
+    );
+}
+
+const COLUMNS = 12;
+
+function formatMetric(value: number | null | undefined, digits: number, suffix = ''): string {
+    if (value == null || !isFinite(value)) return '—';
+    return `${round(value, digits)}${suffix}`;
+}
+
+/** Power, W/kg and cadence cells; empty ones hide on phones so walks don't list three blanks. */
+function PowerCells({
+    power,
+    wkg,
+    cadence,
+    hints = false,
+}: {
+    power: number | null | undefined;
+    wkg: number | null | undefined;
+    cadence: number | null | undefined;
+    hints?: boolean;
+}) {
+    const empty = (value: number | null | undefined) => (value == null ? 'metric-empty' : undefined);
+    const tip = (text: string) => (hints ? { 'data-tip': text, tabIndex: 0 } : {});
+    return (
+        <>
+            <td
+                data-label="Avg power"
+                className={empty(power)}
+                {...tip('Duration-weighted average of available workout power')}
+            >
+                {formatMetric(power, 0, ' W')}
+            </td>
+            <td data-label="W/kg" className={empty(wkg)} {...tip('Duration-weighted average of stored W/kg')}>
+                {formatMetric(wkg, 2)}
+            </td>
+            <td data-label="Cadence" className={empty(cadence)}>
+                {formatMetric(cadence, 0, ' rpm')}
+            </td>
+        </>
+    );
+}
+
+/** Columns 3 to 12 of a subtotal or footer row. */
+function TotalCells({ totals, unit, hints = false }: { totals: WorkoutTotals; unit: Unit; hints?: boolean }) {
+    const tip = (text: string) => (hints ? { 'data-tip': text, tabIndex: 0 } : {});
+    return (
+        <>
+            <td data-label="Duration">{formatHms(totals.duration)}</td>
+            <td data-label="Distance">{formatDistance(totals.distance, unit)}</td>
+            <td data-label="Avg pace" {...tip('Total duration / distance for rides with both values')}>
+                {formatPace(avgPaceSecPerUnit(totals.paceDistance, totals.paceDuration, unit), unit)}
+            </td>
+            <td data-label="Active kcal">{round(totals.calories)}</td>
+            <td data-label="Avg HR" {...tip('Duration-weighted average of available workout heart rates')}>
+                {round(totals.avgHr)}
+            </td>
+            <td data-label="Max HR">{round(totals.maxHr)}</td>
+            <PowerCells power={totals.avgPower} wkg={totals.avgWkg} cadence={totals.avgCadence} hints={hints} />
+            <td data-label="Elev gain">{formatElevation(totals.elevation, unit)}</td>
         </>
     );
 }

@@ -6,7 +6,7 @@ from threading import Event
 
 import httpx
 import pytest
-from app.models import RawIngestEvent, Workout, WorkoutRoutePoint, WorkoutSample, WorkoutSplit
+from app.models import AthleteProfile, RawIngestEvent, Workout, WorkoutRoutePoint, WorkoutSample, WorkoutSplit
 from app.normalize import ParsedPayload, parse_workout, payload_hash, persist_payload
 from app.strava import (
     Credentials,
@@ -531,3 +531,70 @@ def test_ride_and_raw_event_roll_back_together(db_session, monkeypatch):
             persist_strava_event(ride(), db)
     assert db_session.query(Workout).count() == 0
     assert db_session.query(RawIngestEvent).count() == 0
+
+
+def power_ride(watts=210.5, cadence=88.0):
+    payload = ride()
+    payload["activity"]["average_watts"] = watts
+    payload["activity"]["average_cadence"] = cadence
+    return payload
+
+
+def set_weight(db, kg):
+    profile = db.get(AthleteProfile, 1)
+    if profile is None:
+        db.add(AthleteProfile(id=1, weight_kg=kg, updated_utc=datetime(2026, 11, 13)))
+    else:
+        profile.weight_kg = kg
+    db.commit()
+
+
+def test_parse_power_and_cadence():
+    workout = parse_strava_payload(power_ride()).workouts[0]
+    assert workout.average_watts == 210.5
+    assert workout.average_cadence == 88.0
+    assert parse_strava_payload(ride()).workouts[0].average_watts is None
+
+
+@pytest.mark.parametrize("key", ["average_watts", "average_cadence"])
+def test_reject_negative_power_or_cadence(key):
+    payload = power_ride()
+    payload["activity"][key] = -1
+    with pytest.raises(StravaError):
+        parse_strava_payload(payload)
+
+
+def test_watts_per_kg_is_set_once_and_survives_weight_changes(db_session):
+    set_weight(db_session, 84.2)
+    persist_strava_event(power_ride(), db_session)
+    workout = db_session.get(Workout, "strava:123")
+    assert (workout.average_watts, workout.average_cadence, workout.watts_per_kg) == (210.5, 88.0, 2.5)
+
+    set_weight(db_session, 80.0)
+    changed = power_ride(watts=220.0)
+    changed["summary"]["distance"] = 2001
+    persist_strava_event(changed, db_session)
+    persist_payload(parse_strava_payload(changed), db_session, ingest_source="strava")
+    db_session.commit()
+    workout = db_session.get(Workout, "strava:123")
+    assert workout.average_watts == 220.0
+    assert workout.watts_per_kg == 2.5
+
+
+def test_watts_per_kg_waits_for_a_weight_and_handles_zero_power(db_session):
+    persist_strava_event(power_ride(watts=0.0), db_session)
+    assert db_session.get(Workout, "strava:123").watts_per_kg is None
+    set_weight(db_session, 84.2)
+    persist_payload(parse_strava_payload(power_ride(watts=0.0)), db_session, ingest_source="strava")
+    db_session.commit()
+    assert db_session.get(Workout, "strava:123").watts_per_kg == 0.0
+
+
+def test_health_workouts_have_no_power_fields(db_session):
+    parsed = parse_workout({"id": "apple-1", "name": "Outdoor Walk", "start": "2026-10-23 08:00:00 -0700",
+                            "end": "2026-10-23 08:30:00 -0700", "duration": 1800})
+    set_weight(db_session, 84.2)
+    persist_payload(ParsedPayload(workouts=[parsed]), db_session)
+    db_session.commit()
+    workout = db_session.get(Workout, "apple-1")
+    assert (workout.average_watts, workout.average_cadence, workout.watts_per_kg) == (None, None, None)

@@ -1,7 +1,15 @@
-import { Fragment } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import type { WorkoutSummary } from '../lib/api';
-import { DEFAULT_ORDER, type SortKey, type WorkoutSort } from '../lib/workoutSort';
+import {
+    DEFAULT_ORDER,
+    SORT_LABELS,
+    VIEW_COLUMNS,
+    type MetricKey,
+    type SortKey,
+    type WorkoutSort,
+    type WorkoutView,
+} from '../lib/workoutSort';
 import type { WorkoutDay, WorkoutTotals } from '../lib/workoutTotals';
 import {
     avgPaceSecPerUnit,
@@ -15,12 +23,88 @@ import {
     type Unit,
 } from '../lib/format';
 
+type BarKey = 'distance' | 'power' | 'wkg';
+type Best = Record<string, Partial<Record<BarKey, number>>>;
+
+interface Column {
+    /** Value for a single workout; bar columns also return the raw number the bar is sized by. */
+    row: (w: WorkoutSummary, unit: Unit) => { text: string; value?: number | null };
+    total: (t: WorkoutTotals, unit: Unit) => string;
+    bar?: BarKey;
+    totalTip?: string;
+}
+
+function formatMetric(value: number | null | undefined, digits: number, suffix = ''): string {
+    if (value == null || !isFinite(value)) return '—';
+    return `${round(value, digits)}${suffix}`;
+}
+
+const COLUMNS: Record<MetricKey, Column> = {
+    distance: {
+        row: (w, unit) => ({ text: formatDistance(w.distance_m, unit), value: w.distance_m }),
+        total: (t, unit) => formatDistance(t.distance, unit),
+        bar: 'distance',
+    },
+    pace: {
+        row: (w, unit) => ({ text: formatPace(avgPaceSecPerUnit(w.distance_m, w.duration_sec, unit), unit) }),
+        total: (t, unit) => formatPace(avgPaceSecPerUnit(t.paceDistance, t.paceDuration, unit), unit),
+        totalTip: 'Total duration / distance for rides with both values',
+    },
+    kcal: { row: (w) => ({ text: String(round(w.active_energy_kcal)) }), total: (t) => String(round(t.calories)) },
+    hr: {
+        row: (w) => ({ text: String(round(w.avg_hr)) }),
+        total: (t) => String(round(t.avgHr)),
+        totalTip: 'Duration-weighted average of available workout heart rates',
+    },
+    maxhr: { row: (w) => ({ text: String(round(w.max_hr)) }), total: (t) => String(round(t.maxHr)) },
+    power: {
+        row: (w) => ({ text: formatMetric(w.average_watts, 0, ' W'), value: w.average_watts }),
+        total: (t) => formatMetric(t.avgPower, 0, ' W'),
+        bar: 'power',
+        totalTip: 'Duration-weighted average of available workout power',
+    },
+    wkg: {
+        row: (w) => ({ text: formatMetric(w.watts_per_kg, 2), value: w.watts_per_kg }),
+        total: (t) => formatMetric(t.avgWkg, 2),
+        bar: 'wkg',
+        totalTip: 'Duration-weighted average of stored W/kg',
+    },
+    cadence: {
+        row: (w) => ({ text: formatMetric(w.average_cadence, 0, ' rpm'), value: w.average_cadence }),
+        total: (t) => formatMetric(t.avgCadence, 0, ' rpm'),
+    },
+    elev: {
+        row: (w, unit) => ({ text: formatElevation(w.elevation_gain_m, unit) }),
+        total: (t, unit) => formatElevation(t.elevation, unit),
+    },
+};
+
+// Power columns are blank for walks and other workouts without a power meter.
+const HIDE_WHEN_EMPTY = new Set<MetricKey>(['power', 'wkg', 'cadence']);
+
+const barValue = (w: WorkoutSummary, key: BarKey) =>
+    key === 'distance' ? w.distance_m : key === 'power' ? w.average_watts : w.watts_per_kg;
+
+/** Best visible value per workout type, so each bar compares like with like. */
+function bestByType(rows: WorkoutSummary[]): Best {
+    const best: Best = {};
+    for (const w of rows) {
+        const entry = (best[w.workout_type] ??= {});
+        for (const key of ['distance', 'power', 'wkg'] as const) {
+            const value = barValue(w, key);
+            if (value != null && value > 0 && value > (entry[key] ?? 0)) entry[key] = value;
+        }
+    }
+    return best;
+}
+
 /** Workouts list: day groups with subtotals when sorted by date, otherwise a flat list. */
 export function WorkoutsTable({
     rows,
     groups,
     summary,
     unit,
+    view,
     sort,
     onSort,
     emptyMessage,
@@ -30,27 +114,36 @@ export function WorkoutsTable({
     groups: WorkoutDay[] | null;
     summary: WorkoutTotals;
     unit: Unit;
+    view: WorkoutView;
     sort: WorkoutSort;
     onSort: (sort: WorkoutSort) => void;
     emptyMessage: string | null;
     onOpen: (uuid: string) => void;
 }) {
+    const keys = VIEW_COLUMNS[view];
+    const span = keys.length + 3;
+    const best = bestByType(rows);
+    const row = (w: WorkoutSummary, showDate: boolean) => (
+        <WorkoutRow
+            key={w.uuid}
+            workout={w}
+            unit={unit}
+            keys={keys}
+            best={best[w.workout_type] ?? {}}
+            showDate={showDate}
+            onOpen={() => onOpen(w.uuid)}
+        />
+    );
     return (
-        <table className="stack-table">
+        <table className={`stack-table workouts-table view-${view}`}>
             <thead>
                 <tr>
                     <SortHeader label={groups ? 'Time' : 'Date'} sortKey="date" sort={sort} onSort={onSort} />
                     <th>Type</th>
                     <SortHeader label="Duration" sortKey="duration" sort={sort} onSort={onSort} />
-                    <SortHeader label="Distance" sortKey="distance" sort={sort} onSort={onSort} />
-                    <SortHeader label="Avg pace" sortKey="pace" sort={sort} onSort={onSort} />
-                    <SortHeader label="Active kcal" sortKey="kcal" sort={sort} onSort={onSort} />
-                    <SortHeader label="Avg HR" sortKey="hr" sort={sort} onSort={onSort} />
-                    <SortHeader label="Max HR" sortKey="maxhr" sort={sort} onSort={onSort} />
-                    <SortHeader label="Avg power" sortKey="power" sort={sort} onSort={onSort} />
-                    <SortHeader label="Avg W/kg" sortKey="wkg" sort={sort} onSort={onSort} />
-                    <SortHeader label="Cadence" sortKey="cadence" sort={sort} onSort={onSort} />
-                    <SortHeader label="Elev gain" sortKey="elev" sort={sort} onSort={onSort} />
+                    {keys.map((key) => (
+                        <SortHeader key={key} label={SORT_LABELS[key]} sortKey={key} sort={sort} onSort={onSort} />
+                    ))}
                 </tr>
             </thead>
             <tbody>
@@ -58,35 +151,33 @@ export function WorkoutsTable({
                     ? groups.map((g) => (
                           <Fragment key={g.date}>
                               <tr className="group-row">
-                                  <td colSpan={COLUMNS}>
+                                  <td colSpan={span}>
                                       {formatLocalDate(g.date)}
                                       <span className="group-count">
                                           {g.rows.length} {g.rows.length === 1 ? 'workout' : 'workouts'}
                                       </span>
                                   </td>
                               </tr>
-                              {g.rows.map((w) => (
-                                  <WorkoutRow key={w.uuid} workout={w} unit={unit} onOpen={() => onOpen(w.uuid)} />
-                              ))}
+                              {g.rows.map((w) => row(w, false))}
                               {g.subtotals.map(({ type: subtotalType, totals }) => (
                                   <tr key={`${g.date}-${subtotalType}-total`} className="subtotal-row">
-                                      <td data-label="Subtotal">Total</td>
-                                      <td data-label="Type">
+                                      <td data-label="Subtotal" className="lead-time">
+                                          Total
+                                      </td>
+                                      <td data-label="Type" className="lead-type">
                                           <span>
                                               {subtotalType} × {totals.count}
                                           </span>
                                       </td>
-                                      <TotalCells totals={totals} unit={unit} />
+                                      <TotalCells totals={totals} unit={unit} keys={keys} />
                                   </tr>
                               ))}
                           </Fragment>
                       ))
-                    : rows.map((w) => (
-                          <WorkoutRow key={w.uuid} workout={w} unit={unit} showDate onOpen={() => onOpen(w.uuid)} />
-                      ))}
+                    : rows.map((w) => row(w, true))}
                 {rows.length === 0 && emptyMessage && (
                     <tr>
-                        <td colSpan={COLUMNS} className="muted" style={{ textAlign: 'center', padding: 32 }}>
+                        <td colSpan={span} className="muted" style={{ textAlign: 'center', padding: 32 }}>
                             {emptyMessage}
                         </td>
                     </tr>
@@ -95,11 +186,13 @@ export function WorkoutsTable({
             {rows.length > 0 && (
                 <tfoot>
                     <tr className="summary-row">
-                        <td data-label="Summary">Total</td>
-                        <td data-label="Workouts">
+                        <td data-label="Summary" className="lead-time">
+                            Total
+                        </td>
+                        <td data-label="Workouts" className="lead-type">
                             {rows.length} {rows.length === 1 ? 'workout' : 'workouts'}
                         </td>
-                        <TotalCells totals={summary} unit={unit} hints />
+                        <TotalCells totals={summary} unit={unit} keys={keys} hints />
                     </tr>
                 </tfoot>
             )}
@@ -107,63 +200,38 @@ export function WorkoutsTable({
     );
 }
 
-const COLUMNS = 12;
-
-function formatMetric(value: number | null | undefined, digits: number, suffix = ''): string {
-    if (value == null || !isFinite(value)) return '—';
-    return `${round(value, digits)}${suffix}`;
-}
-
-/** Power, W/kg and cadence cells; empty ones hide on phones so walks don't list three blanks. */
-function PowerCells({
-    power,
-    wkg,
-    cadence,
+/** Duration plus the view's metric cells for a subtotal or footer row. */
+function TotalCells({
+    totals,
+    unit,
+    keys,
     hints = false,
 }: {
-    power: number | null | undefined;
-    wkg: number | null | undefined;
-    cadence: number | null | undefined;
+    totals: WorkoutTotals;
+    unit: Unit;
+    keys: MetricKey[];
     hints?: boolean;
 }) {
-    const empty = (value: number | null | undefined) => (value == null ? 'metric-empty' : undefined);
-    const tip = (text: string) => (hints ? { 'data-tip': text, tabIndex: 0 } : {});
     return (
         <>
-            <td
-                data-label="Avg power"
-                className={empty(power)}
-                {...tip('Duration-weighted average of available workout power')}
-            >
-                {formatMetric(power, 0, ' W')}
+            <td data-label="Duration" className="lead-duration">
+                {formatHms(totals.duration)}
             </td>
-            <td data-label="Avg W/kg" className={empty(wkg)} {...tip('Duration-weighted average of stored W/kg')}>
-                {formatMetric(wkg, 2)}
-            </td>
-            <td data-label="Cadence" className={empty(cadence)}>
-                {formatMetric(cadence, 0, ' rpm')}
-            </td>
-        </>
-    );
-}
-
-/** Columns 3 to 12 of a subtotal or footer row. */
-function TotalCells({ totals, unit, hints = false }: { totals: WorkoutTotals; unit: Unit; hints?: boolean }) {
-    const tip = (text: string) => (hints ? { 'data-tip': text, tabIndex: 0 } : {});
-    return (
-        <>
-            <td data-label="Duration">{formatHms(totals.duration)}</td>
-            <td data-label="Distance">{formatDistance(totals.distance, unit)}</td>
-            <td data-label="Avg pace" {...tip('Total duration / distance for rides with both values')}>
-                {formatPace(avgPaceSecPerUnit(totals.paceDistance, totals.paceDuration, unit), unit)}
-            </td>
-            <td data-label="Active kcal">{round(totals.calories)}</td>
-            <td data-label="Avg HR" {...tip('Duration-weighted average of available workout heart rates')}>
-                {round(totals.avgHr)}
-            </td>
-            <td data-label="Max HR">{round(totals.maxHr)}</td>
-            <PowerCells power={totals.avgPower} wkg={totals.avgWkg} cadence={totals.avgCadence} hints={hints} />
-            <td data-label="Elev gain">{formatElevation(totals.elevation, unit)}</td>
+            {keys.map((key) => {
+                const column = COLUMNS[key];
+                const text = column.total(totals, unit);
+                const tip = hints && column.totalTip ? { 'data-tip': column.totalTip, tabIndex: 0 } : {};
+                return (
+                    <td
+                        key={key}
+                        data-label={SORT_LABELS[key]}
+                        className={HIDE_WHEN_EMPTY.has(key) && text === '—' ? 'metric-empty' : undefined}
+                        {...tip}
+                    >
+                        {text}
+                    </td>
+                );
+            })}
         </>
     );
 }
@@ -171,32 +239,56 @@ function TotalCells({ totals, unit, hints = false }: { totals: WorkoutTotals; un
 function WorkoutRow({
     workout: w,
     unit,
-    showDate = false,
+    keys,
+    best,
+    showDate,
     onOpen,
 }: {
     workout: WorkoutSummary;
     unit: Unit;
-    showDate?: boolean;
+    keys: MetricKey[];
+    best: Partial<Record<BarKey, number>>;
+    showDate: boolean;
     onOpen: () => void;
 }) {
     return (
         <tr onClick={onOpen}>
-            <td data-label={showDate ? 'Date' : 'Time'}>
+            <td data-label={showDate ? 'Date' : 'Time'} className="lead-time">
                 {showDate
                     ? `${formatLocalDate(w.local_date)} ${formatLocalTime(w.start_utc)}`
                     : formatLocalTime(w.start_utc)}
             </td>
-            <td data-label="Type">
+            <td data-label="Type" className="lead-type">
                 <span className="chip">{w.workout_type}</span>
             </td>
-            <td data-label="Duration">{formatHms(w.duration_sec)}</td>
-            <td data-label="Distance">{formatDistance(w.distance_m, unit)}</td>
-            <td data-label="Avg pace">{formatPace(avgPaceSecPerUnit(w.distance_m, w.duration_sec, unit), unit)}</td>
-            <td data-label="Active kcal">{round(w.active_energy_kcal)}</td>
-            <td data-label="Avg HR">{round(w.avg_hr)}</td>
-            <td data-label="Max HR">{round(w.max_hr)}</td>
-            <PowerCells power={w.average_watts} wkg={w.watts_per_kg} cadence={w.average_cadence} />
-            <td data-label="Elev gain">{formatElevation(w.elevation_gain_m, unit)}</td>
+            <td data-label="Duration" className="lead-duration">
+                {formatHms(w.duration_sec)}
+            </td>
+            {keys.map((key) => {
+                const column = COLUMNS[key];
+                const { text, value } = column.row(w, unit);
+                const max = column.bar ? best[column.bar] : undefined;
+                let content: ReactNode = text;
+                if (column.bar && max && value != null && value > 0) {
+                    content = (
+                        <span className="metric-bar">
+                            <span>{text}</span>
+                            <span className="metric-bar-track" aria-hidden="true">
+                                <span style={{ width: `${Math.round((value / max) * 100)}%` }} />
+                            </span>
+                        </span>
+                    );
+                }
+                return (
+                    <td
+                        key={key}
+                        data-label={SORT_LABELS[key]}
+                        className={HIDE_WHEN_EMPTY.has(key) && value == null ? 'metric-empty' : undefined}
+                    >
+                        {content}
+                    </td>
+                );
+            })}
         </tr>
     );
 }

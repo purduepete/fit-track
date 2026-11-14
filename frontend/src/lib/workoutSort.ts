@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { api } from './api';
 
 export type SortKey =
     'date' | 'duration' | 'distance' | 'pace' | 'kcal' | 'hr' | 'maxhr' | 'power' | 'wkg' | 'cadence' | 'elev';
@@ -7,6 +8,33 @@ export interface WorkoutSort {
     key: SortKey;
     order: SortOrder;
 }
+
+/** Column sets for the Workouts table; Time, Type and Duration always show. */
+export type WorkoutView = 'ride' | 'power' | 'all';
+export type MetricKey = Exclude<SortKey, 'date' | 'duration'>;
+export const VIEW_COLUMNS: Record<WorkoutView, MetricKey[]> = {
+    ride: ['distance', 'pace', 'kcal', 'hr'],
+    power: ['power', 'wkg', 'cadence', 'elev'],
+    all: ['distance', 'pace', 'kcal', 'hr', 'maxhr', 'power', 'wkg', 'cadence', 'elev'],
+};
+export const VIEWS: { key: WorkoutView; label: string }[] = [
+    { key: 'ride', label: 'Ride' },
+    { key: 'power', label: 'Power' },
+    { key: 'all', label: 'All' },
+];
+export const SORT_LABELS: Record<SortKey, string> = {
+    date: 'Date',
+    duration: 'Duration',
+    distance: 'Distance',
+    pace: 'Avg pace',
+    kcal: 'Active kcal',
+    hr: 'Avg HR',
+    maxhr: 'Max HR',
+    power: 'Avg power',
+    wkg: 'Avg W/kg',
+    cadence: 'Cadence',
+    elev: 'Elev gain',
+};
 
 // Fastest pace first; largest value first for everything else.
 export const DEFAULT_ORDER: Record<SortKey, SortOrder> = {
@@ -24,38 +52,82 @@ export const DEFAULT_ORDER: Record<SortKey, SortOrder> = {
 };
 
 const KEY = 'fittrack_workout_sort';
+const VIEW_KEY = 'fittrack_workout_view';
 const DEFAULT_SORT: WorkoutSort = { key: 'date', order: 'desc' };
+const DEFAULT_VIEW: WorkoutView = 'ride';
 
-function savedSort(): WorkoutSort {
-    try {
-        const value: unknown = JSON.parse(localStorage.getItem(KEY) ?? 'null');
-        if (value && typeof value === 'object' && 'key' in value && 'order' in value) {
-            const { key, order } = value as { key: unknown; order: unknown };
-            if (
-                typeof key === 'string' &&
-                Object.prototype.hasOwnProperty.call(DEFAULT_ORDER, key) &&
-                (order === 'asc' || order === 'desc')
-            ) {
-                return { key: key as SortKey, order };
-            }
-        }
-    } catch {
-        // Unavailable or malformed storage falls back to newest first.
-    }
-    return DEFAULT_SORT;
+function cookie(name: string): string | undefined {
+    return document.cookie
+        .split('; ')
+        .find((value) => value.startsWith(`${name}=`))
+        ?.slice(name.length + 1);
 }
 
-export function useWorkoutSort() {
+function parseSort(value: unknown): WorkoutSort | null {
+    if (value && typeof value === 'object' && 'key' in value && 'order' in value) {
+        const { key, order } = value as { key: unknown; order: unknown };
+        if (
+            typeof key === 'string' &&
+            Object.prototype.hasOwnProperty.call(DEFAULT_ORDER, key) &&
+            (order === 'asc' || order === 'desc')
+        ) {
+            return { key: key as SortKey, order };
+        }
+    }
+    return null;
+}
+
+// Local storage first, then the server-set cookie that survives Safari's storage purge.
+function savedSort(): WorkoutSort {
+    try {
+        const stored = parseSort(JSON.parse(localStorage.getItem(KEY) ?? 'null'));
+        if (stored) return stored;
+    } catch {
+        // Fall through to the cookie.
+    }
+    const [key, order] = (cookie(KEY) ?? '').split('.');
+    return parseSort({ key, order }) ?? DEFAULT_SORT;
+}
+
+const isView = (value: unknown): value is WorkoutView => value === 'ride' || value === 'power' || value === 'all';
+
+function savedView(): WorkoutView {
+    try {
+        const stored = localStorage.getItem(VIEW_KEY);
+        if (isView(stored)) return stored;
+    } catch {
+        // Fall through to the cookie.
+    }
+    const fromCookie = cookie(VIEW_KEY);
+    return isView(fromCookie) ? fromCookie : DEFAULT_VIEW;
+}
+
+let cookieSave: Promise<unknown> = Promise.resolve();
+
+function persist(view: WorkoutView, sort: WorkoutSort) {
+    try {
+        localStorage.setItem(KEY, JSON.stringify(sort));
+        localStorage.setItem(VIEW_KEY, view);
+    } catch {
+        // The cookie still records the choice.
+    }
+    // Saves run in order so the cookie keeps the last choice; a failed save leaves local storage in charge.
+    const save = () => api.saveWorkoutTable({ view, sort: sort.key, order: sort.order });
+    cookieSave = cookieSave.then(save, save).catch(() => undefined);
+}
+
+export function useWorkoutTable() {
     const [sort, setSortState] = useState<WorkoutSort>(savedSort);
+    const [view, setViewState] = useState<WorkoutView>(savedView);
     const setSort = (next: WorkoutSort) => {
         setSortState(next);
-        try {
-            localStorage.setItem(KEY, JSON.stringify(next));
-        } catch {
-            // The choice still applies for this visit.
-        }
+        persist(view, next);
     };
-    return { sort, setSort };
+    const setView = (next: WorkoutView) => {
+        setViewState(next);
+        persist(next, sort);
+    };
+    return { sort, setSort, view, setView };
 }
 
 type Row = {

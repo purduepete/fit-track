@@ -8,7 +8,7 @@ import { useUnit } from '../lib/useUnit';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useDelayedLoading } from '../hooks/useDelayedLoading';
 import { WeightField } from '../components/WeightField';
-import { sortWorkouts, useWorkoutSort, type WorkoutSort } from '../lib/workoutSort';
+import { SORT_LABELS, VIEW_COLUMNS, VIEWS, sortWorkouts, useWorkoutTable, type WorkoutSort } from '../lib/workoutSort';
 import { WorkoutsTable } from '../components/WorkoutsTable';
 import { groupWorkoutDays, totalWorkouts } from '../lib/workoutTotals';
 import { useFirstLoad } from '../lib/firstLoad';
@@ -48,7 +48,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
     const [type, setType] = useState('');
     const { unit, setUnit, saveError } = useUnit();
     const [range, setRange] = useState('week');
-    const { sort, setSort } = useWorkoutSort();
+    const { sort, setSort, view, setView } = useWorkoutTable();
     const sortRef = useRef(sort);
     sortRef.current = sort;
     // Bumped when a new order needs rows that aren't loaded yet.
@@ -187,6 +187,9 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
         return complete || loadedSortKey === 'date' ? days : days.map((day) => ({ ...day, subtotals: [] }));
     }, [byDate, filtered, partialDate, complete, loadedSortKey]);
     const hasMore = items.length < total && !search;
+    // A sort column the current view hides is named so the row order isn't a mystery.
+    const hiddenSort =
+        sort.key !== 'date' && sort.key !== 'duration' && !VIEW_COLUMNS[view].some((key) => key === sort.key);
 
     const typeOptions = useMemo(
         () => [{ value: '', label: 'All types' }, ...types.map((t) => ({ value: t, label: t }))],
@@ -241,6 +244,34 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                     />
                 </div>
 
+                <div className="view-bar">
+                    <div className="toggle-group workout-view-selector" role="group" aria-label="Columns">
+                        {VIEWS.map((option) => (
+                            <button
+                                key={option.key}
+                                type="button"
+                                aria-pressed={view === option.key}
+                                onClick={() => setView(option.key)}
+                            >
+                                {option.label}
+                            </button>
+                        ))}
+                    </div>
+                    {hiddenSort && (
+                        <span className="hidden-sort">
+                            Sorted by <strong>{SORT_LABELS[sort.key]}</strong>{' '}
+                            {sort.order === 'asc' ? '(low to high)' : '(high to low)'}
+                            <button
+                                type="button"
+                                className="hidden-sort-reset"
+                                onClick={() => changeSort({ key: 'date', order: 'desc' })}
+                            >
+                                Sort by date
+                            </button>
+                        </span>
+                    )}
+                </div>
+
                 {dateParam && (
                     <div className="active-filter">
                         <span>
@@ -272,6 +303,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                                 groups={byDate ? groups : null}
                                 summary={summary}
                                 unit={unit}
+                                view={view}
                                 sort={sort}
                                 onSort={changeSort}
                                 emptyMessage={

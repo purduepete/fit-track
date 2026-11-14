@@ -24,6 +24,7 @@ const WorkoutDetail = lazy(() => import('./pages/WorkoutDetail').then((m) => ({ 
 
 export default function App() {
     const [, , preference, setPreference] = useTheme();
+    const appBar = useStickyHeaderOffset();
     const [authed, setAuthed] = useState(Boolean(getToken()));
     const [gateway, setGateway] = useState(false);
     const [checkingAuth, setCheckingAuth] = useState(true);
@@ -103,7 +104,7 @@ export default function App() {
                 <Router>
                     <FirstLoad>
                         <Tooltip />
-                        <header className="app-bar">
+                        <header className="app-bar" ref={appBar}>
                             <div className="brand">
                                 <BrandMark />
                                 <span className="brand-name">Fit Track</span>
@@ -138,6 +139,21 @@ export default function App() {
 }
 
 const ROUTE_LEAVE_MS = 250;
+
+/** Publishes the sticky app bar's height as --app-bar-height so pinned table headers sit below it. */
+function useStickyHeaderOffset() {
+    const [element, setElement] = useState<HTMLElement | null>(null);
+    useEffect(() => {
+        if (!element) return;
+        const root = document.documentElement;
+        const update = () => root.style.setProperty('--app-bar-height', `${element.offsetHeight}px`);
+        update();
+        const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(update);
+        observer?.observe(element);
+        return () => observer?.disconnect();
+    }, [element]);
+    return setElement;
+}
 
 /** Fades the outgoing page out, swaps the shown route, then fades the new page in. */
 function RouteFade({ onAuthError }: { onAuthError: () => void }) {

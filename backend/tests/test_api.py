@@ -48,6 +48,21 @@ def test_unit_preference_cookie(client, monkeypatch):
     assert "Secure" in secure.headers["set-cookie"]
 
 
+def test_workout_table_preference_cookies(client, monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "gateway_read_auth", True)
+    body = {"view": "power", "sort": "wkg", "order": "asc"}
+    response = client.post("/api/preferences/workouts-table", json=body)
+    assert response.status_code == 200
+    assert response.json() == body
+    assert response.cookies["fittrack_workout_view"] == "power"
+    assert response.cookies["fittrack_workout_sort"] == "wkg.asc"
+    assert response.headers["cache-control"] == "no-store"
+    bad = {**body, "sort": "type"}
+    assert client.post("/api/preferences/workouts-table", json=bad).status_code == 422
+
+
 def test_unit_preference_requires_read_access(client):
     assert client.post("/api/preferences/units", json={"unit": "km"}).status_code == 401
 

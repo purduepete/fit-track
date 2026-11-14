@@ -108,6 +108,30 @@ def save_unit(preference: UnitPreference, request: Request, response: Response) 
     return {"unit": preference.unit}
 
 
+SortKeyName = Literal[
+    "date", "duration", "distance", "pace", "kcal", "hr", "maxhr", "power", "wkg", "cadence", "elev"
+]
+
+
+class WorkoutTablePreference(BaseModel):
+    view: Literal["ride", "power", "all"]
+    sort: SortKeyName
+    order: Literal["asc", "desc"]
+
+
+@app.post("/api/preferences/workouts-table", tags=["meta"], dependencies=[Depends(require_read)])
+def save_workout_table(preference: WorkoutTablePreference, request: Request, response: Response) -> dict:
+    """Mirror the Workouts view and sort in cookies; Safari can purge localStorage after sign-in."""
+    secure = request.url.scheme == "https"
+    for name, value in (
+        ("fittrack_workout_view", preference.view),
+        ("fittrack_workout_sort", f"{preference.sort}.{preference.order}"),
+    ):
+        response.set_cookie(name, value, max_age=31536000, path="/", secure=secure, samesite="lax")
+    response.headers["Cache-Control"] = "no-store"
+    return preference.model_dump()
+
+
 @app.get("/api/ready", tags=["meta"])
 def ready() -> dict:
     with SessionLocal() as db:

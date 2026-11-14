@@ -52,7 +52,14 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   When more rows remain, the server sorts the whole range while the table stays on
   screen, so Load more continues in order. Workouts missing the value come last. Sorting by anything except date lists workouts flat with their
   dates, without day groups or daily subtotals. Phones hide the table header, so they
-  keep the date order. The choice is remembered on the device.
+  use the order last chosen on a wider screen. The choice is remembered on the device
+  and in a server-set cookie.
+- **Column views**: Ride (distance, pace, active kcal, avg HR), Power (avg power,
+  W/kg, cadence, elevation) or All. Time, type and duration always show; Ride is the
+  default and the choice is remembered like the sort. Distance, avg power and W/kg
+  carry a bar sized against the best visible workout of the same type. Sorting by a
+  column the view hides shows a "Sorted by" label with a way back to date order. On
+  phones each workout is a compact card: time, type and duration, then the metrics.
 - **Dashboard**: this week's (Monday to Sunday, Pacific) active days, workout
   time and active energy, matching the Workouts page's default range; resting-HR,
   VO₂ max and sleep trends, plus a 30-day daily-steps chart with a 10k goal line,

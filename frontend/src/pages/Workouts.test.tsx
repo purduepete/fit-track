@@ -10,9 +10,14 @@ import { Tooltip } from '../components/Tooltip';
 afterEach(() => {
     localStorage.removeItem('fittrack_unit');
     localStorage.removeItem('fittrack_workout_sort');
+    localStorage.removeItem('fittrack_workout_view');
+    document.cookie = 'fittrack_workout_view=; Max-Age=0; Path=/';
 });
 beforeEach(() => {
     vi.spyOn(api, 'weight').mockResolvedValue({ weight_kg: 84.2 });
+    vi.spyOn(api, 'saveWorkoutTable').mockImplementation(async (preference) => preference);
+    // Most tests check every column; the column-view tests start from the default.
+    localStorage.setItem('fittrack_workout_view', 'all');
 });
 
 function getFooter() {
@@ -610,5 +615,81 @@ describe('Workouts sorting', () => {
         await waitFor(() =>
             expect(workouts).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'date', order: 'desc' }))
         );
+    });
+});
+
+describe('Workouts column views', () => {
+    afterEach(() => vi.restoreAllMocks());
+
+    const ride = (uuid: string, distance: number, watts: number | null, cadence: number): WorkoutSummary => ({
+        uuid,
+        workout_type: 'Indoor Cycling',
+        local_date: '2026-11-13',
+        start_utc: `2026-11-13T1${uuid === 'a' ? 7 : 8}:00:00`,
+        duration_sec: 1800,
+        distance_m: distance,
+        active_energy_kcal: 300,
+        avg_hr: 130,
+        max_hr: 150,
+        average_watts: watts,
+        watts_per_kg: watts == null ? null : watts / 84.2,
+        average_cadence: cadence,
+        elevation_gain_m: null,
+        has_route: false,
+    });
+    const headers = () => screen.getAllByRole('columnheader').map((cell) => cell.textContent);
+
+    it('opens on Ride, switches views and sizes bars against the best visible workout', async () => {
+        localStorage.removeItem('fittrack_workout_view');
+        vi.spyOn(api, 'workouts').mockResolvedValue({
+            items: [ride('a', 20000, 200, 80), ride('b', 10000, null, 70)],
+            total: 2,
+        });
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        renderAt('/workouts');
+        await findFooter();
+        expect(headers()).toEqual(['Time', 'Type', 'Duration', 'Distance', 'Avg pace', 'Active kcal', 'Avg HR']);
+        const bars = [...document.querySelectorAll<HTMLElement>('td[data-label="Distance"] .metric-bar-track > span')];
+        expect(bars.map((bar) => bar.style.width)).toEqual(['50%', '100%']);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Power' }));
+        expect(headers()).toEqual(['Time', 'Type', 'Duration', 'Avg power', 'Avg W/kg', 'Cadence', 'Elev gain']);
+        expect(document.querySelectorAll('td[data-label="Avg power"] .metric-bar')).toHaveLength(1);
+        expect(localStorage.getItem('fittrack_workout_view')).toBe('power');
+        await waitFor(() =>
+            expect(api.saveWorkoutTable).toHaveBeenLastCalledWith({ view: 'power', sort: 'date', order: 'desc' })
+        );
+    });
+
+    it('names a sort column the view hides and offers a return to date order', async () => {
+        vi.spyOn(api, 'workouts').mockResolvedValue({
+            items: [ride('a', 20000, 200, 70), ride('b', 10000, 150, 80)],
+            total: 2,
+        });
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        renderAt('/workouts');
+        await findFooter();
+        fireEvent.click(screen.getByRole('button', { name: /^Cadence/ }));
+        expect(screen.queryByText(/Sorted by/)).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Ride' }));
+        expect(screen.getByText(/Sorted by/)).toHaveTextContent('Sorted by Cadence (high to low)');
+        const distances = () =>
+            [...document.querySelectorAll('tbody td[data-label="Distance"]')].map((cell) => cell.textContent);
+        expect(distances()).toEqual(['6.21 mi', '12.43 mi']);
+
+        fireEvent.click(screen.getByRole('button', { name: 'Sort by date' }));
+        expect(screen.queryByText(/Sorted by/)).toBeNull();
+        expect(document.querySelectorAll('tr.group-row')).toHaveLength(1);
+    });
+
+    it('falls back to the server cookie when local storage has no view', async () => {
+        localStorage.removeItem('fittrack_workout_view');
+        document.cookie = 'fittrack_workout_view=power; Path=/';
+        vi.spyOn(api, 'workouts').mockResolvedValue({ items: [ride('a', 20000, 200, 80)], total: 1 });
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        renderAt('/workouts');
+        await findFooter();
+        expect(screen.getByRole('button', { name: 'Power' })).toHaveAttribute('aria-pressed', 'true');
     });
 });

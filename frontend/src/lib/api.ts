@@ -211,6 +211,12 @@ export const api = {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ unit }),
         }),
+    saveWorkoutTable: (preference: { view: string; sort: string; order: string }) =>
+        apiGet<{ view: string; sort: string; order: string }>('/api/preferences/workouts-table', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(preference),
+        }),
     pullStrava: () =>
         apiGet<{ workouts: number }>('/api/strava/pull', { method: 'POST', headers: { 'X-FitTrack-Sync': '1' } }),
     weight: () => apiGet<{ weight_kg: number | null }>('/api/profile/weight'),

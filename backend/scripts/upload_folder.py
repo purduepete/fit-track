@@ -18,7 +18,7 @@ Route/splits/map all derive from the embedded JSON, so the separate ``*.gpx``
 files in the zip are ignored here.
 
 Environment:
-    FITTRACK_API_URL   e.g. https://fittrack.<region>.azurecontainerapps.io
+    FITTRACK_API_URL   e.g. http://127.0.0.1:8791
     FITTRACK_TOKEN     an ingest-scoped token (see New-IngestToken.ps1)
 
 Usage:

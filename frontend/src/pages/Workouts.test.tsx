@@ -54,7 +54,7 @@ describe('Workouts ?date= deep-link', () => {
         const explanation = screen.getByRole('group', { name: 'Date range disabled reason' });
         fireEvent.focusIn(explanation);
         expect(screen.queryByRole('tooltip')).toBeNull();
-        expect(explanation).toHaveAccessibleDescription('Showing a single day — clear the day filter to use ranges');
+        expect(explanation).toHaveAccessibleDescription('Showing a single day. Clear the day filter to use ranges.');
         expect(document.querySelector('[title]')).toBeNull();
     });
 
@@ -541,52 +541,60 @@ describe('Workouts sorting', () => {
         );
     });
 
-    it('drops day groups and daily subtotals when sorted, and keeps rows ungrouped until date order loads', async () => {
+    it('sorts loaded rows at once without a request, and restores day groups and subtotals by date', async () => {
         const sameDay = [
             ride('a', '2026-11-13', 20000),
             ride('b', '2026-11-13', 10000),
             ride('c', '2026-11-12', 15000),
         ];
-        const workouts = vi.spyOn(api, 'workouts').mockResolvedValueOnce({ items: sameDay, total: 3 });
+        const workouts = vi.spyOn(api, 'workouts').mockResolvedValue({ items: sameDay, total: 3 });
         vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
         renderAt('/workouts');
         await findFooter();
         expect(document.querySelectorAll('tr.subtotal-row')).toHaveLength(1);
         expect(document.querySelectorAll('tr.group-row')).toHaveLength(2);
+        const requests = workouts.mock.calls.length;
 
-        workouts.mockResolvedValueOnce({ items: [sameDay[0], sameDay[2], sameDay[1]], total: 3 });
         fireEvent.click(screen.getByRole('button', { name: /^Distance/ }));
-        await waitFor(() => expect(document.querySelector('tr.group-row')).toBeNull());
+        const distances = () =>
+            [...document.querySelectorAll('tbody td[data-label="Distance"]')].map((cell) => cell.textContent);
+        expect(distances()).toEqual(['12.43 mi', '9.32 mi', '6.21 mi']);
+        expect(document.querySelector('tr.group-row')).toBeNull();
         expect(document.querySelector('tr.subtotal-row')).toBeNull();
-        expect(getFooter()).toBeInTheDocument();
-        expect(document.querySelectorAll('tbody tr')).toHaveLength(3);
+        expect(screen.queryByRole('status', { name: 'Loading workouts' })).toBeNull();
 
+        fireEvent.click(screen.getByRole('button', { name: /^Avg pace/ }));
+        expect(distances()).toEqual(['12.43 mi', '9.32 mi', '6.21 mi']);
+        fireEvent.click(screen.getByRole('button', { name: /^Date/ }));
+        expect(document.querySelectorAll('tr.group-row')).toHaveLength(2);
+        expect(document.querySelectorAll('tr.subtotal-row')).toHaveLength(1);
+        expect(workouts).toHaveBeenCalledTimes(requests);
+        expect(screen.queryByRole('combobox', { name: 'Sort by' })).toBeNull();
+    });
+
+    it('keeps the table on screen while a sort fetches rows that are not loaded yet', async () => {
+        const workouts = vi.spyOn(api, 'workouts').mockResolvedValueOnce({
+            items: [ride('a', '2026-11-13', 10000), ride('b', '2026-11-12', 20000)],
+            total: 3,
+        });
+        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
+        renderAt('/workouts');
+        await findFooter();
         let finish!: (value: { items: WorkoutSummary[]; total: number }) => void;
         workouts.mockReturnValueOnce(
             new Promise((resolve) => {
                 finish = resolve;
             })
         );
-        fireEvent.click(screen.getByRole('button', { name: /^Date/ }));
-        expect(document.querySelector('tr.group-row')).toBeNull();
-        expect(document.querySelector('tr.subtotal-row')).toBeNull();
-        await act(async () => finish({ items: sameDay, total: 3 }));
-        expect(document.querySelectorAll('tr.group-row')).toHaveLength(2);
-        expect(document.querySelectorAll('tr.subtotal-row')).toHaveLength(1);
-    });
-    it('sorts pace fastest first from its header and offers no toolbar sort control', async () => {
-        const workouts = vi
-            .spyOn(api, 'workouts')
-            .mockResolvedValue({ items: [ride('a', '2026-11-12', 20000)], total: 1 });
-        vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
-        renderAt('/workouts');
-        await findFooter();
-        expect(screen.queryByRole('combobox', { name: 'Sort by' })).toBeNull();
-        expect(screen.queryByRole('group', { name: 'Sort direction' })).toBeNull();
-        fireEvent.click(screen.getByRole('button', { name: /^Avg pace/ }));
-        await waitFor(() =>
-            expect(workouts).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'pace', order: 'asc' }))
+        fireEvent.click(screen.getByRole('button', { name: /^Distance/ }));
+        expect(workouts).toHaveBeenLastCalledWith(expect.objectContaining({ sort: 'distance', offset: 0 }));
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        expect(screen.queryByRole('status', { name: 'Loading workouts' })).toBeNull();
+        expect(document.querySelectorAll('tbody td[data-label="Distance"]')[0]).toHaveTextContent('12.43 mi');
+        await act(async () =>
+            finish({ items: [ride('c', '2026-11-11', 30000), ride('b', '2026-11-12', 20000)], total: 3 })
         );
+        expect(document.querySelectorAll('tbody td[data-label="Distance"]')[0]).toHaveTextContent('18.64 mi');
     });
     it('restores a saved sort and ignores an invalid one', async () => {
         localStorage.setItem('fittrack_workout_sort', JSON.stringify({ key: 'wkg', order: 'asc' }));

@@ -6,6 +6,7 @@ import { api } from '../lib/api';
 import { DashboardProvider } from '../lib/dashboard';
 import { SHOW_TOOLTIPS } from '../siteSettings';
 import { addWeeklyStepTotals } from '../lib/steps';
+import { currentPacificWeek } from '../lib/format';
 import { Dashboard } from './Dashboard';
 
 vi.mock('recharts', async (importOriginal) => ({
@@ -121,4 +122,7 @@ it('shows the sleep and cardio scale tooltips while control hints are disabled',
     expect(screen.getByRole('tooltip')).toHaveTextContent('Excellent');
     fireEvent.keyDown(document, { key: 'Escape' });
     expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(api.dashboard).toHaveBeenCalledWith(currentPacificWeek());
+    expect(screen.getByText('Active days (week)')).toBeInTheDocument();
+    expect(screen.getByText('1h 35m')).toBeInTheDocument();
 });

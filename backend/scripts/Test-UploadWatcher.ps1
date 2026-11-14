@@ -169,7 +169,7 @@ Write-Section 'Next steps'
 Write-Host @'
  - Pending files with an empty _failed folder means the API returned 5xx or the
    network failed; the watcher leaves those in place and retries. Check the
-   server logs:  az containerapp logs show -n fittrack-api -g jimbpersonal-rg --type console --tail 200
+   app log under C:\ProgramData\SolutionDeploy\apps\fit-track\shared\logs on jimbrownhome1.
  - Files in _failed means a 4xx or a corrupt archive. Fix the cause, then move
    them back into the watch folder to retry.
  - "HUNG" above: Get-Process python* | Stop-Process, then

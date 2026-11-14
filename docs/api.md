@@ -1,6 +1,6 @@
 # API reference
 
-Base URL: the Container App URL in production, or `http://localhost:8000` in
+Base URL: `https://fit-track.jimlertech.com` in production, or `http://localhost:8000` in
 dev. Interactive docs: `GET /docs` (Swagger) and `/redoc`.
 
 Auth: all endpoints except `/api/health` require `Authorization: Bearer <token>`.
@@ -182,8 +182,11 @@ On failure, none of the requested changes are saved.
 
 ## `GET /api/dashboard` _(read scope)_
 
-7-day rollup and trend series. `weekly_workouts`/`weekly_minutes` cover the last
-7 days; `resting_hr_trend` covers the last 90 days; `vo2max_trend` covers the last
+Weekly rollup and trend series. Query `week_from` and `week_to` (inclusive local
+`YYYY-MM-DD`, at most 7 days) select the week; the app sends its Pacific Monday to
+Sunday week. Without them the last 7 local days are used. `workouts_7d` counts
+active days (several workouts on one day count once), and `weekly_minutes` has one
+point per day of the week, 0 on days without workouts. `resting_hr_trend` covers the last 90 days; `vo2max_trend` covers the last
 365 days; `sleep_trend` covers the last 30 days. `minutes_7d` and each
 `weekly_minutes` value are totals in minutes, rounded to the nearest second after
 adding the underlying durations. `vo2max_band` interprets the latest

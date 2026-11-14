@@ -220,7 +220,10 @@ export const api = {
             headers: { 'Content-Type': 'application/json', 'X-FitTrack-Edit': '1' },
             body: JSON.stringify({ weight_kg: weightKg }),
         }),
-    dashboard: () => apiGet<DashboardSummary>('/api/dashboard'),
+    dashboard: (week: { dateFrom: string; dateTo: string }) =>
+        apiGet<DashboardSummary>(
+            `/api/dashboard?week_from=${encodeURIComponent(week.dateFrom)}&week_to=${encodeURIComponent(week.dateTo)}`
+        ),
     workouts: (q: WorkoutQuery = {}) => {
         const p = new URLSearchParams();
         if (q.type) p.set('workout_type', q.type);

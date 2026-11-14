@@ -25,6 +25,11 @@
     --bar-bg: #ffffff;
     --shadow: 0 1px 3px rgba(20, 20, 50, 0.08);
     --chip-fg: #15803d;
+    --chart-bar: #4f46e5;
+    --chart-alt: #7c3aed;
+    --chart-average: #d97706;
+    --chart-workout: #059669;
+    --chart-goal: #16a34a;
     --scrollbar-track: #eef0f3;
     --scrollbar-thumb: #9ca3af;
     --scrollbar-thumb-hover: #64748b;
@@ -42,6 +47,11 @@
     --bar-bg: #020617;
     --shadow: 0 10px 28px rgb(0 0 0 / 36%);
     --chip-fg: #4ade80;
+    --chart-bar: #6366f1;
+    --chart-alt: #8b5cf6;
+    --chart-average: #f59e0b;
+    --chart-workout: #10b981;
+    --chart-goal: #22c55e;
     --scrollbar-track: #080f20;
     --scrollbar-thumb: #3b4962;
     --scrollbar-thumb-hover: #64748b;

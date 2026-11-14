@@ -121,7 +121,7 @@ describe('shared tooltips', () => {
 
     it('makes a disabled date filter explanation reachable without enabling its control', () => {
         const onChange = vi.fn();
-        const reason = 'Showing a single day — clear the day filter to use ranges';
+        const reason = 'Showing a single day. Clear the day filter to use ranges.';
         render(
             <>
                 <Tooltip />

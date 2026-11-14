@@ -108,8 +108,8 @@ def test_persist_batches_multiple_workouts_and_metrics(db_session):
 
 def test_persist_chunks_in_clauses_across_boundaries(db_session, monkeypatch):
     """With a tiny chunk size, workouts and metrics that span multiple IN-clause
-    batches must all persist and stay idempotent (regression for the Azure SQL
-    2,100-parameter limit, which is enforced by chunking)."""
+    batches must all persist and stay idempotent (statement size is bounded by
+    chunking)."""
     from app import normalize
 
     monkeypatch.setattr(normalize, "_IN_CHUNK", 2)  # force several chunks

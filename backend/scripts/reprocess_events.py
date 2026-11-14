@@ -6,8 +6,8 @@ events, re-parses each payload with the current :func:`parse_payload`, and
 idempotently upserts the result via :func:`persist_payload` — the same code path
 as live ingest, so it is safe to run repeatedly.
 
-DB-altering script: per project policy, get a Gemini second opinion before
-running this against the live WebPortfolio database.
+DB-altering script: per project policy, get an independent model review before
+running this against the live fit_track database.
 
 Usage:
     python -m scripts.reprocess_events --dry-run            # parse only, no writes

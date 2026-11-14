@@ -6,8 +6,8 @@ Workout summaries and per-day aggregate metrics are extracted; if the export
 contains ``workout-routes/*.gpx`` files, routes are attached to their workouts
 and mileage splits are computed for historical runs too.
 
-DB-altering script: per project policy, get a Gemini second opinion before
-running this against the live WebPortfolio database.
+DB-altering script: per project policy, get an independent model review before
+running this against the live fit_track database.
 
 Usage:
     python -m scripts.backfill_export_xml --export-dir "C:\\path\\to\\apple_health_export"

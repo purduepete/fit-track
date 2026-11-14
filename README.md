@@ -1,9 +1,9 @@
-# fittrack
+# Fit Track
 
 First entry keeps the mounted shell hidden until the active route and its initial data-backed sections are ready. Shell and content enter together over 600ms; reduced motion skips the fade. Initial content stays visible after the entrance; newly mounted route content retains its own entrance. Refreshes and later navigation retain the shell.
 
 Track your Apple Watch / iPhone **workouts** on Windows — export daily from
-Health, load into Azure SQL, and browse a web dashboard with **mileage splits**,
+Health, store it in PostgreSQL, and browse a web dashboard with **mileage splits**,
 a **route map**, and **heart-rate** charts.
 
 No Mac required. Route, HR and distance data all come from the JSON that
@@ -14,7 +14,7 @@ produces, so a single daily export drives everything.
 Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
      ─▶ dated .zip into a synced folder (iCloud / Dropbox / OneDrive)
      ─▶ upload_folder.py  ──POST(token)──▶  FastAPI /api/ingest
-     ─▶ Azure SQL (WebPortfolio DB, `fit` schema)
+     ─▶ PostgreSQL `fit_track` on jimbrownhome1
      ─▶ React + Recharts + Leaflet dashboard
 ```
 
@@ -48,12 +48,13 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   is imported, so a later weight change affects only new rides. Totals average
   these by duration. On phones, empty power cells are hidden.
 - **Sorting**: click any column header except Type to sort by it; click again to
-  reverse. Pace starts fastest first, the rest highest first. The server sorts every
-  workout in the range, so Load more continues in order, and workouts missing the
-  value come last. Sorting by anything except date lists workouts flat with their
+  reverse. Pace starts fastest first, the rest highest first. Loaded rows reorder at once.
+  When more rows remain, the server sorts the whole range while the table stays on
+  screen, so Load more continues in order. Workouts missing the value come last. Sorting by anything except date lists workouts flat with their
   dates, without day groups or daily subtotals. Phones hide the table header, so they
   keep the date order. The choice is remembered on the device.
-- **Dashboard** — 7-day workout count / minutes / active energy, resting-HR,
+- **Dashboard**: this week's (Monday to Sunday, Pacific) active days, workout
+  time and active energy, matching the Workouts page's default range; resting-HR,
   VO₂ max and sleep trends, plus a 30-day daily-steps chart with a 10k goal line,
   a stepped 7-day block-average line, and green bars on days with a logged
   workout (tap one to open that day on the Workouts page).
@@ -66,76 +67,59 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   embedded-frame storage when the app closes. It only talks to a direct parent
   whose origin is in `VITE_SITEDOCK_ORIGINS` (comma-separated, set at build
   time; defaults to `https://jimbrownhome1.tail8ad282.ts.net:8790` and
-  `https://site-dock.jimlertech.com`). The Docker build uses the same defaults;
-  override them with `--build-arg VITE_SITEDOCK_ORIGINS=...` when needed. Firefox
+  `https://site-dock.jimlertech.com`). Set `VITE_SITEDOCK_ORIGINS` before the
+  frontend build to override them. Firefox
   doesn't expose `location.ancestorOrigins`, so the handoff is off there.
 
 ## Repository layout
 
-| Path               | Purpose                                                                                                                       |
-| ------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
-| `backend/app/`     | FastAPI app: config, db, models, auth, normalizer, geo/splits, routers                                                        |
-| `backend/scripts/` | `init_db`, `check_config`, `token_admin` / `New-IngestToken.ps1`, `upload_folder` / `Watch-Upload.ps1`, `backfill_export_xml` |
-| `backend/tests/`   | pytest suite (geo, normalizer, persistence, API)                                                                              |
-| `frontend/`        | React + Vite + TS dashboard (Recharts, react-leaflet)                                                                         |
-| `infra/main.bicep` | Azure Container Apps (Consumption, scale-to-zero)                                                                             |
-| `Dockerfile`       | Builds the SPA and serves it from FastAPI (incl. ODBC Driver 18)                                                              |
-| `docs/`            | Architecture, data pipeline, splits algorithm, API, schema, testing                                                           |
+| Path               | Purpose                                                                                                |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| `backend/app/`     | FastAPI app: config, db, models, auth, normalizer, geo/splits, Strava sync, routers                    |
+| `backend/scripts/` | `token_admin` / `New-IngestToken.ps1`, `upload_folder` / `Watch-Upload.ps1`, replay and backfill tools |
+| `backend/tests/`   | pytest suite (geo, normalizer, persistence, Strava, API)                                               |
+| `frontend/`        | React + Vite + TS dashboard (Recharts, react-leaflet)                                                  |
+| `deploy/`          | Solution Deploy manifest, launcher and reviewed PostgreSQL migrations (`deploy/postgresql`)            |
+| `docs/`            | Architecture, data pipeline, splits algorithm, API, schema, testing, deployment                        |
 
-## Quickstart (local)
+## Hosting
 
-### Windows PostgreSQL deployment
-
-The home runtime uses Python 3.14.8. The backend dependency pins were tested on
-that interpreter with all 132 offline tests passing. Python updates are held
-on the host; runtime upgrades require rebuilding the release's `.venv`.
-The separate upload watcher also uses Python 3.14.8, selected explicitly by
-`backend\scripts\Watch-Upload.ps1`. Its upload module uses only the standard library.
-
-The home deployment runs on `jimbrownhome1` using the dedicated PostgreSQL
-database `fittrack` and the existing `fit` schema. Azure SQL remains supported
-for development and rollback through the legacy `DB_*` settings.
+Fit Track runs on `jimbrownhome1` with the dedicated PostgreSQL database
+`fit_track` (`public` schema). See [docs/deployment.md](docs/deployment.md).
 
 - Public dashboard: `https://fit-track.jimlertech.com`, protected by Microsoft
   sign-in through Cloudflare Access.
 - Private dashboard: `https://jimbrownhome1.tail8ad282.ts.net:8791`.
 - Upload endpoint: append `/api/ingest/health-auto-export` to the private URL.
   Uploads still require an existing ingest-scoped bearer token.
-- `DATABASE_URL=postgresql+psycopg://.../fittrack` selects PostgreSQL.
-  Credentials belong in the protected SolutionDeploy `shared\secrets\app.env`,
-  never in this repository.
+- `DATABASE_URL=postgresql+psycopg://.../fit_track` lives in the protected
+  SolutionDeploy `shared\secrets\app.env`, never in this repository. Without it
+  the app fails readiness.
 - `GATEWAY_READ_AUTH=true` removes the dashboard's second token prompt. Enable
   it only with a loopback listener and protected Cloudflare Access / private
   Tailscale routes. Its default is false; ingest authentication stays enabled.
 - `deploy\application.json` binds the API to `127.0.0.1:8791` and uses the
   framework's restricted account, startup task, and watchdog.
-- `backend\scripts\migrate_postgresql.py` exports the source's complete rows,
-  imports only into an empty dedicated PostgreSQL database, and compares
-  SHA-256 digests of every column in primary-key order. Raw JSON is compressed
-  by SQL Server during export and decoded before comparison.
+- The runtime uses Python 3.14.8; upgrading it requires rebuilding the
+  release's `.venv`. The upload watcher also uses Python 3.14.8, selected by
+  `backend\scripts\Watch-Upload.ps1`, and only the standard library.
+- The Google Drive upload client runs on `jimbrownhome1` in JimBrown's
+  signed-in session, where Google Drive mounts `G:`, and posts to
+  `http://127.0.0.1:8791`. It stops while nobody is signed in.
 
-The migration archive and `pg_dump` backup are private under
-`C:\ProgramData\SolutionDeploy\archives\fittrack-migration-20261018`.
-Provisioning and imports require an independent review before execution.
-The Azure `fittrack-api--0000060` revision is inactive; its resources and the
-shared WebPortfolio database remain intact. The Google Drive upload client
-runs on `jimbrownhome1` in JimBrown's signed-in session, where Google Drive
-mounts `G:`, and posts to `http://127.0.0.1:8791`. It stops while nobody is signed in. The scheduled GitHub check verifies the public
-Access sign-in boundary; the host watchdog checks the app's database readiness.
+## Local development
 
-Prerequisites: Python 3.12+, Node 20+, the
-[ODBC Driver 18 for SQL Server](https://learn.microsoft.com/sql/connect/odbc/download-odbc-driver-for-sql-server),
-and access to the WebPortfolio Azure SQL server.
+Prerequisites: Python 3.12+, Node 20+ and a PostgreSQL database for the app.
 
 ```powershell
 # 1. Backend
 cd backend
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt -r requirements-dev.txt
-Copy-Item .env.example .env   # then fill in DB_PASSWORD
+Copy-Item .env.example .env   # then set DATABASE_URL
 
-# 2. Create the `fit` schema + tables  (DB-altering — see the warning below)
-.\.venv\Scripts\python.exe -m scripts.init_db
+# 2. Create the tables: apply deploy\postgresql\001_initial.sql and each later
+#    numbered file, in order, to your local database.
 
 # 3. Create tokens (shown once)
 .\scripts\New-IngestToken.ps1 -Name iphone-hae  -Scope ingest
@@ -146,47 +130,20 @@ Copy-Item .env.example .env   # then fill in DB_PASSWORD
 ```
 
 ```powershell
-# 5. Frontend (separate terminal) — proxies /api to :8000
+# 5. Frontend (separate terminal), proxies /api to :8000
 cd frontend
 npm install
 npm run dev        # http://localhost:5173  (paste the read token)
 ```
 
-## Setting up on another machine
+Carry `backend/.env` and `backend/.env.local` between machines over a secure
+channel (both are gitignored) and re-mint a read token, since only the SHA-256
+hash of a token is stored.
 
-Moving to a second machine needs no schema work — the `fit` schema already
-exists, so **skip `scripts.init_db`** and run everything above except step 2.
-Carry `backend/.env` and `backend/.env.local` over a secure channel (both are
-gitignored) and re-mint a read token, since only the SHA-256 hash of a token is
-stored and the raw value cannot be recovered.
-
-When something doesn't connect, run the config doctor before anything else. It
-prints no secret values:
-
-```powershell
-cd backend
-.\.venv\Scripts\python.exe -m scripts.check_config
-```
-
-It reports where the env file is expected, whether it exists and parses, its
-encoding, which `DB_*` process variables outrank it, the effective auth mode,
-the installed ODBC drivers, whether an Azure AD token can be acquired, and who
-the connection authenticates as.
-
-### Two errors that name the wrong culprit
-
-**`Login failed for user 'sqladmin'`** usually means the env file was never
-applied, not that the password is wrong. Every field falls back to its default,
-and the defaults are `DB_AUTH=sql` with an empty password against user
-`sqladmin`. Check that `backend/.env` really is in `backend/`, that it is UTF-8
-(a UTF-16 save parses to zero keys), and that Windows didn't save it as
-`.env.txt`. Before `384ba60` this also happened whenever the process started
-outside `backend/`, because `env_file` was a relative path.
-
-**`403` from a dashboard endpoint** is a scope mismatch, not a bad token — an
-invalid token returns `401`. The dashboard needs a `read`-scoped token, so a
-`403` normally means the `ingest` token from `.env.local` was pasted instead.
-Check with `python -m scripts.token_admin list`.
+**`403` from a dashboard endpoint** is a scope mismatch; an invalid token
+returns `401`. The dashboard needs a `read`-scoped token, so a `403` normally
+means the `ingest` token from `.env.local` was pasted instead. Check with
+`python -m scripts.token_admin list`.
 
 ### Two healthy states that look like failures
 
@@ -232,7 +189,7 @@ A stub plus its own child is expected. Two unrelated parents, or two `Watching
    `backend/.env.local` (never committed — matched by `*.local`):
 
    ```
-   FITTRACK_API_URL=https://<your-container-app>
+   FITTRACK_API_URL=http://127.0.0.1:8791
    FITTRACK_TOKEN=<ingest token>
    # Optional: watch a synced cloud folder instead of fittrack/upload, and keep
    # processed files tidied in a subfolder that stays in the cloud folder.
@@ -243,7 +200,7 @@ A stub plus its own child is expected. Two unrelated parents, or two `Watching
    Or run the client directly (equivalent):
 
    ```powershell
-   $env:FITTRACK_API_URL = "https://<your-container-app>"   # or http://localhost:8000
+   $env:FITTRACK_API_URL = "http://127.0.0.1:8791"   # or http://localhost:8000
    $env:FITTRACK_TOKEN   = "<ingest token>"
    cd backend
    .\.venv\Scripts\python.exe -m scripts.upload_folder --dir ..\upload
@@ -285,198 +242,32 @@ The web release leaves the upload watcher unchanged. Database input changes
 require a separate reviewed procedure; the review flag cannot bypass that check.
 See the Solution Deploy repository's `docs/Deployment.md` for the full procedure.
 
-GitHub CI remains enabled for tests, lint and builds. Uptime remains enabled
-for the public Cloudflare Access boundary. The obsolete Azure Deploy workflow
-is disabled in GitHub; keep it disabled while jimbrownhome1 hosts production.
+GitHub CI runs tests, lint and builds on every push.
 
-## Deploy (Azure, historical)
+## Uptime monitoring
 
-These instructions describe the retired Azure installation. Production releases
-use the jimbrownhome1 procedure above.
-
-Cheapest path is **Azure Container Apps** on the Consumption plan
-(`minReplicas: 0` → scales to zero when idle). The app (`fittrack-api`) runs in
-the **`jimbpersonal-rg`** resource group (**eastus2**) and pulls its image from a
-**private GitHub Container Registry package** (`ghcr.io/purduepete/fittrack`,
-free on the GitHub free tier — avoids the ACR Basic daily fee). A **user-assigned
-managed identity** (`fittrack-identity`) is used for Azure SQL (`DB_AUTH=aad`, no
-DB password); the private ghcr image is pulled with a PAT (`read:packages`) stored
-as a Container App secret. The Azure SQL server is reused cross-RG (see
-[architecture](docs/architecture.md)).
-
-### Option A — GitHub Actions (manual trigger)
-
-`.github/workflows/deploy.yml` is disabled. Its former `workflow_dispatch`
-procedure touches the shared WebPortfolio DB. Do not re-enable it for routine
-production releases. The historical procedure requires:
-
-| Kind     | Name                 | Example                                                                          |
-| -------- | -------------------- | -------------------------------------------------------------------------------- |
-| secret   | `AZURE_CREDENTIALS`  | output of `az ad sp create-for-rbac --sdk-auth`                                  |
-| secret   | `GHCR_PAT`           | classic PAT with `read:packages` (Container App pulls the private image with it) |
-| secret   | `GHCR_PUSH_TOKEN`    | classic PAT with `write:packages` (pushes the image from the runner)             |
-| variable | `FITTRACK_RG`        | `jimbpersonal-rg`                                                                |
-| variable | `ATHLETE_BIRTH_DATE` | `1970-09-20` (blank = disables VO₂ interpretation)                               |
-| variable | `ATHLETE_SEX`        | `male` \| `female`                                                               |
-
-> ⚠️ If `AZURE_CREDENTIALS` is not set the workflow fails at the Azure login
-> step — use Option B.
-
-> 🔐 **The service principal needs RBAC, not just credentials.** `AZURE_CREDENTIALS`
-> authenticating is not enough: the SP (`fittrack-gh-deploy`) must hold
-> **Contributor on `jimbpersonal-rg`**, because the bicep creates a user-assigned
-> identity, a managed environment and the container app there. Without it the
-> deploy authenticates fine and then dies with
-> `AuthorizationFailed ... Microsoft.Resources/deployments/validate/action`. It
-> also needs **Log Analytics Contributor** on the reused workspace in
-> `investmentportfolio` (cross-RG). Verify with:
->
-> ```powershell
-> az role assignment list --assignee <sp-object-id> --all -o table
-> ```
->
-> Note this scope grants the CI principal write access to everything else in
-> `jimbpersonal-rg` (webbookmarksapi, func-worklog). This is a **known and
-> accepted trade-off** for a personal resource group — do not change role
-> assignments to "fix" it without asking first.
-
-### Option B — local az CLI (what to run today)
-
-```powershell
-$tag = git rev-parse --short=7 HEAD
-$image = "ghcr.io/purduepete/fittrack:$tag"
-
-# Build + push to the private ghcr package (needs a PAT with write:packages):
-docker build -t $image -t ghcr.io/purduepete/fittrack:latest .
-$env:CR_PAT | docker login ghcr.io -u purduepete --password-stdin
-docker push $image
-docker push ghcr.io/purduepete/fittrack:latest
-
-az deployment group create -g jimbpersonal-rg -f infra/main.bicep `
-  -p containerImage=$image `
-     registryServer=ghcr.io `
-     registryUsername=purduepete `
-     registryPassword=$env:CR_PAT
-```
-
-> ℹ️ **Athlete profile is baked into `infra/main.bicep` defaults**
-> (`athleteBirthDate=1970-09-20`, `athleteSex=male`), so every deploy — manual or
-> via Actions — keeps VO₂ max interpretation working without needing to pass the
-> params. Override them explicitly only to change the profile. (A blank birth date
-> is still tolerated and simply disables interpretation — see
-> `backend/app/config.py`.)
-
-> 🪟 The local build uses your Docker daemon (Docker Desktop) — no `az acr build`,
-> so the old Windows cp1252 log-streaming crash no longer applies. Create the
-> `CR_PAT` env var from a GitHub PAT with `write:packages` before pushing.
-
-Confirm the new revision came up healthy (a bad env/config would crash-loop and
-traffic would stay on the previous revision):
-
-```powershell
-az containerapp revision list -n fittrack-api -g jimbpersonal-rg `
-  --query "[?properties.active].{rev:name,running:properties.runningState,health:properties.healthState,image:properties.template.containers[0].image}" -o table
-```
-
-### Troubleshooting: site hangs / won't load
-
-The most common cause is an **expired ghcr PAT**. The Container App stores the
-`read:packages` PAT as the **`registry-password`** secret (the name `infra/main.bicep`
-assigns). Beware: `az containerapp registry set` writes to a _different_,
-CLI-generated secret name (e.g. `ghcrio-purduepete`) and leaves the bicep one
-orphaned — a later deploy then switches the reference back. So always read
-`properties.configuration.registries[].passwordSecretRef` rather than assuming a
-name. When that PAT expires the image pull fails and — because the app scales to
-zero — there is no running replica left to serve traffic, so every request just
-times out.
-
-Diagnose (look for `ErrImagePull` / `403 Forbidden` from `ghcr.io/token`):
-
-```powershell
-az containerapp logs show -n fittrack-api -g jimbpersonal-rg --type system --tail 30
-```
-
-Fix by refreshing the stored credential with a current PAT, then restarting the
-active revision so the backed-off replicas retry the pull:
-
-```powershell
-az containerapp registry set -n fittrack-api -g jimbpersonal-rg `
-  --server ghcr.io --username purduepete --password $env:CR_PAT
-
-az containerapp revision restart -n fittrack-api -g jimbpersonal-rg `
-  --revision <active-revision>
-```
-
-Note: `az containerapp registry set` **does not create a new revision and does not
-restart anything** — running replicas keep serving with the credential they
-started with, and a node-cached image can hide a broken new credential until the
-next cold start. So always follow a credential change with a revision restart,
-both to recover crash-looping replicas and to _prove_ the new secret can actually
-pull. Remember to update the `GHCR_PAT` GitHub secret too, or the next Actions
-deploy will re-store the expired value.
-
-To confirm a stored credential really works (without printing it):
-
-```powershell
-$sec = az containerapp secret show -n fittrack-api -g jimbpersonal-rg `
-  --secret-name registry-password --query value -o tsv
-$b64 = [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes("purduepete:$sec"))
-$t = Invoke-RestMethod -Headers @{Authorization="Basic $b64"} `
-  "https://ghcr.io/token?scope=repository%3Apurduepete%2Ffittrack%3Apull&service=ghcr.io"
-Invoke-WebRequest -UseBasicParsing -Headers @{Authorization="Bearer $($t.token)"} `
-  "https://ghcr.io/v2/purduepete/fittrack/manifests/<tag>" | % StatusCode   # expect 200
-```
-
-> ❗ **Managed identity cannot replace this PAT.** Container Apps' identity-based
-> image pull is **Azure Container Registry only**; ghcr.io accepts only a
-> username + PAT. So `fittrack-identity` handles Azure SQL auth, but the registry
-> credential must stay a secret. Don't burn time trying to eliminate it.
-
-The PAT currently in use is a **classic PAT with no expiration**, so this should
-not recur on a timer — but it can still break if the token is revoked, regenerated,
-or auto-removed by GitHub (classic PATs are revoked after **one year of disuse**).
-Because the app scales to zero, such a break is **silent until someone opens the
-page** — which is exactly how the 2026-08-03 outage went unnoticed.
-
-### Uptime monitoring
-
-`.github/workflows/uptime.yml` guards against that silence: it GETs `/api/health`
-from a GitHub runner **three times a day** and fails the run (which emails you)
-if the app doesn't return 200 after three tries.
-
-It deliberately runs _outside_ Azure. Because `minReplicas: 0`, **zero replicas is
-the normal idle state**, so an Azure metric alert on replica count or restarts
-cannot tell "idle" from "broken" — only a real HTTP request that forces a cold
-start can. The retries exist because that cold start takes ~20s.
-
-The frequency is deliberately low: every probe wakes the app, so checking every
-few minutes would keep it permanently warm and negate the scale-to-zero saving
-that justifies the Consumption plan. Run it on demand — or test the check itself
-against a different host — with:
+`.github/workflows/uptime.yml` runs three times a day. It requests `/api/health`
+on the public hostname and passes only when Cloudflare Access answers with its
+sign-in redirect, so it catches a broken Access application, DNS record or
+tunnel route. The host watchdog checks `/api/ready`, including PostgreSQL, on
+the protected origin.
 
 ```powershell
 gh workflow run uptime.yml                          # probe production
 gh workflow run uptime.yml -f base_url=https://...  # probe something else
 ```
 
-Runs started with `base_url` are labelled **MANUAL OVERRIDE — not production** in
-the log and failure annotation, so a deliberate test of the check is never
-mistaken for a real outage. Scheduled runs never set it: a red run whose log says
-`Probing production` is genuine.
+Runs started with `base_url` log `manual override` as their target, so a
+deliberate test of the check is never mistaken for a real outage.
 
-> 🔑 **The pull credential is scoped to `read:packages` — keep it that way.**
-> During the 2026-08-03 recovery the app briefly held the local `CR_PAT`
-> (`repo` + `write:packages`), which was then replaced by a dedicated read-only
-> classic PAT and verified to pull. `CR_PAT` still needs `write:packages` for
-> _pushing_ images from your machine, so only the value stored **in the app**
-> should be read-only. When rotating, don't paste `CR_PAT` back in.
+## Database-change policy
 
-## ⚠️ Database-change policy
-
-`init_db.py` and `backfill_export_xml.py` **alter the shared WebPortfolio
-database**. Per project policy, get a **Gemini second opinion** before running
-either against the live DB. The test suite uses in-memory SQLite and touches
-nothing real.
+Schema changes go through reviewed files in `deploy/postgresql`, applied by the
+migration identity before a release. `reprocess_events.py`,
+`backfill_export_xml.py`, `enrich_from_strava.py` and `remove_excluded_workouts.py`
+write to the live database. Get an independent model review before running any
+of them, or any other change, against `fit_track`. The test suite uses in-memory
+SQLite and touches nothing real.
 
 ## Documentation
 

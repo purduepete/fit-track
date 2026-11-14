@@ -16,7 +16,7 @@ from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from sqlalchemy import select, text
+from sqlalchemy import select
 
 from .auth import require_read
 from .config import get_settings
@@ -30,28 +30,8 @@ logger = logging.getLogger("fittrack")
 settings = get_settings()
 
 
-def _prewarm_db() -> None:
-    """Open one pooled DB connection at startup so the first user request does
-    not pay the Azure AD token acquisition + ODBC connect cost (a significant
-    slice of perceived cold-start latency).
-
-    Only runs for the ``aad`` auth path (production / Azure), so the test suite
-    and password-based local runs are unaffected. Best-effort: any failure is
-    logged and never blocks application startup.
-    """
-    if settings.db_auth.lower() != "aad":
-        return
-    try:
-        with SessionLocal() as db:
-            db.execute(text("SELECT 1"))
-        logger.info("DB pre-warm succeeded")
-    except Exception as exc:  # pragma: no cover - best effort, never blocks boot
-        logger.warning("DB pre-warm failed (continuing without it): %s", exc)
-
-
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    _prewarm_db()
     stop = Event()
     worker = None
     if settings.strava_token_file:
@@ -106,7 +86,7 @@ async def _revalidate_app_shell(request, call_next):
 
 @app.get("/api/health", tags=["meta"])
 def health() -> dict:
-    """Unauthenticated liveness probe used by Azure Container Apps."""
+    """Unauthenticated liveness probe (the public uptime check uses it)."""
     return {"status": "ok"}
 
 

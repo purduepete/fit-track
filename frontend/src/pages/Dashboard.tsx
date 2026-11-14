@@ -42,12 +42,14 @@ const VO2_TIERS = ['Very Poor', 'Poor', 'Fair', 'Good', 'Excellent', 'Superior']
 const SLEEP_COLORS = ['#dc2626', '#f59e0b', '#84cc16', '#22c55e'];
 const SLEEP_TIERS = ['Low', 'Fair', 'Good', 'Excellent'];
 
-const STEPS_BAR_COLOR = '#4f46e5'; // indigo — base daily-steps bar
-const STEPS_AVG_COLOR = '#f59e0b'; // amber — 7-day block-average line
-const WORKOUT_BAR_COLOR = '#10b981'; // emerald — bar highlight on days with a logged workout
+const CHART_BAR_COLOR = 'var(--chart-bar)';
+const STEPS_AVG_COLOR = 'var(--chart-average)';
+const WORKOUT_BAR_COLOR = 'var(--chart-workout)';
+const GOAL_COLOR = 'var(--chart-goal)';
+const CHART_ALT_COLOR = 'var(--chart-alt)';
 
 function SleepQuality({ band, hours }: { band: SleepBand; hours: number }) {
-    const color = SLEEP_COLORS[band.category_index] ?? '#4f46e5';
+    const color = SLEEP_COLORS[band.category_index] ?? CHART_BAR_COLOR;
     return (
         <div className="card">
             <h2>Sleep quality</h2>
@@ -56,7 +58,7 @@ function SleepQuality({ band, hours }: { band: SleepBand; hours: number }) {
                     {band.category}
                 </span>
                 <p className="muted vo2-context">
-                    {formatHoursMinutes(hours)} asleep last night — rated <strong>{band.category}</strong> against a{' '}
+                    {formatHoursMinutes(hours)} asleep last night, rated <strong>{band.category}</strong> against a{' '}
                     {band.target_low}–{band.target_high} h target.
                 </p>
                 <div
@@ -86,7 +88,7 @@ function SleepQuality({ band, hours }: { band: SleepBand; hours: number }) {
 }
 
 function CardioFitness({ band, value }: { band: Vo2MaxBand; value: number }) {
-    const color = VO2_COLORS[band.category_index] ?? '#4f46e5';
+    const color = VO2_COLORS[band.category_index] ?? CHART_BAR_COLOR;
     const toNext = band.next_at !== null && band.next_category ? round(band.next_at - value, 1) : null;
     const sexLabel = band.sex === 'female' ? 'F' : 'M';
     return (
@@ -158,7 +160,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                 {data.vo2max_band && (
                     <span
                         className="vo2-badge"
-                        style={{ background: VO2_COLORS[data.vo2max_band.category_index] ?? '#4f46e5' }}
+                        style={{ background: VO2_COLORS[data.vo2max_band.category_index] ?? CHART_BAR_COLOR }}
                     >
                         {data.vo2max_band.category}
                     </span>
@@ -175,7 +177,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                 {data.sleep_band && (
                     <span
                         className="vo2-badge"
-                        style={{ background: SLEEP_COLORS[data.sleep_band.category_index] ?? '#4f46e5' }}
+                        style={{ background: SLEEP_COLORS[data.sleep_band.category_index] ?? CHART_BAR_COLOR }}
                     >
                         {data.sleep_band.category}
                     </span>
@@ -187,7 +189,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
 
     // Build ONE shared data array for the ComposedChart: the daily steps value,
     // the 7-day block average, and a `workout` y (= that day's steps) only on days
-    // with a logged workout. All series must share this single array — giving the
+    // with a logged workout. All series must share this single array: giving the
     // Scatter its own `data` prop hijacks the category axis and hides the bars/line.
     const stepsAvgByDate = new Map(data.steps_avg7_trend.map((p) => [p.local_date, p.value]));
     const workoutDaySet = new Set(data.workout_days);
@@ -207,11 +209,15 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                     <h1 className="page-title">Dashboard</h1>
                 </div>
                 <div className="grid-cards">
-                    <StatCard icon={<ActivityIcon />} label="Workouts (7d)" value={data.workouts_7d} />
-                    <StatCard icon={<ClockIcon />} label="Minutes (7d)" value={formatMinutesHms(data.minutes_7d)} />
+                    <StatCard icon={<ActivityIcon />} label="Active days (week)" value={data.workouts_7d} />
+                    <StatCard
+                        icon={<ClockIcon />}
+                        label="Time (week)"
+                        value={formatHoursMinutes(data.minutes_7d / 60)}
+                    />
                     <StatCard
                         icon={<FlameIcon />}
-                        label="Active energy (7d)"
+                        label="Active energy (week)"
                         value={round(data.active_kcal_7d)}
                         unit="kcal"
                     />
@@ -229,7 +235,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                     <h2 className="section-title">This week</h2>
                     <div className="card">
                         <h2>Workout minutes by day</h2>
-                        <p className="muted chart-caption">Active minutes per day over the last 7 days.</p>
+                        <p className="muted chart-caption">Workout minutes per day, Monday to Sunday.</p>
                         <ResponsiveContainer width="100%" height={240}>
                             <BarChart data={data.weekly_minutes}>
                                 <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -241,7 +247,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                     labelFormatter={formatLocalDate}
                                     formatter={(v) => [formatMinutesHms(v as number), 'Duration']}
                                 />
-                                <Bar dataKey="value" fill="#4f46e5" radius={[2, 2, 0, 0]} />
+                                <Bar dataKey="value" fill={CHART_BAR_COLOR} radius={[2, 2, 0, 0]} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -252,9 +258,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                     <div className="card">
                         <h2>Daily steps</h2>
                         <p className="muted chart-caption">
-                            Last 30 days. Dashed line = 10k goal, amber = weekly average. Green bars have a workout —
-                            tap to view it. Weekly totals (Mon–Sun) appear on Sundays, or on the last recorded day for
-                            incomplete weeks. Totals include only recorded days visible in the chart.
+                            Last 30 days, with weekly totals above Sundays. Tap a green bar to open that day.
                         </p>
                         {hasStepData ? (
                             <>
@@ -315,14 +319,14 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                         />
                                         <ReferenceLine
                                             y={10000}
-                                            stroke="#22c55e"
+                                            stroke={GOAL_COLOR}
                                             strokeDasharray="4 4"
                                             ifOverflow="extendDomain"
                                             label={{
                                                 value: 'Goal 10k',
                                                 position: 'right',
                                                 fontSize: 11,
-                                                fill: '#22c55e',
+                                                fill: GOAL_COLOR,
                                             }}
                                         />
                                         <Bar dataKey="value" radius={[2, 2, 0, 0]}>
@@ -338,7 +342,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                             {stepsChartData.map((d) => (
                                                 <Cell
                                                     key={d.local_date}
-                                                    fill={d.workout != null ? WORKOUT_BAR_COLOR : STEPS_BAR_COLOR}
+                                                    fill={d.workout != null ? WORKOUT_BAR_COLOR : CHART_BAR_COLOR}
                                                     cursor={d.workout != null ? 'pointer' : 'default'}
                                                 />
                                             ))}
@@ -367,7 +371,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                         <div className="card">
                             <h2>Resting heart rate trend</h2>
                             <p className="muted chart-caption">
-                                Lower is generally better — watch for a stable or downward trend.
+                                Lower is generally better. Look for a stable or falling trend.
                             </p>
                             <ResponsiveContainer width="100%" height={240}>
                                 <LineChart data={data.resting_hr_trend}>
@@ -382,7 +386,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                     <Line
                                         type="monotone"
                                         dataKey="value"
-                                        stroke="#7c3aed"
+                                        stroke={CHART_ALT_COLOR}
                                         strokeWidth={2}
                                         dot={false}
                                     />
@@ -392,7 +396,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                         <div className="card">
                             <h2>VO₂ max trend</h2>
                             <p className="muted chart-caption">
-                                Higher is better — see your cardio-fitness rating below.
+                                Higher is better. Your cardio fitness rating is below.
                             </p>
                             {data.vo2max_trend.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={240}>
@@ -412,7 +416,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                         <Line
                                             type="monotone"
                                             dataKey="value"
-                                            stroke="#4f46e5"
+                                            stroke={CHART_BAR_COLOR}
                                             strokeWidth={2}
                                             dot={false}
                                         />
@@ -463,11 +467,11 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                         <ReferenceArea
                                             y1={7}
                                             y2={9}
-                                            fill="#22c55e"
+                                            fill={GOAL_COLOR}
                                             fillOpacity={0.12}
                                             ifOverflow="extendDomain"
                                         />
-                                        <Bar dataKey="value" fill="#7c3aed" radius={[2, 2, 0, 0]} />
+                                        <Bar dataKey="value" fill={CHART_ALT_COLOR} radius={[2, 2, 0, 0]} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             ) : (

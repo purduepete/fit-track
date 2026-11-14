@@ -24,7 +24,6 @@ jobs:
       - name: Run backend tests (in-memory SQLite)
         env:
           DB_SCHEMA: ""
-          DB_PASSWORD: "test"
         run: pytest -q
 
   frontend:

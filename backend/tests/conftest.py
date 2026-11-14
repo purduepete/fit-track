@@ -2,12 +2,11 @@
 
 DB_SCHEMA is cleared *before* importing any app module so the ORM models bind
 to the default (schemaless) namespace, letting the suite run against in-memory
-SQLite instead of Azure SQL.
+SQLite instead of PostgreSQL.
 """
 import os
 
 os.environ.setdefault("DB_SCHEMA", "")
-os.environ.setdefault("DB_PASSWORD", "test")
 
 import pytest  # noqa: E402
 from app import auth  # noqa: E402

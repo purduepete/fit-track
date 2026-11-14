@@ -563,6 +563,37 @@ def test_dashboard_trends_are_windowed(client, auth_headers, db_session):
     dates = [p["local_date"] for p in dash["weekly_minutes"]]
     assert recent.strftime("%Y-%m-%d") in dates
     assert old.strftime("%Y-%m-%d") not in dates
+    assert len(dates) == 7
+
+
+def test_dashboard_uses_the_requested_week_and_pads_every_day(client, auth_headers, db_session):
+    from datetime import datetime
+
+    from app.models import Workout
+    from app.timeutil import utcnow
+
+    now = utcnow()
+
+    def mk(uuid, day, seconds):
+        moment = datetime.fromisoformat(f"{day}T18:00:00")
+        return Workout(uuid=uuid, workout_type="Ride", start_utc=moment, end_utc=moment, local_date=day,
+                       duration_sec=seconds, active_energy_kcal=100, has_route=False, created_utc=now, updated_utc=now)
+
+    db_session.add_all([
+        mk("sun-before", "2026-11-08", 600), mk("mon", "2026-11-09", 600), mk("mon2", "2026-11-09", 300),
+        mk("fri", "2026-11-13", 1200), mk("next-mon", "2026-11-16", 600),
+    ])
+    db_session.commit()
+    week = client.get("/api/dashboard?week_from=2026-11-09&week_to=2026-11-15", headers=auth_headers).json()
+    assert week["workouts_7d"] == 2
+    assert week["minutes_7d"] == 35
+    assert week["active_kcal_7d"] == 300
+    assert [(p["local_date"], p["value"]) for p in week["weekly_minutes"]] == [
+        ("2026-11-09", 15), ("2026-11-10", 0), ("2026-11-11", 0), ("2026-11-12", 0),
+        ("2026-11-13", 20), ("2026-11-14", 0), ("2026-11-15", 0),
+    ]
+    for bad in ("week_from=2026-11-09&week_to=2026-11-20", "week_from=nope", "week_from=2026-11-15&week_to=2026-11-09"):
+        assert client.get(f"/api/dashboard?{bad}", headers=auth_headers).status_code == 422
 
 
 @pytest.mark.parametrize(

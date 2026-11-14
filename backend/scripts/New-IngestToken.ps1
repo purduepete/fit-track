@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Generate a fittrack API token locally and store its hash in Azure SQL.
+    Generate a Fit Track API token and store its hash in the fit_track database.
 
 .DESCRIPTION
     Thin, friendly wrapper around scripts/token_admin.py. Activates the backend

@@ -1,8 +1,8 @@
-"""Dashboard aggregate endpoint (last-7-day summary + trend series)."""
-from datetime import timedelta
+"""Dashboard aggregate endpoint (weekly summary + trend series)."""
+from datetime import date, timedelta
 from math import floor
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -69,8 +69,19 @@ def _sleep_band(value: float | None) -> SleepBand | None:
 def dashboard(
     db: Session = Depends(get_db),
     _token=Depends(require_read),
+    week_from: str | None = Query(None, description="Inclusive local week start (YYYY-MM-DD)."),
+    week_to: str | None = Query(None, description="Inclusive local week end (YYYY-MM-DD)."),
 ) -> DashboardSummary:
-    since = utcnow() - timedelta(days=WEEK_DAYS)
+    # The client sends its Pacific Monday-Sunday week so the cards match the
+    # Workouts page; without bounds the summary covers the last 7 local days.
+    try:
+        first = date.fromisoformat(week_from) if week_from else (utcnow() - timedelta(days=WEEK_DAYS - 1)).date()
+        last = date.fromisoformat(week_to) if week_to else first + timedelta(days=WEEK_DAYS - 1)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail="week_from and week_to must be YYYY-MM-DD dates") from exc
+    if not timedelta(0) <= last - first < timedelta(days=WEEK_DAYS):
+        raise HTTPException(status_code=422, detail="The week must span 1 to 7 days")
+    week_dates = [(first + timedelta(days=i)).isoformat() for i in range((last - first).days + 1)]
     # local_date is a "YYYY-MM-DD" string, so lexical >= is a valid date window.
     resting_since = (utcnow() - timedelta(days=RESTING_TREND_DAYS)).strftime("%Y-%m-%d")
     vo2max_since = (utcnow() - timedelta(days=VO2MAX_TREND_DAYS)).strftime("%Y-%m-%d")
@@ -86,13 +97,13 @@ def dashboard(
             func.coalesce(func.sum(Workout.duration_sec), 0.0),
             func.coalesce(func.sum(Workout.active_energy_kcal), 0.0),
         )
-        .where(Workout.start_utc >= since)
+        .where(Workout.local_date >= week_dates[0], Workout.local_date <= week_dates[-1])
         .group_by(Workout.local_date)
         .order_by(Workout.local_date)
     ).all()
 
     # Count active days, not raw workout rows: two workouts on the same day
-    # count as one toward the "Workouts (7d)" KPI.
+    # count as one toward the "Active days" KPI.
     workouts_7d = len(by_date)
     duration_7d = sum(row[2] for row in by_date)
     energy_7d = sum(row[3] for row in by_date)
@@ -184,6 +195,7 @@ def dashboard(
     # When data was last uploaded: the newest successfully processed ingest.
     # Events still in "received" (failed mid-persist) don't count, since none of
     # their rows are visible.
+    minutes_by_date = {d: _minutes_at_second_precision(s) for d, _, s, _ in by_date}
     last_ingest_utc = db.execute(
         select(func.max(RawIngestEvent.processed_utc)).where(RawIngestEvent.status == "processed")
     ).scalar_one_or_none()
@@ -200,7 +212,7 @@ def dashboard(
         sleep_band=_sleep_band(latest_sleep),
         latest_steps=latest_steps,
         latest_steps_date=latest_steps_date,
-        weekly_minutes=[MetricPoint(local_date=d, value=_minutes_at_second_precision(s)) for d, _, s, _ in by_date],
+        weekly_minutes=[MetricPoint(local_date=d, value=minutes_by_date.get(d, 0.0)) for d in week_dates],
         resting_hr_trend=[MetricPoint(local_date=d, value=v) for d, v in resting_trend],
         vo2max_trend=[MetricPoint(local_date=d, value=v) for d, v in vo2max_trend],
         sleep_trend=[MetricPoint(local_date=d, value=v) for d, v in sleep_trend],

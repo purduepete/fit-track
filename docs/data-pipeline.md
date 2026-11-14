@@ -296,5 +296,5 @@ It streams the XML (`lxml.iterparse`, never fully in memory), extracts workout
 summaries and per-day metric aggregates, links `workout-routes/*.gpx` tracks to
 their workouts, and computes historical splits. Use `--no-routes` to skip GPX.
 
-> **DB-altering** — get a Gemini second opinion before running against the live
-> WebPortfolio database.
+> **DB-altering**: get an independent model review before running against the
+> live `fit_track` database.

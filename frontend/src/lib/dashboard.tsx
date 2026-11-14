@@ -1,12 +1,13 @@
 import { createContext, useContext, type ReactNode } from 'react';
 import { api, type DashboardSummary } from './api';
 import { useApiResource } from './useApiResource';
+import { currentPacificWeek } from './format';
 
 type DashboardResource = ReturnType<typeof useApiResource<DashboardSummary>>;
 const DashboardContext = createContext<DashboardResource | null>(null);
 
 export function DashboardProvider({ children, onAuthError }: { children: ReactNode; onAuthError: () => void }) {
-    const resource = useApiResource(() => api.dashboard(), [onAuthError], onAuthError);
+    const resource = useApiResource(() => api.dashboard(currentPacificWeek()), [onAuthError], onAuthError);
     return <DashboardContext.Provider value={resource}>{children}</DashboardContext.Provider>;
 }
 

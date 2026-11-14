@@ -1,4 +1,4 @@
-"""ORM models. All tables live in the ``fit`` schema of the WebPortfolio DB."""
+"""ORM models. Production tables live in the ``public`` schema of ``fit_track``."""
 from datetime import datetime
 from typing import Any
 
@@ -6,6 +6,7 @@ from sqlalchemy import (
     JSON,
     BigInteger,
     Boolean,
+    DateTime,
     Float,
     ForeignKey,
     Index,
@@ -13,28 +14,16 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Unicode,
+    UnicodeText,
     UniqueConstraint,
     text,
 )
-from sqlalchemy import (
-    DateTime as _SA_DateTime,
-)
-from sqlalchemy import (
-    UnicodeText as _SA_UnicodeText,
-)
-from sqlalchemy.dialects import mssql, postgresql
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 from .config import get_settings
 
-# Use modern SQL Server types on Azure SQL (DATETIME2 instead of the legacy
-# DATETIME, and NVARCHAR(max) instead of the deprecated NTEXT) while falling
-# back to the plain generic types on SQLite so the test suite is unaffected.
-# A single type instance may safely be shared across many columns.
-DateTime = _SA_DateTime().with_variant(mssql.DATETIME2, "mssql")
-UnicodeText = _SA_UnicodeText().with_variant(mssql.NVARCHAR(None), "mssql")
-
-# ``fit`` in production; tests set DB_SCHEMA="" to run on schemaless SQLite.
+# ``public`` in production; tests set DB_SCHEMA="" to run on schemaless SQLite.
 SCHEMA = get_settings().db_schema or None
 
 

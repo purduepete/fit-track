@@ -76,7 +76,7 @@ def as_source_name(value) -> str | None:
     """Coerce an HAE source field to its display name.
 
     HAE changed workout ``source`` from a bare string to
-    ``{"name": ..., "identifier": ...}``; the dict then reached pyodbc as a bind
+    ``{"name": ..., "identifier": ...}``; the dict then reached the database driver as a bind
     parameter and every ingest failed with "Unknown object type dict during
     describe". Accept either shape, and keep the name short enough for the
     Unicode(120) column.
@@ -547,7 +547,7 @@ def payload_hash(raw_text: str) -> str:
 
 
 # --- persistence (idempotent upserts) ---------------------------------------
-# Azure SQL rejects a statement with more than 2,100 parameters. Every unbounded
+# Bound statement size: some databases reject over 2,100 parameters. Every unbounded
 # IN (...) / executemany is chunked below this so a large payload or a multi-year
 # backfill cannot blow the limit mid-ingest.
 _IN_CHUNK = 1000
@@ -681,7 +681,7 @@ def persist_payload(
         if existing.watts_per_kg is None and pw.average_watts is not None:
             if weight_kg is _UNSET:
                 weight_kg = _current_weight_kg(db)
-            if weight_kg:
+            if isinstance(weight_kg, float) and weight_kg:
                 existing.watts_per_kg = round(pw.average_watts / weight_kg, 2)
         existing.has_route = has_route
         existing.updated_utc = now

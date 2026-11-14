@@ -119,6 +119,9 @@ Behavior:
   saved access token has more than 30 minutes left, so it never refreshes the
   token the app's sync also uses. Imports keep stored power, cadence and
   elevation when a payload has none, so later Health replays don't erase them.
+  On 11/13/2026 it filled 12 of the 16 RunGap rides at 84.2 kg. The 2 short
+  10/06 rides and the 10/07 07:03 and 07:39 rides have no matching Strava ride,
+  and 2 Strava rides from that period have no stored workout.
 - Elevation: the activity's `total_elevation_gain` is stored as the workout's
   elevation gain (Strava's smoothed total), and the `altitude` stream fills each
   route point's `elevation_m` for the elevation chart. Splits take per-split

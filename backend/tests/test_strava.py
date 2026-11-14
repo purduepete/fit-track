@@ -598,3 +598,55 @@ def test_health_workouts_have_no_power_fields(db_session):
     db_session.commit()
     workout = db_session.get(Workout, "apple-1")
     assert (workout.average_watts, workout.average_cadence, workout.watts_per_kg) == (None, None, None)
+
+def test_enrich_fills_only_empty_fields_on_the_matching_health_ride(token_file, db_session):
+    from scripts.enrich_from_strava import enrich
+
+    start = datetime(2026, 10, 10, 15, 0)
+    def health(uuid, offset=0, **values):
+        moment = start + timedelta(seconds=offset)
+        return Workout(uuid=uuid, workout_type="Indoor Cycling", source_name="RunGap", start_utc=moment,
+                       end_utc=moment + timedelta(seconds=1800), local_date="2026-10-10", duration_sec=1800,
+                       has_route=True, created_utc=start, updated_utc=start, **values)
+    db_session.add_all([health("rungap-1", 30), health("rungap-2", 3600, elevation_gain_m=99.0)])
+    set_weight(db_session, 84.2)
+
+    def handler(request):
+        if request.url.path.endswith("/athlete/activities"):
+            if request.url.params["page"] != "1":
+                return httpx.Response(200, json=[])
+            return httpx.Response(200, json=[
+                {"id": 1, "sport_type": "VirtualRide", "start_date": "2026-10-10T15:00:00Z", "elapsed_time": 1800},
+                {"id": 2, "sport_type": "VirtualRide", "start_date": "2026-10-10T16:00:00Z", "elapsed_time": 1800},
+                {"id": 3, "sport_type": "VirtualRide", "start_date": "2026-10-11T15:00:00Z", "elapsed_time": 1800},
+                {"id": 4, "sport_type": "Run", "start_date": "2026-10-10T15:00:00Z", "elapsed_time": 1800},
+            ])
+        activity_id = int(request.url.path.rsplit("/", 1)[1])
+        return httpx.Response(200, json={"id": activity_id, "average_watts": 168.4, "average_cadence": 82.0,
+                                         "total_elevation_gain": 140.0})
+
+    with httpx.Client(transport=httpx.MockTransport(handler)) as http:
+        results = enrich(StravaClient(token_file, http), db_session, 0, 2_000_000_000)
+    db_session.commit()
+
+    assert [(r.activity_id, r.workout_uuid) for r in results] == [(1, "rungap-1"), (2, "rungap-2"), (3, None)]
+    first, second = db_session.get(Workout, "rungap-1"), db_session.get(Workout, "rungap-2")
+    assert (first.average_watts, first.average_cadence, first.elevation_gain_m, first.watts_per_kg) == (
+        168.4, 82.0, 140.0, 2.0)
+    assert second.elevation_gain_m == 99.0
+    assert results[1].changes == {"average_watts": 168.4, "average_cadence": 82.0, "watts_per_kg": 2.0}
+
+def test_health_reimport_keeps_backfilled_power_cadence_and_elevation(db_session):
+    payload = {"id": "apple-9", "name": "Indoor Cycling", "start": "2026-10-10 08:00:00 -0700",
+               "end": "2026-10-10 08:30:00 -0700", "duration": 1800}
+    persist_payload(ParsedPayload(workouts=[parse_workout(payload)]), db_session)
+    db_session.commit()
+    workout = db_session.get(Workout, "apple-9")
+    workout.average_watts, workout.average_cadence = 168.4, 82.0
+    workout.elevation_gain_m, workout.watts_per_kg = 140.0, 2.0
+    db_session.commit()
+    persist_payload(ParsedPayload(workouts=[parse_workout(payload)]), db_session)
+    db_session.commit()
+    workout = db_session.get(Workout, "apple-9")
+    assert (workout.average_watts, workout.average_cadence, workout.elevation_gain_m, workout.watts_per_kg) == (
+        168.4, 82.0, 140.0, 2.0)

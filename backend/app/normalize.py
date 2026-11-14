@@ -670,9 +670,13 @@ def persist_payload(
         existing.avg_hr = pw.avg_hr
         existing.max_hr = pw.max_hr
         existing.min_hr = pw.min_hr
-        existing.elevation_gain_m = pw.elevation_gain_m
-        existing.average_watts = pw.average_watts
-        existing.average_cadence = pw.average_cadence
+        # Keep values a payload lacks; Health rides get these from a Strava backfill.
+        if pw.elevation_gain_m is not None:
+            existing.elevation_gain_m = pw.elevation_gain_m
+        if pw.average_watts is not None:
+            existing.average_watts = pw.average_watts
+        if pw.average_cadence is not None:
+            existing.average_cadence = pw.average_cadence
         # W/kg is fixed once set; re-imports and replays never recalculate it.
         if existing.watts_per_kg is None and pw.average_watts is not None:
             if weight_kg is _UNSET:

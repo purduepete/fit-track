@@ -110,6 +110,15 @@ Behavior:
   recalculated: later weight changes, changed-summary re-imports and raw-event
   replays keep the stored value. The 15 rides imported before 11/13/2026 were
   backfilled from their retained raw events with 84.2 kg.
+- Older Zwift rides that arrived through Apple Health (for example RunGap,
+  10/06 to 10/22/2026) get power, cadence, elevation gain and W/kg from
+  `python -m scripts.enrich_from_strava --token-file <tokens.json> --start <YYYY-MM-DD>`
+  (add `--apply` after checking the dry run). It matches each Strava virtual ride
+  to one stored cycling workout (start within 60 s, end within 120 s), fills only
+  empty fields, and holds the import lock until it commits. Run it only while the
+  saved access token has more than 30 minutes left, so it never refreshes the
+  token the app's sync also uses. Imports keep stored power, cadence and
+  elevation when a payload has none, so later Health replays don't erase them.
 - Elevation: the activity's `total_elevation_gain` is stored as the workout's
   elevation gain (Strava's smoothed total), and the `altitude` stream fills each
   route point's `elevation_m` for the elevation chart. Splits take per-split

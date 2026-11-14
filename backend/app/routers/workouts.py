@@ -2,10 +2,10 @@
 import math
 from collections.abc import Sequence
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import case, func, nulls_last, select
 from sqlalchemy.orm import Session
 
 from ..auth import require_control, require_read
@@ -78,6 +78,37 @@ def _load_series(
     return rows, total
 
 
+def _sort_column(key: str) -> Any:
+    if key == "distance":
+        return Workout.distance_m
+    if key == "pace":
+        # Seconds per meter; null without a positive distance and a duration.
+        return case(
+            (
+                (Workout.distance_m > 0) & Workout.duration_sec.is_not(None),
+                Workout.duration_sec / Workout.distance_m,
+            ),
+            else_=None,
+        )
+    if key == "kcal":
+        return Workout.active_energy_kcal
+    if key == "power":
+        return Workout.average_watts
+    if key == "wkg":
+        return Workout.watts_per_kg
+    if key == "duration":
+        return Workout.duration_sec
+    if key == "hr":
+        return Workout.avg_hr
+    if key == "maxhr":
+        return Workout.max_hr
+    if key == "cadence":
+        return Workout.average_cadence
+    if key == "elev":
+        return Workout.elevation_gain_m
+    return Workout.start_utc
+
+
 @router.get("", response_model=WorkoutList)
 def list_workouts(
     db: Session = Depends(get_db),
@@ -87,6 +118,10 @@ def list_workouts(
     workout_type: str | None = None,
     date_from: str | None = Query(None, description="Inclusive local start date (YYYY-MM-DD)."),
     date_to: str | None = Query(None, description="Inclusive local end date (YYYY-MM-DD)."),
+    sort: Literal[
+        "date", "duration", "distance", "pace", "kcal", "hr", "maxhr", "power", "wkg", "cadence", "elev"
+    ] = "date",
+    order: Literal["asc", "desc"] = "desc",
 ) -> WorkoutList:
     # local_date is a "YYYY-MM-DD" string, so lexical comparisons are valid dates.
     filters = []
@@ -98,10 +133,13 @@ def list_workouts(
         filters.append(Workout.local_date <= date_to)
 
     total = db.scalar(select(func.count()).select_from(Workout).where(*filters)) or 0
+    column = _sort_column(sort)
+    primary = column.asc() if order == "asc" else column.desc()
     stmt = (
         select(Workout)
         .where(*filters)
-        .order_by(Workout.start_utc.desc())
+        # Missing values sort last either way; newest first breaks ties.
+        .order_by(nulls_last(primary), Workout.start_utc.desc(), Workout.uuid.desc())
         .offset(offset)
         .limit(limit)
     )

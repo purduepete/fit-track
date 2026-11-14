@@ -1,5 +1,6 @@
 /** Tiny typed API client. The bearer token is kept in localStorage (and in SiteDock when embedded there). */
 import { sitedockToken } from './sitedock';
+import type { SortKey } from './workoutSort';
 
 export interface WorkoutSummary {
     uuid: string;
@@ -148,6 +149,8 @@ export interface WorkoutQuery {
     dateTo?: string;
     limit?: number;
     offset?: number;
+    sort?: SortKey;
+    order?: 'asc' | 'desc';
 }
 
 const TOKEN_KEY = 'fittrack_token';
@@ -225,6 +228,8 @@ export const api = {
         if (q.dateTo) p.set('date_to', q.dateTo);
         if (q.limit != null) p.set('limit', String(q.limit));
         if (q.offset != null) p.set('offset', String(q.offset));
+        if (q.sort && q.sort !== 'date') p.set('sort', q.sort);
+        if (q.order && q.order !== 'desc') p.set('order', q.order);
         const qs = p.toString();
         return apiGet<WorkoutList>('/api/workouts' + (qs ? `?${qs}` : ''));
     },

@@ -47,6 +47,12 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   (rpm). Enter your weight in kg on the Workouts page; W/kg is fixed when a ride
   is imported, so a later weight change affects only new rides. Totals average
   these by duration. On phones, empty power cells are hidden.
+- **Sorting**: click any column header except Type to sort by it; click again to
+  reverse. Pace starts fastest first, the rest highest first. The server sorts every
+  workout in the range, so Load more continues in order, and workouts missing the
+  value come last. Sorting by anything except date lists workouts flat with their
+  dates, without day groups or daily subtotals. Phones hide the table header, so they
+  keep the date order. The choice is remembered on the device.
 - **Dashboard** — 7-day workout count / minutes / active energy, resting-HR,
   VO₂ max and sleep trends, plus a 30-day daily-steps chart with a 10k goal line,
   a stepped 7-day block-average line, and green bars on days with a logged

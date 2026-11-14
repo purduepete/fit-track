@@ -367,6 +367,47 @@ def test_workouts_filter_paginate_and_types(client, auth_headers, db_session):
     assert client.get("/api/workouts/types", headers=auth_headers).json() == ["Run", "Walk"]
 
 
+def test_workouts_sort_by_metric_with_missing_values_last(client, auth_headers, db_session):
+    from datetime import timedelta
+
+    from app.models import Workout
+    from app.timeutil import utcnow
+
+    now = utcnow()
+
+    def mk(uuid, day, distance, duration, watts=None, wkg=None):
+        d = now - timedelta(days=day)
+        return Workout(
+            uuid=uuid, workout_type="Ride", start_utc=d, end_utc=d, local_date=d.strftime("%Y-%m-%d"),
+            duration_sec=duration, distance_m=distance, average_watts=watts, watts_per_kg=wkg,
+            has_route=False, created_utc=now, updated_utc=now,
+        )
+
+    db_session.add_all([
+        mk("slow", 0, 1000, 600, 150, 1.8),
+        mk("fast", 1, 2000, 600, 200, 2.4),
+        mk("none", 2, None, 600),
+        mk("zero", 3, 0, 600),
+    ])
+    db_session.commit()
+
+    def order(query):
+        response = client.get(f"/api/workouts?{query}", headers=auth_headers)
+        assert response.status_code == 200
+        return [item["uuid"] for item in response.json()["items"]]
+
+    assert order("sort=distance") == ["fast", "slow", "zero", "none"]
+    assert order("sort=pace&order=asc") == ["fast", "slow", "none", "zero"]
+    assert order("sort=pace&order=desc") == ["slow", "fast", "none", "zero"]
+    assert order("sort=power&order=asc") == ["slow", "fast", "none", "zero"]
+    assert order("sort=wkg") == ["fast", "slow", "none", "zero"]
+    assert order("sort=date&order=asc") == ["zero", "none", "fast", "slow"]
+    for key in ("duration", "hr", "maxhr", "cadence", "elev"):
+        assert len(order(f"sort={key}")) == 4
+    assert order("sort=distance&limit=2&offset=2") == ["zero", "none"]
+    assert client.get("/api/workouts?sort=bogus", headers=auth_headers).status_code == 422
+
+
 def test_workout_detail_prev_next_navigation(client, auth_headers, db_session):
     from datetime import timedelta
 

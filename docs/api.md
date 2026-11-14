@@ -58,8 +58,12 @@ Response:
 ## `GET /api/workouts` _(read scope)_
 
 Query: `limit` (≤500, default 50), `offset`, `workout_type`, `date_from`,
-`date_to` (inclusive local `YYYY-MM-DD` bounds). Returns a page of workout
-summaries (newest first) plus the total matching count for pagination:
+`date_to` (inclusive local `YYYY-MM-DD` bounds), `sort` (`date`, `duration`,
+`distance`, `pace`, `kcal`, `hr`, `maxhr`, `power`, `wkg`, `cadence` or `elev`;
+default `date`) and `order` (`asc` or `desc`;
+default `desc`). Pace sorts by stored duration ÷ distance. Workouts missing the
+sorted value come last in either direction, and newest first breaks ties.
+Returns a page of workout summaries plus the total matching count for pagination:
 
 ```json
 {
@@ -162,8 +166,8 @@ sends only changed timestamps:
 
 ```json
 {
-  "exclude": [{"ts_utc": "2026-10-24T00:05:00"}],
-  "restore": [{"ts_utc": "2026-10-24T00:06:00"}]
+  "exclude": [{ "ts_utc": "2026-10-24T00:05:00" }],
+  "restore": [{ "ts_utc": "2026-10-24T00:06:00" }]
 }
 ```
 

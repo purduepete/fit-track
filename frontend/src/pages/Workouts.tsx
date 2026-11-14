@@ -8,6 +8,8 @@ import { useUnit } from '../lib/useUnit';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useDelayedLoading } from '../hooks/useDelayedLoading';
 import { WeightField } from '../components/WeightField';
+import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
+import { DEFAULT_ORDER, useWorkoutSort, type SortKey, type WorkoutSort } from '../lib/workoutSort';
 import { groupWorkoutDays, totalWorkouts, type WorkoutTotals } from '../lib/workoutTotals';
 import { useFirstLoad } from '../lib/firstLoad';
 import { usePageRefresh } from '../lib/refresh';
@@ -57,6 +59,11 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
     const [type, setType] = useState('');
     const { unit, setUnit, saveError } = useUnit();
     const [range, setRange] = useState('week');
+    const { sort, setSort } = useWorkoutSort();
+    // Layout follows the order the loaded rows came in, so rows still sorted by
+    // another column are never grouped by day while the new order loads.
+    const [loadedSortKey, setLoadedSortKey] = useState(sort.key);
+    const byDate = loadedSortKey === 'date';
     const [search, setSearch] = useState('');
     const [types, setTypes] = useState<string[]>([]);
     const [typesReady, setTypesReady] = useState(false);
@@ -80,6 +87,8 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
           ? currentPacificWeek()
           : { dateFrom: rangeToDateFrom(range), dateTo: undefined };
 
+    const query = { type: type || undefined, dateFrom, dateTo, sort: sort.key, order: sort.order };
+
     // A deep-linked date must not be hidden by a leftover client-side search term.
     useEffect(() => {
         if (dateParam) setSearch('');
@@ -102,13 +111,14 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
     useEffect(() => {
         if (!active) return;
         let live = true;
-        const key = JSON.stringify([type, dateFrom, dateTo]);
+        const key = JSON.stringify([type, dateFrom, dateTo, sort.key, sort.order]);
         setPending(key === loadedKey.current ? 'revalidate' : 'list');
         setError(null);
-        api.workouts({ type: type || undefined, dateFrom, dateTo, limit: PAGE_SIZE, offset: 0 })
+        api.workouts({ ...query, limit: PAGE_SIZE, offset: 0 })
             .then((res) => {
                 if (!live) return;
                 setItems(res.items);
+                setLoadedSortKey(sort.key);
                 setTotal(res.total);
                 loadedKey.current = key;
             })
@@ -130,11 +140,11 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
             live = false;
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [type, dateFrom, dateTo, revision, active]);
+    }, [type, dateFrom, dateTo, sort.key, sort.order, revision, active]);
 
     function loadMore() {
         setPending('more');
-        api.workouts({ type: type || undefined, dateFrom, dateTo, limit: PAGE_SIZE, offset: items.length })
+        api.workouts({ ...query, limit: PAGE_SIZE, offset: items.length })
             .then((res) => {
                 setItems((prev) => [...prev, ...res.items]);
                 setTotal(res.total);
@@ -163,7 +173,10 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
 
     // The list is newest-first, so only the oldest loaded day can continue on the next page.
     const partialDate = items.length < total && items.length > 0 ? items[items.length - 1].local_date : null;
-    const groups = useMemo(() => groupWorkoutDays(filtered, partialDate), [filtered, partialDate]);
+    const groups = useMemo(
+        () => (byDate ? groupWorkoutDays(filtered, partialDate) : []),
+        [byDate, filtered, partialDate]
+    );
     const hasMore = items.length < total && !search;
 
     const typeOptions = useMemo(
@@ -248,71 +261,71 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                             <table className="stack-table">
                                 <thead>
                                     <tr>
-                                        <th>Time</th>
+                                        <SortHeader
+                                            label={byDate ? 'Time' : 'Date'}
+                                            sortKey="date"
+                                            sort={sort}
+                                            onSort={setSort}
+                                        />
                                         <th>Type</th>
-                                        <th>Duration</th>
-                                        <th>Distance</th>
-                                        <th>Avg pace</th>
-                                        <th>Active kcal</th>
-                                        <th>Avg HR</th>
-                                        <th>Max HR</th>
-                                        <th>Avg power</th>
-                                        <th>W/kg</th>
-                                        <th>Cadence</th>
-                                        <th>Elev gain</th>
+                                        <SortHeader label="Duration" sortKey="duration" sort={sort} onSort={setSort} />
+                                        <SortHeader label="Distance" sortKey="distance" sort={sort} onSort={setSort} />
+                                        <SortHeader label="Avg pace" sortKey="pace" sort={sort} onSort={setSort} />
+                                        <SortHeader label="Active kcal" sortKey="kcal" sort={sort} onSort={setSort} />
+                                        <SortHeader label="Avg HR" sortKey="hr" sort={sort} onSort={setSort} />
+                                        <SortHeader label="Max HR" sortKey="maxhr" sort={sort} onSort={setSort} />
+                                        <SortHeader label="Avg power" sortKey="power" sort={sort} onSort={setSort} />
+                                        <SortHeader label="Avg W/kg" sortKey="wkg" sort={sort} onSort={setSort} />
+                                        <SortHeader label="Cadence" sortKey="cadence" sort={sort} onSort={setSort} />
+                                        <SortHeader label="Elev gain" sortKey="elev" sort={sort} onSort={setSort} />
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {groups.map((g) => (
-                                        <Fragment key={g.date}>
-                                            <tr className="group-row">
-                                                <td colSpan={COLUMNS}>
-                                                    {formatLocalDate(g.date)}
-                                                    <span className="group-count">
-                                                        {g.rows.length} {g.rows.length === 1 ? 'workout' : 'workouts'}
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                            {g.rows.map((w) => (
-                                                <tr key={w.uuid} onClick={() => nav(`/workouts/${w.uuid}`)}>
-                                                    <td data-label="Time">{formatLocalTime(w.start_utc)}</td>
-                                                    <td data-label="Type">
-                                                        <span className="chip">{w.workout_type}</span>
-                                                    </td>
-                                                    <td data-label="Duration">{formatHms(w.duration_sec)}</td>
-                                                    <td data-label="Distance">{formatDistance(w.distance_m, unit)}</td>
-                                                    <td data-label="Avg pace">
-                                                        {formatPace(
-                                                            avgPaceSecPerUnit(w.distance_m, w.duration_sec, unit),
-                                                            unit
-                                                        )}
-                                                    </td>
-                                                    <td data-label="Active kcal">{round(w.active_energy_kcal)}</td>
-                                                    <td data-label="Avg HR">{round(w.avg_hr)}</td>
-                                                    <td data-label="Max HR">{round(w.max_hr)}</td>
-                                                    <PowerCells
-                                                        power={w.average_watts}
-                                                        wkg={w.watts_per_kg}
-                                                        cadence={w.average_cadence}
-                                                    />
-                                                    <td data-label="Elev gain">
-                                                        {formatElevation(w.elevation_gain_m, unit)}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {g.subtotals.map(({ type: subtotalType, totals }) => (
-                                                <tr key={`${g.date}-${subtotalType}-total`} className="subtotal-row">
-                                                    <td data-label="Subtotal">Total</td>
-                                                    <td data-label="Type">
-                                                        <span>
-                                                            {subtotalType} × {totals.count}
-                                                        </span>
-                                                    </td>
-                                                    <TotalCells totals={totals} unit={unit} />
-                                                </tr>
-                                            ))}
-                                        </Fragment>
-                                    ))}
+                                    {byDate
+                                        ? groups.map((g) => (
+                                              <Fragment key={g.date}>
+                                                  <tr className="group-row">
+                                                      <td colSpan={COLUMNS}>
+                                                          {formatLocalDate(g.date)}
+                                                          <span className="group-count">
+                                                              {g.rows.length}{' '}
+                                                              {g.rows.length === 1 ? 'workout' : 'workouts'}
+                                                          </span>
+                                                      </td>
+                                                  </tr>
+                                                  {g.rows.map((w) => (
+                                                      <WorkoutRow
+                                                          key={w.uuid}
+                                                          workout={w}
+                                                          unit={unit}
+                                                          onOpen={() => nav(`/workouts/${w.uuid}`)}
+                                                      />
+                                                  ))}
+                                                  {g.subtotals.map(({ type: subtotalType, totals }) => (
+                                                      <tr
+                                                          key={`${g.date}-${subtotalType}-total`}
+                                                          className="subtotal-row"
+                                                      >
+                                                          <td data-label="Subtotal">Total</td>
+                                                          <td data-label="Type">
+                                                              <span>
+                                                                  {subtotalType} × {totals.count}
+                                                              </span>
+                                                          </td>
+                                                          <TotalCells totals={totals} unit={unit} />
+                                                      </tr>
+                                                  ))}
+                                              </Fragment>
+                                          ))
+                                        : filtered.map((w) => (
+                                              <WorkoutRow
+                                                  key={w.uuid}
+                                                  workout={w}
+                                                  unit={unit}
+                                                  showDate
+                                                  onOpen={() => nav(`/workouts/${w.uuid}`)}
+                                              />
+                                          ))}
                                     {!loading && filtered.length === 0 && (
                                         <tr>
                                             <td
@@ -397,7 +410,7 @@ function PowerCells({
             >
                 {formatMetric(power, 0, ' W')}
             </td>
-            <td data-label="W/kg" className={empty(wkg)} {...tip('Duration-weighted average of stored W/kg')}>
+            <td data-label="Avg W/kg" className={empty(wkg)} {...tip('Duration-weighted average of stored W/kg')}>
                 {formatMetric(wkg, 2)}
             </td>
             <td data-label="Cadence" className={empty(cadence)}>
@@ -425,5 +438,71 @@ function TotalCells({ totals, unit, hints = false }: { totals: WorkoutTotals; un
             <PowerCells power={totals.avgPower} wkg={totals.avgWkg} cadence={totals.avgCadence} hints={hints} />
             <td data-label="Elev gain">{formatElevation(totals.elevation, unit)}</td>
         </>
+    );
+}
+
+function WorkoutRow({
+    workout: w,
+    unit,
+    showDate = false,
+    onOpen,
+}: {
+    workout: WorkoutSummary;
+    unit: Unit;
+    showDate?: boolean;
+    onOpen: () => void;
+}) {
+    return (
+        <tr onClick={onOpen}>
+            <td data-label={showDate ? 'Date' : 'Time'}>
+                {showDate
+                    ? `${formatLocalDate(w.local_date)} ${formatLocalTime(w.start_utc)}`
+                    : formatLocalTime(w.start_utc)}
+            </td>
+            <td data-label="Type">
+                <span className="chip">{w.workout_type}</span>
+            </td>
+            <td data-label="Duration">{formatHms(w.duration_sec)}</td>
+            <td data-label="Distance">{formatDistance(w.distance_m, unit)}</td>
+            <td data-label="Avg pace">{formatPace(avgPaceSecPerUnit(w.distance_m, w.duration_sec, unit), unit)}</td>
+            <td data-label="Active kcal">{round(w.active_energy_kcal)}</td>
+            <td data-label="Avg HR">{round(w.avg_hr)}</td>
+            <td data-label="Max HR">{round(w.max_hr)}</td>
+            <PowerCells power={w.average_watts} wkg={w.watts_per_kg} cadence={w.average_cadence} />
+            <td data-label="Elev gain">{formatElevation(w.elevation_gain_m, unit)}</td>
+        </tr>
+    );
+}
+
+/** Column header that sorts by its column; a second click reverses the direction. */
+function SortHeader({
+    label,
+    sortKey,
+    sort,
+    onSort,
+}: {
+    label: string;
+    sortKey: SortKey;
+    sort: WorkoutSort;
+    onSort: (sort: WorkoutSort) => void;
+}) {
+    const active = sort.key === sortKey;
+    const Icon = !active ? ArrowUpDown : sort.order === 'asc' ? ArrowUp : ArrowDown;
+    return (
+        <th aria-sort={active ? (sort.order === 'asc' ? 'ascending' : 'descending') : undefined}>
+            <button
+                type="button"
+                className={`sort-header${active ? ' is-active' : ''}`}
+                onClick={() =>
+                    onSort({
+                        key: sortKey,
+                        order: active ? (sort.order === 'asc' ? 'desc' : 'asc') : DEFAULT_ORDER[sortKey],
+                    })
+                }
+            >
+                {label}
+                <Icon size={13} aria-hidden="true" />
+            </button>
+        </th>
     );
 }

@@ -375,9 +375,12 @@ textarea {
 }
 
 .subtotal-row td {
-    background: var(--surface-2);
+    background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
     color: var(--text-dim);
-    font-weight: 600;
+    font-size: 0.82rem;
+    font-weight: 500;
+    padding-top: 6px;
+    padding-bottom: 6px;
     cursor: default;
 }
 

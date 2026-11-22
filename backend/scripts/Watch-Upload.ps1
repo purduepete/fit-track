@@ -43,6 +43,32 @@ $ErrorActionPreference = 'Stop'
 $backend = Split-Path $PSScriptRoot -Parent
 $repo = Split-Path $backend -Parent
 
+if ($Background) {
+    $logDir = Join-Path $backend 'logs'
+    if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
+    $log = Join-Path $logDir 'upload-watcher.log'
+}
+trap {
+    if ($Background) {
+        "[$(Get-Date -Format s)] Startup or watcher error: $($_.Exception.Message)" |
+            Out-File -FilePath $log -Append -Encoding utf8
+    }
+    throw
+}
+
+function Wait-UploadFolder {
+    param([string]$Path, [switch]$Wait, [string]$Log)
+
+    while (-not (Test-Path -LiteralPath $Path -PathType Container)) {
+        if (-not $Wait) {
+            throw "Watch folder not found: $Path (check FITTRACK_WATCH_DIR in backend/.env.local)."
+        }
+        "[$(Get-Date -Format s)] Waiting for watch folder: $Path" |
+            Out-File -FilePath $Log -Append -Encoding utf8
+        Start-Sleep -Seconds 30
+    }
+}
+
 # Load config from the gitignored .env.local (KEY=VALUE lines).
 $envFile = Join-Path $backend '.env.local'
 if (Test-Path $envFile) {
@@ -55,18 +81,6 @@ if (Test-Path $envFile) {
 
 if (-not $env:FITTRACK_API_URL -or -not $env:FITTRACK_TOKEN) {
     throw "Set FITTRACK_API_URL and FITTRACK_TOKEN (in backend/.env.local or the environment)."
-}
-
-# Singleton guard: if a watcher is already running, this launch is a no-op.
-# A manual launch or restart-on-failure can fire
-# while a healthy watcher already exists; without this guard duplicate watchers
-# accumulate (each poll re-scans the same folder). We treat any live
-# scripts.upload_folder process as the running watcher and exit early.
-$existing = @(Get-CimInstance Win32_Process -Filter "Name='pythonw.exe' OR Name='python.exe'" -ErrorAction SilentlyContinue |
-    Where-Object { $_.CommandLine -like '*scripts.upload_folder*' })
-if ($existing.Count -gt 0) {
-    Write-Host "Upload watcher already running (PID(s): $($existing.ProcessId -join ', ')). Nothing to do."
-    return
 }
 
 # Always use the CONSOLE python.exe -- even in -Background. pythonw.exe is a
@@ -101,20 +115,23 @@ $archiveName = if ($env:FITTRACK_ARCHIVE_NAME) { $env:FITTRACK_ARCHIVE_NAME } el
 # Delete processed files older than this many days each scan (0 disables).
 $retentionDays = if ($env:FITTRACK_RETENTION_DAYS) { [int]$env:FITTRACK_RETENTION_DAYS } else { 7 }
 
-if (-not (Test-Path $watchDir)) {
-    throw "Watch folder not found: $watchDir (check FITTRACK_WATCH_DIR in backend/.env.local)."
+Wait-UploadFolder -Path $watchDir -Wait:$Background -Log $log
+
+# Recheck after waiting in case another watcher started while Drive was mounting.
+$existing = @(Get-CimInstance Win32_Process -Filter "Name='pythonw.exe' OR Name='python.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like '*scripts.upload_folder*' })
+if ($existing.Count -gt 0) {
+    Write-Host "Upload watcher already running (PID(s): $($existing.ProcessId -join ', ')). Nothing to do."
+    return
+}
+
+if ($Background -and (Test-Path $log) -and (Get-Item $log).Length -gt 5MB) {
+    Move-Item $log "$log.1" -Force
 }
 
 Push-Location $backend
 try {
     if ($Background) {
-        $logDir = Join-Path $backend 'logs'
-        if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
-        $log = Join-Path $logDir 'upload-watcher.log'
-        # Keep the log from growing without bound (~5 MB cap).
-        if ((Test-Path $log) -and (Get-Item $log).Length -gt 5MB) {
-            Move-Item $log "$log.1" -Force
-        }
         "[$(Get-Date -Format s)] Watching $watchDir -> $($env:FITTRACK_API_URL) (every ${IntervalSeconds}s, archive=$archiveName, retentionDays=$retentionDays)." |
             Out-File -FilePath $log -Append -Encoding utf8
         & $python -m scripts.upload_folder --dir $watchDir --interval $IntervalSeconds --archive-name $archiveName --retention-days $retentionDays *>> $log

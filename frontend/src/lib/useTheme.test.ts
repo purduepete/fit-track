@@ -14,7 +14,7 @@ beforeEach(() => {
         removeEventListener: (_: string, listener: () => void) => listeners.delete(listener),
     } as unknown as MediaQueryList;
     vi.stubGlobal('matchMedia', () => media);
-    document.head.innerHTML = '<meta name="theme-color" content="">';
+    document.head.innerHTML = '<meta name="theme-color" content=""><link rel="icon" href="/favicon.svg?v=4">';
 });
 afterEach(() => {
     cleanup();
@@ -28,8 +28,11 @@ function expectTheme(dark: boolean) {
     expect(document.documentElement.dataset.theme).toBe(dark ? 'dark' : 'light');
     expect(document.documentElement.style.colorScheme).toBe(dark ? 'dark' : 'light');
     expect(document.documentElement.classList.contains('theme-midnight')).toBe(dark);
-    expect(document.documentElement.style.getPropertyValue('--launch-bg')).toBe(dark ? '#020617' : '#ffffff');
-    expect(document.querySelector('meta')?.content).toBe(dark ? '#020617' : '#ffffff');
+    expect(document.documentElement.style.getPropertyValue('--launch-bg')).toBe(dark ? '#0c1523' : '#f8f9fb');
+    expect(document.querySelector('meta')?.content).toBe(dark ? '#0c1523' : '#f8f9fb');
+    expect(document.querySelector('link[rel="icon"]')?.getAttribute('href')).toBe(
+        dark ? '/favicon.svg?v=4' : '/favicon-light.svg?v=4'
+    );
 }
 describe('theme preference', () => {
     it('sets the theme, launch styles and iOS mask before the font stylesheet', () => {

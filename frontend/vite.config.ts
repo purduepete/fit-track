@@ -14,7 +14,7 @@ export default defineConfig({
             injectRegister: null,
             // Cloudflare Access needs the session cookie on the manifest request.
             useCredentials: true,
-            includeAssets: ['favicon.svg'],
+            includeAssets: ['favicon.svg', 'favicon-light.svg'],
             manifest: {
                 name: 'Fit Track',
                 short_name: 'Fit Track',

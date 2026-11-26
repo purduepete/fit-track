@@ -29,15 +29,18 @@ export function useTheme() {
 
     useEffect(() => {
         const root = document.documentElement;
-        const bg = theme === 'dark' ? '#020617' : '#ffffff';
+        const bg = theme === 'dark' ? '#0c1523' : '#f8f9fb';
         root.dataset.theme = theme;
         root.classList.toggle('light', theme === 'light');
         root.classList.toggle('dark', theme === 'dark');
         root.classList.toggle('theme-midnight', theme === 'dark');
         root.style.colorScheme = theme;
         root.style.setProperty('--launch-bg', bg);
-        root.style.setProperty('--launch-fg', theme === 'dark' ? '#f8fafc' : '#1a1b2e');
+        root.style.setProperty('--launch-fg', theme === 'dark' ? '#edf3fa' : '#19263c');
         document.querySelector('meta[name="theme-color"]')?.setAttribute('content', bg);
+        document
+            .querySelector('link[rel="icon"]')
+            ?.setAttribute('href', theme === 'dark' ? '/favicon.svg?v=4' : '/favicon-light.svg?v=4');
         try {
             localStorage.setItem(KEY, preference);
         } catch {

@@ -3,14 +3,14 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-        <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=3" />
+        <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=4" />
         <!-- iOS ignores an SVG favicon when adding to the home screen and needs this PNG. -->
-        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=3" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=4" />
         <meta name="apple-mobile-web-app-title" content="Fit Track" />
         <!-- No apple-mobile-web-app-status-bar-style: iOS then reserves the status bar instead of
          drawing under it, and paints that strip from theme-color. Kept on the active theme by
          the pre-paint script below and by useTheme.ts. -->
-        <meta name="theme-color" content="#020617" />
+        <meta name="theme-color" content="#0c1523" />
         <meta name="mobile-web-app-capable" content="yes" />
         <title>Fit Track</title>
 
@@ -39,11 +39,14 @@
                 html.classList.toggle('dark', theme === 'dark');
                 html.classList.toggle('theme-midnight', theme === 'dark');
                 html.style.colorScheme = theme;
-                var bg = theme === 'dark' ? '#020617' : '#ffffff';
+                var bg = theme === 'dark' ? '#0c1523' : '#f8f9fb';
                 html.style.setProperty('--launch-bg', bg);
-                html.style.setProperty('--launch-fg', theme === 'dark' ? '#f8fafc' : '#1a1b2e');
+                html.style.setProperty('--launch-fg', theme === 'dark' ? '#edf3fa' : '#19263c');
                 var themeColor = document.querySelector('meta[name="theme-color"]');
                 if (themeColor) themeColor.setAttribute('content', bg);
+                var favicon = document.querySelector('link[rel="icon"]');
+                if (favicon)
+                    favicon.setAttribute('href', theme === 'dark' ? '/favicon.svg?v=4' : '/favicon-light.svg?v=4');
             })();
         </script>
 
@@ -51,8 +54,8 @@
             html {
                 -webkit-text-size-adjust: 100%;
                 text-size-adjust: 100%;
-                background: var(--launch-bg, #020617);
-                color: var(--launch-fg, #f8fafc);
+                background: var(--launch-bg, #0c1523);
+                color: var(--launch-fg, #edf3fa);
             }
             html,
             body {
@@ -61,7 +64,7 @@
             }
             body {
                 min-height: 100dvh;
-                background: var(--launch-bg, #020617);
+                background: var(--launch-bg, #0c1523);
             }
 
             /* iOS standalone cold-launch mask: keep #root hidden behind a themed backdrop
@@ -81,7 +84,7 @@
                 inset: 0;
                 z-index: 2147483647;
                 pointer-events: none;
-                background: var(--launch-bg, #020617);
+                background: var(--launch-bg, #0c1523);
             }
             html.pwa-launch-mask *,
             html.pwa-no-motion * {

@@ -14,6 +14,9 @@
 }
 
 :root[data-theme='light'] {
+    --brand-bg: #dbeafe;
+    --brand-route: #1e3a8a;
+    --brand-marker: #2563eb;
     --accent: #2f477b;
     --on-accent: #f8fafc;
     --bg: #ffffff;
@@ -36,6 +39,9 @@
 }
 
 :root[data-theme='dark'] {
+    --brand-bg: #172554;
+    --brand-route: #dbeafe;
+    --brand-marker: #60a5fa;
     --accent: #6b8cae;
     --on-accent: #0f172a;
     --bg: #020617;

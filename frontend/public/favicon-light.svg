@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Fit Track">
+  <rect width="64" height="64" rx="12" fill="#dbeafe" />
+  <path d="M16 46h8c6 0 6-10 12-10h2c6 0 6-9 10-13" fill="none" stroke="#1e3a8a" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+  <circle cx="16" cy="46" r="3" fill="#2563eb" />
+  <path d="M39 22l13-8-3 15z" fill="#2563eb" />
+</svg>

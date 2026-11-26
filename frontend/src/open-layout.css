@@ -1,0 +1,399 @@
+:root[data-theme='light'] {
+    --bg: #f8f9fb;
+    --surface: #f8f9fb;
+    --bar-bg: #f8f9fb;
+    --border: #dce2e9;
+    --text: #19263c;
+    --text-dim: #64748b;
+    --accent: #315d9b;
+    --chart-bar: #315d9b;
+    --chart-alt: #6583ad;
+    --shadow: none;
+}
+
+:root[data-theme='dark'] {
+    --bg: #0c1523;
+    --surface: #0c1523;
+    --bar-bg: #0c1523;
+    --border: #2b3a4d;
+    --text: #edf3fa;
+    --text-dim: #a4b4c8;
+    --accent: #a8c5ec;
+    --chart-bar: #8db4e6;
+    --chart-alt: #b6a9dc;
+    --shadow: none;
+}
+
+html body .app-bar {
+    padding-top: max(16px, env(safe-area-inset-top));
+    padding-bottom: 16px;
+    gap: 42px;
+}
+
+html body .brand {
+    font-weight: 650;
+    letter-spacing: -0.02em;
+}
+
+html body .nav {
+    gap: 6px;
+    border: 0;
+    padding: 0;
+    background: transparent;
+}
+
+html body .nav::before {
+    display: none;
+}
+
+html body .nav a {
+    border-bottom: 2px solid transparent;
+    padding: 0 12px;
+    color: var(--text-dim);
+}
+
+html body .nav a.active {
+    color: var(--text);
+    border-bottom-color: var(--accent);
+}
+
+html body .container {
+    max-width: 1240px;
+    padding-top: 30px;
+}
+
+html body [aria-label='Dashboard view'] .page-head {
+    margin-bottom: 20px;
+}
+
+html body [aria-label='Dashboard view'] .page-title {
+    font-size: clamp(1.9rem, 3vw, 2.5rem);
+    line-height: 1.05;
+    font-weight: 600;
+    letter-spacing: -0.045em;
+}
+
+html body [aria-label='Dashboard view'] .page-head::before {
+    content: 'YOUR OVERVIEW';
+    display: block;
+    flex-basis: 100%;
+    color: var(--accent);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    margin-bottom: 7px;
+}
+
+html body [aria-label='Dashboard view'] .grid-cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0;
+    margin: 0 0 32px;
+    border-top: 1px solid var(--border);
+}
+
+html body [aria-label='Dashboard view'] .stat {
+    display: flex;
+    flex-direction: column;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    box-shadow: none;
+    padding: 16px 12px 18px 0;
+}
+
+html body [aria-label='Dashboard view'] .stat .label {
+    font-size: 0.8rem;
+    line-height: 18px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+html body [aria-label='Dashboard view'] .stat .label svg {
+    display: none;
+}
+
+html body [aria-label='Dashboard view'] .stat .value {
+    order: -1;
+    font-size: clamp(1.7rem, 2.4vw, 2.25rem);
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    margin: 0 0 9px;
+}
+
+html body [aria-label='Dashboard view'] .vo2-badge {
+    grid-column: 2;
+    grid-row: 2;
+    align-self: center;
+    justify-self: start;
+    font-size: 0.6rem;
+    color: #000;
+    letter-spacing: 0;
+    margin: 0;
+    padding: 2px 4px;
+}
+
+html body [aria-label='Dashboard view'] .stat:has(.vo2-badge) {
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-content: start;
+    column-gap: 6px;
+    row-gap: 9px;
+}
+
+html body [aria-label='Dashboard view'] .stat:has(.vo2-badge) .label {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+html body [aria-label='Dashboard view'] .stat:has(.vo2-badge) .value {
+    display: contents;
+}
+
+html body [aria-label='Dashboard view'] .dash-section {
+    min-width: 0;
+    margin-bottom: 36px;
+}
+
+html body [aria-label='Dashboard view'] .section-title {
+    color: var(--accent);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    padding: 0;
+    border: 0;
+    margin: 0 0 10px;
+}
+
+html body [aria-label='Dashboard view'] .card:not(.stat) {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+}
+
+html body [aria-label='Dashboard view'] .card h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    margin: 0 0 7px;
+}
+
+html body [aria-label='Dashboard view'] .chart-caption {
+    font-size: 0.86rem;
+    line-height: 1.5;
+    margin-bottom: 10px;
+}
+
+html body [aria-label='Dashboard view'] .dash-steps .recharts-surface {
+    overflow: visible;
+}
+
+html body [aria-label='Dashboard view'] .recharts-cartesian-axis-tick-value {
+    fill: var(--text-dim);
+    font-size: 10px;
+}
+
+html body [aria-label='Dashboard view'] .recharts-tooltip-wrapper[style*='visibility: hidden'] {
+    display: none;
+}
+
+html body [aria-label='Dashboard view'] .two-col {
+    gap: 32px;
+}
+
+html body [aria-label='Dashboard view'] .ratings-stack {
+    min-width: 0;
+}
+
+html body [aria-label='Dashboard view'] .ratings-stack > .card + .card {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+}
+
+html body [aria-label='Dashboard view'] .dash-heart,
+html body [aria-label='Dashboard view'] .dash-sleep {
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+}
+
+html body [aria-label='Dashboard view'] .dash-section > .card:not(:first-of-type) {
+    margin-top: 32px;
+}
+
+html body [aria-label='Dashboard view'] .steps-value {
+    font-weight: 600;
+    letter-spacing: -0.04em;
+}
+
+html body [aria-label='Dashboard view'] .dash-steps > .card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+        'heading headline'
+        'chart chart';
+    grid-template-rows: 32px auto;
+}
+
+html body [aria-label='Dashboard view'] .dash-steps > .card > h2 {
+    grid-area: heading;
+}
+
+html body [aria-label='Dashboard view'] .dash-steps .recharts-responsive-container {
+    grid-area: chart;
+}
+
+html body [aria-label='Dashboard view'] .dash-steps .steps-headline {
+    grid-area: headline;
+    align-items: center;
+    margin: 0 0 7px 12px;
+}
+
+html body [aria-label='Dashboard view'] .dash-steps .steps-value {
+    font-size: 1.15rem;
+}
+
+html body [aria-label='Dashboard view'] .dash-steps > .card > p {
+    grid-area: chart;
+}
+
+@media (min-width: 1050px) {
+    html body [aria-label='Dashboard view'] .grid-cards:not(.cards-4):not(.cards-5) {
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+
+    html body [aria-label='Dashboard view'] .data-enter > [aria-busy] {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        column-gap: 36px;
+    }
+
+    html body [aria-label='Dashboard view'] .page-head,
+    html body [aria-label='Dashboard view'] .grid-cards,
+    html body [aria-label='Dashboard view'] .dash-heart,
+    html body [aria-label='Dashboard view'] .dash-sleep {
+        grid-column: 1 / -1;
+    }
+
+    html body [aria-label='Dashboard view'] .dash-weekly > .card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        grid-template-rows: 32px 240px;
+        grid-template-areas:
+            'heading headline'
+            'chart chart';
+    }
+
+    html body [aria-label='Dashboard view'] .dash-weekly > .card > h2 {
+        grid-area: heading;
+    }
+
+    html body [aria-label='Dashboard view'] .dash-weekly .recharts-responsive-container {
+        grid-area: chart;
+    }
+
+    html body [aria-label='Dashboard view'] .dash-weekly,
+    html body [aria-label='Dashboard view'] .dash-heart,
+    html body [aria-label='Dashboard view'] .dash-sleep {
+        position: relative;
+    }
+
+    html body [aria-label='Dashboard view'] .dash-weekly::before,
+    html body [aria-label='Dashboard view'] .dash-heart::before,
+    html body [aria-label='Dashboard view'] .dash-sleep::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        bottom: -36px;
+        border-left: 1px solid var(--border);
+    }
+
+    html body [aria-label='Dashboard view'] .dash-weekly::before {
+        left: -18px;
+    }
+
+    html body [aria-label='Dashboard view'] .dash-heart::before,
+    html body [aria-label='Dashboard view'] .dash-sleep::before {
+        left: 50%;
+    }
+
+    html body [aria-label='Dashboard view'] .dash-sleep::before {
+        bottom: 0;
+    }
+
+    html body [aria-label='Dashboard view'] .dash-heart .two-col {
+        gap: 36px;
+    }
+
+    html body [aria-label='Dashboard view'] .dash-sleep .two-col {
+        gap: 36px;
+    }
+
+    html body [aria-label='Dashboard view'] .dash-heart .two-col > .card {
+        display: grid;
+        grid-template-rows: 32px 240px;
+        align-content: start;
+    }
+}
+
+@media (max-width: 1049px) {
+    html body [aria-label='Dashboard view'] .dash-weekly,
+    html body [aria-label='Dashboard view'] .dash-heart .two-col > .card:nth-child(2) {
+        border-top: 1px solid var(--border);
+        padding-top: 24px;
+    }
+
+    html body [aria-label='Dashboard view'] .dash-heart .two-col {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+@media (min-width: 821px) and (max-width: 1049px) {
+    html body [aria-label='Dashboard view'] .dash-sleep .ratings-stack {
+        position: relative;
+    }
+
+    html body [aria-label='Dashboard view'] .dash-sleep .ratings-stack::before {
+        content: '';
+        position: absolute;
+        left: -16px;
+        top: 0;
+        bottom: 0;
+        border-left: 1px solid var(--border);
+    }
+}
+
+@media (max-width: 700px) {
+    html body .app-bar {
+        gap: 12px;
+    }
+    html body .container {
+        padding-top: 22px;
+    }
+    html body [aria-label='Dashboard view'] .grid-cards {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-bottom: 28px;
+    }
+    html body [aria-label='Dashboard view'] .stat {
+        padding: 14px 8px 16px 0;
+    }
+    html body [aria-label='Dashboard view'] .dash-section {
+        margin-bottom: 36px;
+    }
+    html body [aria-label='Dashboard view'] .two-col {
+        gap: 32px;
+    }
+}
+
+@media (max-width: 420px) {
+    html body [aria-label='Dashboard view'] .stat:has(.vo2-badge) {
+        grid-template-columns: minmax(0, max-content) auto;
+        column-gap: 3px;
+    }
+
+    html body [aria-label='Dashboard view'] .stat:has(.vo2-badge) .label {
+        font-size: 0.72rem;
+        white-space: normal;
+    }
+}

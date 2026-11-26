@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
     Bar,
     BarChart,
@@ -130,6 +131,14 @@ function CardioFitness({ band, value }: { band: Vo2MaxBand; value: number }) {
 
 export function Dashboard({ active = true }: { active?: boolean }) {
     const { data, error, loading, refresh } = useDashboard();
+    const [compactCharts, setCompactCharts] = useState(() => window.matchMedia('(max-width: 700px)').matches);
+    useEffect(() => {
+        const media = window.matchMedia('(max-width: 700px)');
+        const update = () => setCompactCharts(media.matches);
+        update();
+        media.addEventListener('change', update);
+        return () => media.removeEventListener('change', update);
+    }, []);
     useFirstLoad(Boolean(data), Boolean(error), active);
     usePageRefresh(refresh, loading, active);
     const navigate = useNavigate();
@@ -231,66 +240,29 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                     <StatCard icon={<MoonIcon />} label="Sleep (last night)" value={sleepValue} />
                 </div>
 
-                <section className="dash-section">
-                    <h2 className="section-title">This week</h2>
-                    <div className="card">
-                        <h2>Workout minutes by day</h2>
-                        <p className="muted chart-caption">Workout minutes per day, Monday to Sunday.</p>
-                        <ResponsiveContainer width="100%" height={240}>
-                            <BarChart data={data.weekly_minutes}>
-                                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                                <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
-                                <YAxis tick={{ fontSize: 11 }} />
-                                <Tooltip
-                                    {...tooltipProps}
-                                    cursor={barCursor}
-                                    labelFormatter={formatLocalDate}
-                                    formatter={(v) => [formatMinutesHms(v as number), 'Duration']}
-                                />
-                                <Bar dataKey="value" fill={CHART_BAR_COLOR} radius={[2, 2, 0, 0]} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </section>
-
-                <section className="dash-section">
+                <section
+                    className="dash-section dash-steps"
+                    aria-labelledby="daily-steps-heading"
+                    aria-describedby={hasStepData ? 'steps-chart-description' : undefined}
+                >
                     <h2 className="section-title">Activity</h2>
                     <div className="card">
-                        <h2>Daily steps</h2>
-                        <p className="muted chart-caption">
-                            Last 30 days, with weekly totals above Sundays. Tap a green bar to open that day.
-                        </p>
+                        <h2 id="daily-steps-heading">Daily steps</h2>
                         {hasStepData ? (
                             <>
+                                <p id="steps-chart-description" className="visually-hidden">
+                                    Daily steps for the last 30 days, with weekly totals above Sundays. The orange line
+                                    shows the 7-day block average and the dashed green line marks 10,000 steps. Green
+                                    bars mark workout days and can be selected to open that day&apos;s workouts.
+                                </p>
                                 <div className="steps-headline">
                                     <FootprintsIcon size={20} />
                                     <span className="steps-value">{formatSteps(data.latest_steps)}</span>
                                 </div>
-                                <div className="chart-legend">
-                                    <span className="chart-legend-item">
-                                        <svg width="20" height="10" aria-hidden="true">
-                                            <line
-                                                x1="0"
-                                                y1="5"
-                                                x2="20"
-                                                y2="5"
-                                                stroke={STEPS_AVG_COLOR}
-                                                strokeWidth="2"
-                                            />
-                                        </svg>
-                                        7-day block average
-                                    </span>
-                                    <span className="chart-legend-item">
-                                        <svg width="12" height="12" aria-hidden="true">
-                                            <rect width="12" height="12" rx="2" fill={WORKOUT_BAR_COLOR} />
-                                        </svg>
-                                        Workout logged
-                                    </span>
-                                </div>
                                 <ResponsiveContainer width="100%" height={240}>
                                     <ComposedChart
                                         data={stepsChartData}
-                                        margin={{ top: 18, right: 52, left: 0, bottom: 0 }}
+                                        margin={{ top: 18, right: 5, left: 0, bottom: 0 }}
                                         onClick={handleChartClick}
                                     >
                                         <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
@@ -305,7 +277,8 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                             domain={[0, (max: number) => Math.max(max, 10000) * 1.08]}
                                             tickFormatter={(v) => formatSteps(v as number)}
                                             tick={{ fontSize: 11 }}
-                                            width={48}
+                                            width={compactCharts ? 36 : 48}
+                                            tickSize={compactCharts ? 0 : 6}
                                         />
                                         <Tooltip
                                             {...tooltipProps}
@@ -322,12 +295,6 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                             stroke={GOAL_COLOR}
                                             strokeDasharray="4 4"
                                             ifOverflow="extendDomain"
-                                            label={{
-                                                value: 'Goal 10k',
-                                                position: 'right',
-                                                fontSize: 11,
-                                                fill: GOAL_COLOR,
-                                            }}
                                         />
                                         <Bar dataKey="value" radius={[2, 2, 0, 0]}>
                                             <LabelList
@@ -365,23 +332,53 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                     </div>
                 </section>
 
-                <section className="dash-section">
+                <section className="dash-section dash-weekly">
+                    <h2 className="section-title">This week</h2>
+                    <div className="card">
+                        <h2>Workout minutes by day</h2>
+                        <ResponsiveContainer width="100%" height={240}>
+                            <BarChart data={data.weekly_minutes} margin={{ top: 18, right: 5, left: 0, bottom: 0 }}>
+                                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                <XAxis dataKey="local_date" tickFormatter={formatLocalDate} tick={{ fontSize: 11 }} />
+                                <YAxis
+                                    tick={{ fontSize: 11 }}
+                                    width={compactCharts ? 36 : 48}
+                                    tickSize={compactCharts ? 0 : 6}
+                                />
+                                <Tooltip
+                                    {...tooltipProps}
+                                    cursor={barCursor}
+                                    labelFormatter={formatLocalDate}
+                                    formatter={(v) => [formatMinutesHms(v as number), 'Duration']}
+                                />
+                                <Bar dataKey="value" fill={CHART_BAR_COLOR} radius={[2, 2, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
+                </section>
+
+                <section className="dash-section dash-heart">
                     <h2 className="section-title">Heart &amp; fitness</h2>
                     <div className="two-col">
                         <div className="card">
                             <h2>Resting heart rate trend</h2>
-                            <p className="muted chart-caption">
-                                Lower is generally better. Look for a stable or falling trend.
-                            </p>
                             <ResponsiveContainer width="100%" height={240}>
-                                <LineChart data={data.resting_hr_trend}>
+                                <LineChart
+                                    data={data.resting_hr_trend}
+                                    margin={{ top: 18, right: 5, left: 0, bottom: 0 }}
+                                >
                                     <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                                     <XAxis
                                         dataKey="local_date"
                                         tickFormatter={formatLocalDate}
                                         tick={{ fontSize: 11 }}
                                     />
-                                    <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
+                                    <YAxis
+                                        domain={['auto', 'auto']}
+                                        tick={{ fontSize: 11 }}
+                                        width={compactCharts ? 36 : 48}
+                                        tickSize={compactCharts ? 0 : 6}
+                                    />
                                     <Tooltip {...tooltipProps} labelFormatter={formatLocalDate} />
                                     <Line
                                         type="monotone"
@@ -395,19 +392,24 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                         </div>
                         <div className="card">
                             <h2>VO₂ max trend</h2>
-                            <p className="muted chart-caption">
-                                Higher is better. Your cardio fitness rating is below.
-                            </p>
                             {data.vo2max_trend.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={240}>
-                                    <LineChart data={data.vo2max_trend}>
+                                    <LineChart
+                                        data={data.vo2max_trend}
+                                        margin={{ top: 18, right: 5, left: 0, bottom: 0 }}
+                                    >
                                         <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                                         <XAxis
                                             dataKey="local_date"
                                             tickFormatter={formatLocalDate}
                                             tick={{ fontSize: 11 }}
                                         />
-                                        <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
+                                        <YAxis
+                                            domain={['auto', 'auto']}
+                                            tick={{ fontSize: 11 }}
+                                            width={compactCharts ? 36 : 48}
+                                            tickSize={compactCharts ? 0 : 6}
+                                        />
                                         <Tooltip
                                             {...tooltipProps}
                                             labelFormatter={formatLocalDate}
@@ -427,21 +429,10 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                             )}
                         </div>
                     </div>
-                    {data.vo2max_band && typeof data.latest_vo2max === 'number' ? (
-                        <CardioFitness band={data.vo2max_band} value={data.latest_vo2max} />
-                    ) : (
-                        <div className="card">
-                            <h2>Cardio fitness</h2>
-                            <p className="muted">
-                                Set your birth date and sex in the app config to interpret VO₂ max against age/sex
-                                norms.
-                            </p>
-                        </div>
-                    )}
                 </section>
 
-                <section className="dash-section">
-                    <h2 className="section-title">Sleep</h2>
+                <section className="dash-section dash-sleep">
+                    <h2 className="section-title">Sleep &amp; fitness</h2>
                     <div className="two-col">
                         <div className="card">
                             <h2>Sleep hours</h2>
@@ -450,14 +441,23 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                             </p>
                             {data.sleep_trend.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={240}>
-                                    <BarChart data={data.sleep_trend}>
+                                    <BarChart
+                                        data={data.sleep_trend}
+                                        margin={{ top: 5, right: 5, left: compactCharts ? 0 : 5, bottom: 5 }}
+                                    >
                                         <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                                         <XAxis
                                             dataKey="local_date"
                                             tickFormatter={formatLocalDate}
                                             tick={{ fontSize: 11 }}
                                         />
-                                        <YAxis domain={[0, 'auto']} tick={{ fontSize: 11 }} unit="h" />
+                                        <YAxis
+                                            domain={[0, 'auto']}
+                                            tick={{ fontSize: 11 }}
+                                            unit="h"
+                                            width={compactCharts ? 36 : 60}
+                                            tickSize={compactCharts ? 0 : 6}
+                                        />
                                         <Tooltip
                                             {...tooltipProps}
                                             cursor={barCursor}
@@ -480,16 +480,29 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                 </p>
                             )}
                         </div>
-                        {data.sleep_band && typeof data.latest_sleep_hours === 'number' ? (
-                            <SleepQuality band={data.sleep_band} hours={data.latest_sleep_hours} />
-                        ) : (
-                            <div className="card">
-                                <h2>Sleep quality</h2>
-                                <p className="muted">
-                                    Once sleep data arrives, its rating against the 7–9 h target appears here.
-                                </p>
-                            </div>
-                        )}
+                        <div className="ratings-stack">
+                            {data.vo2max_band && typeof data.latest_vo2max === 'number' ? (
+                                <CardioFitness band={data.vo2max_band} value={data.latest_vo2max} />
+                            ) : (
+                                <div className="card">
+                                    <h2>Cardio fitness</h2>
+                                    <p className="muted">
+                                        Set your birth date and sex in the app config to interpret VO₂ max against
+                                        age/sex norms.
+                                    </p>
+                                </div>
+                            )}
+                            {data.sleep_band && typeof data.latest_sleep_hours === 'number' ? (
+                                <SleepQuality band={data.sleep_band} hours={data.latest_sleep_hours} />
+                            ) : (
+                                <div className="card">
+                                    <h2>Sleep quality</h2>
+                                    <p className="muted">
+                                        Once sleep data arrives, its rating against the 7–9 h target appears here.
+                                    </p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </section>
             </div>

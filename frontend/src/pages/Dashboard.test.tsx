@@ -96,7 +96,7 @@ it('shows the sleep and cardio scale tooltips while control hints are disabled',
         resting_hr_trend: [],
         vo2max_trend: [],
         sleep_trend: [],
-        steps_trend: [],
+        steps_trend: [{ local_date: '2026-11-25', value: 1000 }],
         steps_avg7_trend: [],
         workout_days: [],
     });
@@ -125,4 +125,13 @@ it('shows the sleep and cardio scale tooltips while control hints are disabled',
     expect(api.dashboard).toHaveBeenCalledWith(currentPacificWeek());
     expect(screen.getByText('Active days (week)')).toBeInTheDocument();
     expect(screen.getByText('1h 35m')).toBeInTheDocument();
+    const steps = screen.getByRole('heading', { name: 'Daily steps' });
+    expect(screen.getByRole('region', { name: 'Daily steps' })).toHaveAccessibleDescription(
+        /7-day block average.*10,000 steps.*workout days/i
+    );
+    const minutes = screen.getByRole('heading', { name: 'Workout minutes by day' });
+    expect(steps.compareDocumentPosition(minutes) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const sleepSection = screen.getByRole('heading', { name: 'Sleep & fitness' }).closest('section');
+    expect(sleepSection).toContainElement(screen.getByRole('heading', { name: 'Cardio fitness' }));
+    expect(sleepSection).toContainElement(screen.getByRole('heading', { name: 'Sleep quality' }));
 });

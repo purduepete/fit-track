@@ -11,11 +11,10 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Event, Thread
 from typing import Literal
-from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -98,9 +97,43 @@ def auth_mode() -> dict:
 
 
 @app.get("/api/access-login", include_in_schema=False)
-def access_login(route: str = "") -> RedirectResponse:
-    """Return to the app after Access authenticates this network-only navigation."""
-    return RedirectResponse(f"/#{quote(route, safe='/?:=&%')}", status_code=303)
+def access_login() -> HTMLResponse:
+    """Replace a stale app worker after Access authenticates this navigation."""
+    return HTMLResponse(
+        """<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fit Track sign-in</title>
+  <style>
+    body { font: 16px system-ui, sans-serif; color-scheme: light dark; text-align: center; padding: 3rem 1rem; }
+  </style>
+</head>
+<body>
+  <p id="status" role="status">Finishing sign-in...</p>
+  <noscript>JavaScript is required to finish signing in to Fit Track.</noscript>
+  <script>
+    (async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const registration = await navigator.serviceWorker.getRegistration('/');
+          if (registration) await registration.unregister();
+        }
+        const destination = new URL('/', location.origin);
+        destination.hash = new URLSearchParams(location.search).get('route') || '';
+        location.replace(destination.href);
+      } catch (error) {
+        console.error('Could not refresh the Fit Track app:', error);
+        document.getElementById('status').textContent =
+          'Could not refresh Fit Track. Reload this page to try again.';
+      }
+    })();
+  </script>
+</body>
+</html>""",
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 class UnitPreference(BaseModel):

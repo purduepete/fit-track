@@ -33,15 +33,11 @@ def test_health_endpoint_is_open(client):
     assert client.get("/api/health").json() == {"status": "ok"}
 
 
-def test_access_login_redirects_back_to_the_app(client):
+def test_access_login_serves_an_uncached_recovery_page(client):
     response = client.get("/api/access-login", params={"route": "/workouts/item?unit=mi"}, follow_redirects=False)
-    assert response.status_code == 303
-    assert response.headers["location"] == "/#/workouts/item?unit=mi"
-
-    response = client.get(
-        "/api/access-login", params={"route": "//example.com\r\nX-Test: value"}, follow_redirects=False
-    )
-    assert response.headers["location"] == "/#//example.com%0D%0AX-Test:%20value"
+    assert response.status_code == 200
+    assert response.headers["cache-control"] == "no-store"
+    assert "text/html" in response.headers["content-type"]
 
 
 def test_unit_preference_cookie(client, monkeypatch):

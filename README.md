@@ -302,6 +302,8 @@ clicks preserve unsaved edits.
 
 The route icon and browser favicon follow the selected light or Midnight theme.
 The installed app and Apple touch icon use the Midnight version.
+Midnight uses dark blue page and dialog backgrounds with blue highlights. Section
+labels and the selected theme control retain their lighter blue color.
 
 Dashboard and Workouts keep their views mounted when switching tabs. Workouts retains filters
 and loaded rows while checking for fresh data on return. Content enters over 160ms, separately

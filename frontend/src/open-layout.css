@@ -12,16 +12,29 @@
 }
 
 :root[data-theme='dark'] {
-    --bg: #0c1523;
-    --surface: #0c1523;
-    --bar-bg: #0c1523;
+    --bg: #0f172a;
+    --surface: #17243b;
+    --surface-2: #1e293b;
+    --bar-bg: #0f172a;
     --border: #2b3a4d;
     --text: #edf3fa;
     --text-dim: #a4b4c8;
-    --accent: #a8c5ec;
+    --accent: #3b82f6;
     --chart-bar: #8db4e6;
     --chart-alt: #b6a9dc;
     --shadow: none;
+}
+
+html:root[data-theme='dark'] body [aria-label='Dashboard view'] .page-head::before,
+html:root[data-theme='dark'] body [aria-label='Dashboard view'] .section-title,
+html:root[data-theme='dark'] body [aria-label='Workouts view'] .page-head::before,
+html:root[data-theme='dark'] body [aria-label='Workouts view'] .workouts-table .group-row td,
+html:root[data-theme='dark'] body .data-enter:has(.workout-title-row) .workout-title-row::before {
+    color: #a8c5ec;
+}
+
+html:root[data-theme='dark'] .theme-segments::before {
+    background: #a8c5ec;
 }
 
 html body .app-bar {

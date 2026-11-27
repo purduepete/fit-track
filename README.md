@@ -227,8 +227,7 @@ cd backend;  .\.venv\Scripts\python.exe -m pytest -q     # backend
 cd frontend; npm run test                                # frontend
 ```
 
-CI (`.github/workflows/ci.yml`) runs both on every push/PR. See
-[`docs/testing.md`](docs/testing.md).
+See [`docs/testing.md`](docs/testing.md) for the local checks.
 
 ## Release to jimbrownhome1
 
@@ -248,8 +247,6 @@ existing release folder: that leaves the recorded commit and release date stale.
 The web release leaves the upload watcher unchanged. Database input changes
 require a separate reviewed procedure; the review flag cannot bypass that check.
 See the Solution Deploy repository's `docs/Deployment.md` for the full procedure.
-
-GitHub CI runs tests, lint and builds on every push.
 
 ## Uptime monitoring
 

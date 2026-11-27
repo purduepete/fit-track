@@ -66,8 +66,14 @@ cd backend
 Config lives in `backend/pyproject.toml`. `ruff` also formats imports (`--fix`).
 The frontend is type-checked by `tsc --noEmit` as part of `npm run build`.
 
-## CI
+## Local release checks
 
-`.github/workflows/ci.yml` runs on every push/PR. The backend job installs deps
-then runs **ruff → mypy → pytest**; the frontend job runs `npm test` + `npm run
-build` (which type-checks via `tsc`). It never touches the database.
+Run backend lint, type-checking, and tests, then run the frontend checks:
+
+```powershell
+cd frontend
+npm run format:check
+npm run lint
+npm test
+npm run build
+```

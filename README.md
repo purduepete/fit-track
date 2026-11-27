@@ -34,8 +34,8 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
   Pacific time (including daylight saving). It is the first range option;
   dashboard day links still show that exact day. Dashboard and Workouts share
   a square segmented navigation control with a sliding selected state.
-- **Workout totals**: the bottom row totals the visible, loaded workouts after
-  searching: count, duration, distance and active calories. Overall pace uses
+- **Workout totals**: the bottom row totals the loaded workouts in the selected
+  type and date range: count, duration, distance and active calories. Overall pace uses
   workouts with both distance and duration; average HR is duration-weighted
   across workouts with HR and positive duration. Max HR is the highest available
   value. Missing measurements stay empty; loading more updates the totals.

@@ -397,3 +397,987 @@ html body [aria-label='Dashboard view'] .dash-steps > .card > p {
         white-space: normal;
     }
 }
+
+/* Selected Workouts preview design, now maintained with the application styles. */
+html body [aria-label='Workouts view'] .page-head {
+    align-items: flex-end;
+    margin-bottom: 26px;
+}
+
+html body [aria-label='Workouts view'] .page-head::before {
+    content: 'YOUR ACTIVITY';
+    display: block;
+    flex-basis: 100%;
+    color: var(--accent);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    margin-bottom: 7px;
+}
+
+html body [aria-label='Workouts view'] .page-title {
+    font-size: clamp(1.9rem, 3vw, 2.5rem);
+    line-height: 1.05;
+    font-weight: 600;
+    letter-spacing: -0.045em;
+}
+
+html body [aria-label='Workouts view'] .toolbar {
+    margin-bottom: 16px;
+}
+
+html body [aria-label='Workouts view'] .toolbar .page-head-controls {
+    align-items: center;
+    margin-left: auto;
+}
+
+html body [aria-label='Workouts view'] .toolbar .weight-field-input,
+html body [aria-label='Workouts view'] .toolbar .workout-unit-selector {
+    height: 40px;
+}
+
+html body [aria-label='Workouts view'] .toolbar .weight-field-input input {
+    height: 100%;
+    padding: 0 6px 0 10px;
+    border: 0;
+    outline: 0;
+    background: transparent;
+}
+
+@media (pointer: coarse) {
+    html body [aria-label='Workouts view'] .toolbar .weight-field-input input {
+        font-size: 16px;
+    }
+}
+
+html body [aria-label='Workouts view'] .view-bar {
+    margin-bottom: 12px;
+}
+
+html body [aria-label='Workouts view'] .results-transition .data-enter {
+    animation: none;
+}
+
+html body [aria-label='Workouts view'] .workout-view-selector,
+html body [aria-label='Workouts view'] .workout-unit-selector,
+html body .workout-title-row .workout-unit-selector {
+    gap: 6px;
+    border: 0;
+    overflow: visible;
+    background: transparent;
+}
+
+html body [aria-label='Workouts view'] .workout-view-selector::before,
+html body [aria-label='Workouts view'] .workout-unit-selector::before,
+html body .workout-title-row .workout-unit-selector::before {
+    display: none;
+}
+
+html body [aria-label='Workouts view'] .workout-view-selector {
+    gap: 0;
+}
+
+html body [aria-label='Workouts view'] .workout-view-selector::before {
+    display: block;
+    inset: auto auto 0 0;
+    height: 2px;
+    background: var(--accent);
+}
+
+html body [aria-label='Workouts view'] .workout-view-selector button,
+html body [aria-label='Workouts view'] .workout-unit-selector button,
+html body .workout-title-row .workout-unit-selector button {
+    display: grid;
+    place-items: center;
+    width: auto;
+    padding: 0 12px;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    color: var(--text-dim);
+    font: inherit;
+    font-weight: 500;
+}
+
+html body [aria-label='Workouts view'] .workout-view-selector button[aria-pressed='true'],
+html body [aria-label='Workouts view'] .workout-unit-selector button[aria-pressed='true'],
+html body .workout-title-row .workout-unit-selector button[aria-pressed='true'] {
+    color: var(--text);
+}
+
+html body [aria-label='Workouts view'] .workout-unit-selector button[aria-pressed='true'],
+html body .workout-title-row .workout-unit-selector button[aria-pressed='true'] {
+    border-bottom-color: var(--accent);
+}
+
+html body [aria-label='Workouts view'] .workout-view-selector button {
+    width: 70px;
+}
+
+html body [aria-label='Workouts view'] .workout-view-selector button:focus-visible,
+html body [aria-label='Workouts view'] .workout-unit-selector button:focus-visible,
+html body .workout-title-row .workout-unit-selector button:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+}
+
+html body [aria-label='Workouts view'] .workouts-card {
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+}
+
+html body [aria-label='Workouts view'] .workouts-card thead th {
+    background: var(--bg);
+    border-top: 1px solid var(--border);
+}
+
+html body [aria-label='Workouts view'] .workouts-table .group-row td {
+    padding-top: 15px;
+    padding-bottom: 10px;
+    background: transparent;
+    color: var(--accent);
+}
+
+html body [aria-label='Workouts view'] .workouts-table .group-count {
+    font-weight: 500;
+}
+
+html body [aria-label='Workouts view'] .workouts-table .subtotal-row td {
+    background: transparent;
+    color: var(--text-dim);
+    font-size: 0.89em;
+    font-weight: 400;
+}
+
+html body [aria-label='Workouts view'] .workouts-table .summary-row td {
+    background: transparent;
+    border-top: 1px solid var(--border);
+}
+
+html body [aria-label='Workouts view'] .workouts-table .chip {
+    background: transparent;
+    padding: 0;
+}
+
+html body .data-enter:has(.workout-title-row) > [aria-busy] {
+    position: relative;
+}
+
+html body .data-enter:has(.workout-title-row) .detail-nav {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
+    justify-content: flex-end;
+    gap: 0;
+    margin-bottom: 0;
+}
+
+html body .data-enter:has(.workout-title-row) .detail-nav .nav-btn {
+    justify-content: center;
+    min-height: 40px;
+    padding: 6px 8px;
+    border: 0;
+    background: transparent;
+}
+
+html body .data-enter:has(.workout-title-row) .detail-nav .detail-home {
+    width: 40px;
+}
+
+html body .data-enter:has(.workout-title-row) .detail-nav .nav-btn:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+}
+
+html body .data-enter:has(.workout-title-row) .workout-title-row {
+    align-items: center;
+    margin-top: 0;
+    margin-bottom: 20px;
+}
+
+html body .workout-title-actions {
+    max-width: 100%;
+    min-width: 0;
+}
+
+html body .workout-title-actions > :first-child {
+    min-width: 0;
+}
+
+html body .data-enter:has(.workout-title-row) .workout-title-row::before {
+    content: 'WORKOUT DETAILS';
+    display: flex;
+    align-items: center;
+    flex-basis: 100%;
+    min-height: 40px;
+    padding-right: 210px;
+    color: var(--accent);
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    margin-bottom: 0;
+}
+
+@media (max-width: 360px) {
+    html body .data-enter:has(.workout-title-row) .detail-nav {
+        position: static;
+    }
+
+    html body .data-enter:has(.workout-title-row) .workout-title-row::before {
+        display: block;
+        min-height: 0;
+        padding-right: 0;
+        margin-bottom: 7px;
+    }
+}
+
+html body .data-enter:has(.workout-title-row) .page-title {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 4px 6px;
+    font-size: clamp(1.9rem, 3vw, 2.5rem);
+    line-height: 1.05;
+    font-weight: 600;
+    letter-spacing: -0.045em;
+}
+
+html body .data-enter:has(.workout-title-row) .page-title .muted {
+    font-weight: 500;
+    letter-spacing: 0;
+    white-space: nowrap;
+}
+
+html body .data-enter:has(.workout-title-row) .grid-cards {
+    gap: 0;
+    margin: 0 0 36px;
+    border-top: 1px solid var(--border);
+}
+
+html body .data-enter:has(.workout-title-row) .stat {
+    display: flex;
+    flex-direction: column;
+    border: 0;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    box-shadow: none;
+    padding: 16px 12px 18px 0;
+}
+
+html body .data-enter:has(.workout-title-row) .stat .label {
+    font-size: 0.8rem;
+    line-height: 18px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+html body .data-enter:has(.workout-title-row) .stat .label svg {
+    display: none;
+}
+
+html body .data-enter:has(.workout-title-row) .stat .value {
+    order: -1;
+    font-size: clamp(1.7rem, 2.4vw, 2.25rem);
+    line-height: 1.1;
+    font-weight: 600;
+    letter-spacing: -0.04em;
+    margin: 0 0 9px;
+}
+
+html body .data-enter:has(.workout-title-row) .section {
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+    margin-bottom: 36px;
+}
+
+html body .data-enter:has(.workout-title-row) .grid-cards + .section {
+    border-top: 0;
+    padding-top: 0;
+}
+
+html body .data-enter:has(.workout-title-row) .section h2 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+    margin: 0 0 10px;
+}
+
+html body .data-enter:has(.workout-title-row) .section .card {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    padding: 0;
+}
+
+html body .data-enter:has(.workout-title-row) .workout-chart-row:has(> .section) {
+    position: relative;
+    gap: 32px;
+    border-top: 1px solid var(--border);
+    padding-top: 24px;
+    margin-bottom: 36px;
+}
+
+html body .data-enter:has(.workout-title-row) .workout-chart-row > .section {
+    border: 0;
+    padding: 0;
+    margin: 0;
+}
+
+html body .data-enter:has(.workout-title-row) .recharts-cartesian-axis-tick-value {
+    fill: var(--text-dim);
+    font-size: 10px;
+}
+
+html body .data-enter:has(.workout-title-row) .recharts-tooltip-wrapper[style*='visibility: hidden'] {
+    display: none;
+}
+
+@media (min-width: 821px) {
+    html body .data-enter:has(.workout-title-row) .workout-chart-row--paired::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: -36px;
+        border-left: 1px solid var(--border);
+    }
+
+    html body .data-enter:has(.workout-title-row) .section:has(> .two-col) {
+        position: relative;
+    }
+
+    html body .data-enter:has(.workout-title-row) .section > .two-col {
+        gap: 36px;
+    }
+
+    html body .data-enter:has(.workout-title-row) .section:has(> .two-col)::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        border-left: 1px solid var(--border);
+    }
+}
+
+@media (max-width: 1049px) {
+    html body .data-enter:has(.workout-title-row) .grid-cards.cards-5 {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    html body .data-enter:has(.workout-title-row) .grid-cards.cards-5 > .card:last-child {
+        grid-column: auto;
+    }
+}
+
+@media (max-width: 820px) {
+    html body .data-enter:has(.workout-title-row) .workout-chart-row > .section + .section {
+        border-top: 1px solid var(--border);
+        padding-top: 24px;
+    }
+}
+
+@media (max-width: 700px) {
+    html body .data-enter:has(.workout-title-row) .grid-cards.cards-5 {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    html body .data-enter:has(.workout-title-row) .grid-cards.cards-5 > .card:last-child {
+        grid-column: 1 / -1;
+    }
+
+    html body .data-enter:has(.workout-title-row) .stat {
+        padding: 14px 8px 16px 0;
+    }
+
+    html body .data-enter:has(.workout-title-row) .stat .value {
+        font-size: clamp(1rem, 4.5vw, 1.7rem);
+    }
+}
+
+@media (min-width: 641px) {
+    html body [aria-label='Workouts view'] .workouts-table th,
+    html body [aria-label='Workouts view'] .workouts-table td {
+        white-space: nowrap;
+    }
+
+    html body [aria-label='Workouts view'] .workouts-table.view-all th,
+    html body [aria-label='Workouts view'] .workouts-table.view-all td {
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+
+    html body [aria-label='Workouts view'] .view-all .metric-bar-track {
+        max-width: 60px;
+    }
+}
+
+@media (min-width: 641px) {
+    html body [aria-label='Workouts view'] .workouts-table-scroll.is-scrollable {
+        max-width: 100%;
+        overflow-x: auto;
+        overflow-y: hidden;
+        overscroll-behavior-x: contain;
+    }
+
+    html body [aria-label='Workouts view'] .workouts-card .workouts-table-scroll.is-scrollable thead th {
+        position: static;
+        top: auto;
+        z-index: auto;
+    }
+}
+
+@media (min-width: 641px) and (max-width: 820px) {
+    html body [aria-label='Workouts view'] .workouts-table {
+        font-size: 0.82rem;
+    }
+
+    html body [aria-label='Workouts view'] .workouts-table th,
+    html body [aria-label='Workouts view'] .workouts-table td {
+        padding-left: 6px;
+        padding-right: 6px;
+    }
+
+    html body [aria-label='Workouts view'] .metric-bar-track {
+        max-width: 60px;
+    }
+}
+
+@media (min-width: 641px) and (max-width: 820px) {
+    html body [aria-label='Workouts view'] .workouts-table {
+        width: max-content;
+        min-width: 100%;
+    }
+}
+
+@media (max-width: 640px) {
+    html body [aria-label='Workouts view'] .page-head {
+        row-gap: 12px;
+    }
+
+    html body [aria-label='Workouts view'] .page-head::before {
+        margin-bottom: -5px;
+    }
+
+    html body [aria-label='Workouts view'] .workouts-table tr:not(.group-row) {
+        border: 0;
+        border-bottom: 1px solid var(--border);
+        background: transparent;
+        box-shadow: none;
+        padding: 12px 0;
+        margin: 0;
+    }
+
+    html body [aria-label='Workouts view'] .workouts-table tr.group-row {
+        margin-top: 16px;
+        margin-bottom: 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    html body [aria-label='Workouts view'] .workouts-table .group-row td {
+        padding: 7px 0;
+    }
+
+    html body [aria-label='Workouts view'] .workouts-table .subtotal-row td.lead-type {
+        grid-column: 1 / span 3;
+    }
+
+    html body [aria-label='Workouts view'] .workouts-table .summary-row td {
+        border-top: 0;
+    }
+}
+
+/* Interaction, contrast, and narrow-screen refinements carried over from the
+   selected preview and kept here with the app's own design rules. */
+:root[data-theme='light'] {
+    --control-border: #738095;
+    --error: #b4232a;
+}
+
+:root[data-theme='dark'] {
+    --control-border: #5c6e86;
+    --error: #ff737a;
+}
+
+.app-bar select,
+.weight-field-input,
+.gate input,
+.toolbar input,
+.filter-select-trigger,
+.active-filter-clear {
+    border-color: var(--control-border);
+}
+
+.error {
+    color: var(--error);
+}
+
+.info-hint-box {
+    position: fixed;
+    top: 0;
+    right: auto;
+    left: 0;
+    z-index: 10000;
+    max-height: calc(100dvh - 16px);
+    overflow: auto;
+}
+
+.workout-row-link {
+    color: inherit;
+}
+
+.workout-row-link:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+html body [aria-label='Workouts view'] .toolbar .filter-select-trigger,
+html body [aria-label='Workouts view'] .toolbar input,
+html body [aria-label='Workouts view'] .toolbar .workout-unit-selector,
+html body [aria-label='Workouts view'] .toolbar .weight-field-input,
+html body [aria-label='Workouts view'] .workout-view-selector {
+    height: 40px;
+}
+
+html body [aria-label='Workouts view'] .workout-view-selector button,
+html body [aria-label='Workouts view'] .workout-unit-selector button,
+html body .workout-title-row .workout-unit-selector button {
+    min-height: 40px;
+    transition:
+        color 250ms ease,
+        border-color 250ms ease;
+}
+
+html body [aria-label='Workouts view'] .workout-view-selector::before {
+    transition: transform 250ms ease-out;
+}
+
+html body .nav a {
+    transition:
+        color 250ms ease,
+        border-color 250ms ease;
+}
+
+.point-editor-dialog {
+    opacity: 0;
+    transform: translateY(6px);
+    transition:
+        opacity 250ms ease,
+        transform 250ms ease,
+        display 250ms allow-discrete,
+        overlay 250ms allow-discrete;
+}
+
+.point-editor-dialog[open] {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+@starting-style {
+    .point-editor-dialog[open] {
+        opacity: 0;
+        transform: translateY(6px);
+    }
+}
+
+.point-editor-dialog::backdrop {
+    transition:
+        background-color 250ms ease,
+        overlay 250ms allow-discrete;
+}
+
+.point-editor-page-buttons {
+    gap: 2px;
+}
+
+.point-editor-page-buttons .nav-btn,
+.point-editor-actions > .nav-btn,
+.point-editor-close {
+    min-width: 40px;
+    min-height: 40px;
+}
+
+.point-editor-page-buttons .nav-btn {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+}
+
+.point-editor-page-buttons .nav-btn + .nav-btn {
+    margin-left: 0;
+}
+
+.point-editor-page-count {
+    white-space: nowrap;
+}
+
+.filter-select-trigger:disabled {
+    opacity: 1;
+    border-color: var(--control-border);
+}
+
+.point-editor-checkbox {
+    border-color: var(--control-border);
+}
+
+.gate {
+    width: min(420px, calc(100% - 28px));
+    margin-right: auto;
+    margin-left: auto;
+}
+
+.gate input {
+    height: 40px;
+    margin: 16px 0 12px;
+    padding: 0 12px;
+}
+
+.gate .btn {
+    height: 40px;
+    padding: 0 20px;
+}
+
+@media (min-width: 641px) and (max-width: 1279px) {
+    html body [aria-label='Workouts view'] .workouts-card {
+        overflow: visible;
+    }
+
+    html body [aria-label='Workouts view'] .workouts-table.view-all {
+        width: max-content;
+        min-width: 100%;
+    }
+}
+
+@media (max-width: 640px) {
+    html body .data-enter:has(.workout-title-row) .grid-cards.cards-5 .stat {
+        display: grid;
+        grid-template-rows: 2.5em auto;
+        align-content: start;
+    }
+
+    html body .data-enter:has(.workout-title-row) .grid-cards.cards-5 .stat .value {
+        grid-row: 1;
+        align-self: start;
+        margin: 0 0 9px;
+    }
+
+    html body .data-enter:has(.workout-title-row) .grid-cards.cards-5 .stat .label {
+        grid-row: 2;
+        align-self: start;
+    }
+
+    .point-editor-dialog {
+        width: calc(100% - 16px);
+        padding: 12px;
+    }
+
+    .point-editor-actions {
+        align-items: stretch;
+        flex-wrap: wrap;
+    }
+
+    .point-editor-pagination {
+        width: 100%;
+        min-width: 0;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 6px;
+    }
+
+    .point-editor-page-buttons {
+        display: grid;
+        grid-template-columns: repeat(4, 44px);
+        min-width: 0;
+        gap: 2px;
+        justify-content: start;
+    }
+
+    .point-editor-page-buttons .nav-btn {
+        width: 44px;
+        min-width: 44px;
+        height: 44px;
+    }
+
+    .point-editor-page-count {
+        grid-column: 1;
+    }
+
+    .point-editor-actions > .nav-btn {
+        margin-left: auto;
+    }
+
+    .point-editor-table,
+    .point-editor-table tbody {
+        display: block;
+        width: 100%;
+    }
+
+    .point-editor-table thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .point-editor-table tbody tr {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 44px;
+        align-items: center;
+        gap: 4px 8px;
+        padding: 8px 0;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .point-editor-table tbody td {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+        padding: 0;
+        border: 0;
+    }
+
+    .point-editor-table tbody td:nth-child(1) {
+        grid-column: 1;
+        grid-row: 1;
+    }
+
+    .point-editor-table tbody td:nth-child(2) {
+        grid-column: 1;
+        grid-row: 2;
+    }
+
+    .point-editor-table tbody td:nth-child(3) {
+        grid-column: 2;
+        grid-row: 1 / span 2;
+        align-items: center;
+    }
+
+    .point-editor-table tbody td:nth-child(1)::before {
+        content: 'Time';
+    }
+
+    .point-editor-table tbody td:nth-child(2)::before {
+        content: 'Measurements';
+    }
+
+    .point-editor-table tbody td::before {
+        color: var(--text-dim);
+        font-size: 0.62rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .point-editor-values {
+        min-width: 0;
+        flex-direction: column;
+        gap: 3px;
+    }
+
+    .point-editor-values > span {
+        overflow-wrap: anywhere;
+    }
+
+    .splits-table-card table,
+    .splits-table-card tbody {
+        display: block;
+        width: 100%;
+    }
+
+    .splits-table-card thead {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+        border: 0;
+    }
+
+    .splits-table-card tbody tr {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px 12px;
+        padding: 10px 12px;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .splits-table-card tbody td {
+        display: flex;
+        min-width: 0;
+        flex-direction: column;
+        gap: 2px;
+        padding: 0;
+        border: 0;
+        overflow-wrap: anywhere;
+    }
+
+    .splits-table-card tbody td:first-child {
+        grid-column: 1 / -1;
+    }
+
+    .splits-table-card tbody td::before {
+        content: attr(data-label);
+        color: var(--text-dim);
+        font-size: 0.62rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    html
+        body
+        [aria-label='Workouts view']
+        .workouts-table
+        tr:not(.group-row)
+        td:not(.lead-time):not(.lead-type):not(.lead-duration) {
+        display: grid;
+        grid-template-rows: 26px auto;
+        align-items: start;
+        gap: 0;
+    }
+
+    html
+        body
+        [aria-label='Workouts view']
+        .workouts-table
+        tr:not(.group-row)
+        td:not(.lead-time):not(.lead-type):not(.lead-duration)::before {
+        grid-row: 1;
+        line-height: 12px;
+    }
+
+    html body [aria-label='Workouts view'] .workouts-table .workout-cell-value {
+        grid-row: 2;
+        min-width: 0;
+    }
+
+    html body [aria-label='Workouts view'] .workouts-table tr:not(.group-row) td.metric-empty {
+        display: none;
+    }
+}
+
+@media (pointer: coarse) {
+    .point-editor-page-buttons .nav-btn,
+    .point-editor-actions > .nav-btn,
+    .point-editor-close,
+    .workout-title-actions .point-editor > .icon-btn,
+    .weight-field .info-hint-trigger,
+    .detail-nav .nav-btn,
+    .filter-select-option,
+    .sort-header,
+    .active-filter-clear,
+    .gate input,
+    .gate .btn {
+        min-height: 44px;
+    }
+
+    .point-editor-page-buttons .nav-btn,
+    .point-editor-close,
+    .workout-title-actions .point-editor > .icon-btn,
+    .gate input,
+    .gate .btn {
+        height: 44px;
+    }
+
+    .workout-title-actions .point-editor > .icon-btn {
+        width: 44px;
+    }
+
+    .weight-field .info-hint-trigger {
+        width: 44px;
+        height: 44px;
+    }
+
+    html body [aria-label='Workouts view'] .workout-view-selector button,
+    html body [aria-label='Workouts view'] .workout-unit-selector button,
+    html body .workout-title-row .workout-unit-selector button,
+    html body [aria-label='Workouts view'] .toolbar .filter-select-trigger,
+    html body [aria-label='Workouts view'] .toolbar input,
+    html body [aria-label='Workouts view'] .toolbar .weight-field-input {
+        min-height: 44px;
+    }
+
+    html body [aria-label='Workouts view'] .workout-unit-selector button,
+    html body .workout-title-row .workout-unit-selector button {
+        min-width: 44px;
+    }
+
+    html body [aria-label='Workouts view'] .toolbar .filter-select-trigger,
+    html body [aria-label='Workouts view'] .toolbar input,
+    html body [aria-label='Workouts view'] .toolbar .workout-unit-selector,
+    html body [aria-label='Workouts view'] .toolbar .weight-field-input,
+    html body [aria-label='Workouts view'] .workout-view-selector {
+        height: 44px;
+    }
+}
+
+@media (pointer: coarse) and (max-width: 640px) {
+    html body [aria-label='Workouts view'] .toolbar .page-head-controls {
+        gap: 4px;
+    }
+
+    html body [aria-label='Workouts view'] .toolbar .weight-field {
+        gap: 0;
+    }
+
+    html body [aria-label='Workouts view'] .toolbar .weight-field-input input {
+        width: 52px;
+    }
+
+    html body [aria-label='Workouts view'] .toolbar .workout-unit-selector {
+        gap: 4px;
+    }
+}
+
+.workouts-table-scroll:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+}
+
+.workouts-sticky-head {
+    position: fixed;
+    z-index: 90;
+    overflow: hidden;
+    background: var(--bg);
+    pointer-events: none;
+}
+
+.workouts-sticky-head table {
+    margin: 0;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.workouts-sticky-head thead th {
+    position: static;
+    top: auto;
+    z-index: auto;
+    background: var(--bg);
+    border-bottom: 0;
+    box-shadow: inset 0 -1px 0 var(--border);
+}
+
+.workouts-sticky-head .sort-header {
+    pointer-events: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    html body .nav a,
+    html body [aria-label='Workouts view'] .workout-view-selector::before,
+    html body [aria-label='Workouts view'] .workout-view-selector button,
+    html body [aria-label='Workouts view'] .workout-unit-selector button,
+    html body .workout-title-row .workout-unit-selector button,
+    .point-editor-dialog,
+    .point-editor-dialog::backdrop {
+        transition: none;
+    }
+}

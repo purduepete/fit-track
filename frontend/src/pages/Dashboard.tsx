@@ -236,7 +236,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                         value={round(data.latest_resting_hr)}
                         unit="bpm"
                     />
-                    <StatCard icon={<GaugeIcon />} label="VO₂ max" value={vo2Value} />
+                    <StatCard icon={<GaugeIcon />} label="VO₂ max" value={vo2Value} unit="mL/kg/min" />
                     <StatCard icon={<MoonIcon />} label="Sleep (last night)" value={sleepValue} />
                 </div>
 
@@ -379,7 +379,11 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                         width={compactCharts ? 36 : 48}
                                         tickSize={compactCharts ? 0 : 6}
                                     />
-                                    <Tooltip {...tooltipProps} labelFormatter={formatLocalDate} />
+                                    <Tooltip
+                                        {...tooltipProps}
+                                        labelFormatter={formatLocalDate}
+                                        formatter={(value) => [`${round(Number(value))} bpm`, 'Resting HR']}
+                                    />
                                     <Line
                                         type="monotone"
                                         dataKey="value"
@@ -413,7 +417,7 @@ export function Dashboard({ active = true }: { active?: boolean }) {
                                         <Tooltip
                                             {...tooltipProps}
                                             labelFormatter={formatLocalDate}
-                                            formatter={(value) => Number(value).toFixed(2)}
+                                            formatter={(value) => [`${round(Number(value), 1)} mL/kg/min`, 'VO₂ max']}
                                         />
                                         <Line
                                             type="monotone"

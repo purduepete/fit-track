@@ -120,10 +120,9 @@ describe('Workouts current week', () => {
         vi.spyOn(api, 'workoutTypes').mockResolvedValue([]);
         renderAt('/workouts');
 
-        await waitFor(() => {
-            expect(screen.getByRole('searchbox', { name: 'Search workouts' })).toBeInTheDocument();
-            expect(screen.getByText('Error: Could not load workouts')).toBeInTheDocument();
-        });
+        expect(await screen.findByRole('alert')).toHaveTextContent('Error: Could not load workouts');
+        expect(screen.queryByText(/No workouts in this range/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Showing 0 of 0/)).not.toBeInTheDocument();
         expect(screen.queryByRole('status', { name: 'Loading workouts' })).not.toBeInTheDocument();
     });
 
@@ -275,19 +274,19 @@ describe('Workouts type dropdown', () => {
             renderAt('/workouts');
             await findFooter();
             const units = screen.getByRole('group', { name: 'Distance units' });
-            expect(screen.getByRole('heading', { name: 'Workouts' }).closest('.page-head')).toContainElement(units);
+            expect(units.closest('.toolbar')).toBeInTheDocument();
             expect(screen.getAllByText('1.00 mi')).toHaveLength(2);
             expect(screen.getAllByText('10:00/mi')).toHaveLength(2);
             expect(screen.getAllByText('328 ft')).toHaveLength(2);
             const requests = fetch.mock.calls.length;
             await act(async () => fireEvent.click(within(units).getByRole('button', { name: 'km' })));
-            expect(screen.getAllByText('1.61 km')).toHaveLength(2);
+            expect(await screen.findAllByText('1.61 km')).toHaveLength(2);
             expect(screen.getAllByText('6:13/km')).toHaveLength(2);
             expect(screen.getAllByText('100 m')).toHaveLength(2);
             expect(within(units).getByRole('button', { name: 'km' })).toHaveAttribute('aria-pressed', 'true');
             expect(fetch).toHaveBeenCalledTimes(requests);
             await act(async () => fireEvent.click(within(units).getByRole('button', { name: 'mi' })));
-            expect(screen.getAllByText('1.00 mi')).toHaveLength(2);
+            expect(await screen.findAllByText('1.00 mi')).toHaveLength(2);
         });
 
         it('sums totals and calculates overall pace, duration-weighted HR and highest HR', async () => {
@@ -339,16 +338,18 @@ describe('Workouts type dropdown', () => {
             expect(document.querySelector('[title]')).toBeNull();
         });
 
-        it('follows the visible search results and hides when nothing matches', async () => {
-            setup([workout(), workout({ uuid: 'two', workout_type: 'Walking', duration_sec: 60 })]);
+        it('updates totals when filtering by workout type', async () => {
+            const walking = workout({ uuid: 'two', workout_type: 'Walking', duration_sec: 60 });
+            const request = setup([workout(), walking]);
             renderAt('/workouts');
             await findFooter();
-            fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Walking' } });
+            request.mockResolvedValueOnce({ items: [walking], total: 1 });
+            fireEvent.click(screen.getByRole('combobox', { name: 'Workout type' }));
+            fireEvent.click(screen.getByRole('option', { name: 'Walking' }));
+            await waitFor(() => expect(within(getFooter()).getByText('1 workout')).toBeInTheDocument());
             const row = getFooter();
             expect(within(row).getByText('1 workout')).toBeInTheDocument();
             expect(within(row).getByText('1m')).toBeInTheDocument();
-            fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'missing' } });
-            expect(document.querySelector('.summary-row')).toBeNull();
         });
 
         it('includes only loaded rows and updates when more are loaded', async () => {
@@ -432,8 +433,7 @@ describe('Workouts type dropdown', () => {
                     .getAllByRole('cell')
                     .map((cell) => cell.textContent)
             ).toEqual([
-                'Total',
-                'Indoor Cycling × 2',
+                'Indoor Cycling · 2 workouts',
                 '40m',
                 '2.00 mi',
                 '20:00/mi',
@@ -449,12 +449,10 @@ describe('Workouts type dropdown', () => {
             expect(screen.getByRole('heading', { name: 'Workouts' })).toBeInTheDocument();
         });
 
-        it('skips subtotals for the oldest loaded day while it may continue on the next page, even when searching', async () => {
+        it('skips subtotals for the oldest loaded day while it may continue on the next page', async () => {
             setup([workout(), workout({ uuid: 'two' })], 3);
             renderAt('/workouts');
             await findFooter();
-            expect(document.querySelector('tr.subtotal-row')).toBeNull();
-            fireEvent.change(screen.getByRole('searchbox'), { target: { value: 'Cycling' } });
             expect(document.querySelector('tr.subtotal-row')).toBeNull();
         });
         it('does not show a totals row for an empty range', async () => {
@@ -528,7 +526,9 @@ describe('Workouts sorting', () => {
             )
         );
         await findFooter();
-        expect(screen.getByRole('columnheader', { name: /Distance/ })).toHaveAttribute('aria-sort', 'descending');
+        await waitFor(() =>
+            expect(screen.getByRole('columnheader', { name: /Distance/ })).toHaveAttribute('aria-sort', 'descending')
+        );
         expect(document.querySelector('tr.group-row')).toBeNull();
         expect(screen.getByText(/^11\/12\/2026 \d{2}:\d{2}$/)).toBeInTheDocument();
         expect(JSON.parse(localStorage.getItem('fittrack_workout_sort')!)).toEqual({ key: 'distance', order: 'desc' });
@@ -563,15 +563,15 @@ describe('Workouts sorting', () => {
         fireEvent.click(screen.getByRole('button', { name: /^Distance/ }));
         const distances = () =>
             [...document.querySelectorAll('tbody td[data-label="Distance"]')].map((cell) => cell.textContent);
-        expect(distances()).toEqual(['12.43 mi', '9.32 mi', '6.21 mi']);
+        await waitFor(() => expect(distances()).toEqual(['12.43 mi', '9.32 mi', '6.21 mi']));
         expect(document.querySelector('tr.group-row')).toBeNull();
         expect(document.querySelector('tr.subtotal-row')).toBeNull();
         expect(screen.queryByRole('status', { name: 'Loading workouts' })).toBeNull();
 
         fireEvent.click(screen.getByRole('button', { name: /^Avg pace/ }));
-        expect(distances()).toEqual(['12.43 mi', '9.32 mi', '6.21 mi']);
+        await waitFor(() => expect(distances()).toEqual(['12.43 mi', '9.32 mi', '6.21 mi']));
         fireEvent.click(screen.getByRole('button', { name: /^Date/ }));
-        expect(document.querySelectorAll('tr.group-row')).toHaveLength(2);
+        await waitFor(() => expect(document.querySelectorAll('tr.group-row')).toHaveLength(2));
         expect(document.querySelectorAll('tr.subtotal-row')).toHaveLength(1);
         expect(workouts).toHaveBeenCalledTimes(requests);
         expect(screen.queryByRole('combobox', { name: 'Sort by' })).toBeNull();
@@ -653,7 +653,9 @@ describe('Workouts column views', () => {
         expect(bars.map((bar) => bar.style.width)).toEqual(['50%', '100%']);
 
         fireEvent.click(screen.getByRole('button', { name: 'Power' }));
-        expect(headers()).toEqual(['Time', 'Type', 'Duration', 'Avg power', 'Avg W/kg', 'Cadence', 'Elev gain']);
+        await waitFor(() =>
+            expect(headers()).toEqual(['Time', 'Type', 'Duration', 'Avg power', 'Avg W/kg', 'Cadence', 'Elev gain'])
+        );
         expect(document.querySelectorAll('td[data-label="Avg power"] .metric-bar')).toHaveLength(1);
         expect(localStorage.getItem('fittrack_workout_view')).toBe('power');
         await waitFor(() =>
@@ -676,11 +678,11 @@ describe('Workouts column views', () => {
         expect(screen.getByText(/Sorted by/)).toHaveTextContent('Sorted by Cadence (high to low)');
         const distances = () =>
             [...document.querySelectorAll('tbody td[data-label="Distance"]')].map((cell) => cell.textContent);
-        expect(distances()).toEqual(['6.21 mi', '12.43 mi']);
+        await waitFor(() => expect(distances()).toEqual(['6.21 mi', '12.43 mi']));
 
         fireEvent.click(screen.getByRole('button', { name: 'Sort by date' }));
         expect(screen.queryByText(/Sorted by/)).toBeNull();
-        expect(document.querySelectorAll('tr.group-row')).toHaveLength(1);
+        await waitFor(() => expect(document.querySelectorAll('tr.group-row')).toHaveLength(1));
     });
 
     it('falls back to the server cookie when local storage has no view', async () => {

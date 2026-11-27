@@ -16,6 +16,7 @@ import { api } from '../lib/api';
 import { useApiResource } from '../lib/useApiResource';
 import { StatCard } from '../components/StatCard';
 import { PointExclusions } from '../components/PointExclusions';
+import { ResultsTransition } from '../components/ResultsTransition';
 import { UnitSelector } from '../components/UnitSelector';
 import { LoadingSpinner, PageLoading } from '../components/LoadingSpinner';
 import {
@@ -154,6 +155,28 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                         <ChevronLeftIcon /> Older
                     </button>
                     <button
+                        type="button"
+                        className="nav-btn detail-home"
+                        onClick={() => navigate('/workouts')}
+                        aria-label="All workouts"
+                        data-tip={SHOW_TOOLTIPS ? 'All workouts' : undefined}
+                    >
+                        <svg
+                            width="18"
+                            height="18"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            aria-hidden="true"
+                        >
+                            <path d="M3 10.5 12 3l9 7.5" />
+                            <path d="M5 9.5V21h14V9.5M9 21v-7h6v7" />
+                        </svg>
+                    </button>
+                    <button
                         className="nav-btn"
                         onClick={() => data.next_uuid && navigate(`/workouts/${data.next_uuid}`)}
                         disabled={!data.next_uuid}
@@ -184,229 +207,243 @@ export function WorkoutDetail({ onAuthError }: { onAuthError: () => void }) {
                     </div>
                 </div>
 
-                {data.point_exclusion_warning && (
-                    <p className="error" role="alert">
-                        {data.point_exclusion_warning}
-                    </p>
-                )}
+                <ResultsTransition transitionKey={unit}>
+                    {data.point_exclusion_warning && (
+                        <p className="error" role="alert">
+                            {data.point_exclusion_warning}
+                        </p>
+                    )}
 
-                <div className="grid-cards cards-5">
-                    <StatCard icon={<ClockIcon />} label="Duration" value={formatHms(data.duration_sec)} />
-                    <StatCard icon={<ActivityIcon />} label="Distance" value={formatDistance(data.distance_m, unit)} />
-                    <StatCard
-                        icon={<FlameIcon />}
-                        label="Active energy"
-                        value={round(data.active_energy_kcal)}
-                        unit="kcal"
-                    />
-                    <StatCard
-                        icon={<HeartIcon />}
-                        label="Avg / Max HR"
-                        value={`${round(data.avg_hr)} / ${round(data.max_hr)}`}
-                    />
-                    <StatCard
-                        icon={<MountainIcon />}
-                        label="Elevation gain"
-                        value={formatElevation(data.elevation_gain_m, unit)}
-                    />
-                </div>
-
-                {data.route.length > 0 && (
-                    <div className="section">
-                        <h2>{data.source_name === 'Strava' ? 'Virtual Zwift route' : 'Route'}</h2>
-                        <Suspense
-                            fallback={
-                                <div className="map loading-region">
-                                    <LoadingSpinner label="Loading map" />
-                                </div>
-                            }
-                        >
-                            <RouteMap route={data.route} />
-                        </Suspense>
+                    <div className="grid-cards cards-5">
+                        <StatCard icon={<ClockIcon />} label="Duration" value={formatHms(data.duration_sec)} />
+                        <StatCard
+                            icon={<ActivityIcon />}
+                            label="Distance"
+                            value={formatDistance(data.distance_m, unit)}
+                        />
+                        <StatCard
+                            icon={<FlameIcon />}
+                            label="Active energy"
+                            value={round(data.active_energy_kcal)}
+                            unit="kcal"
+                        />
+                        <StatCard
+                            icon={<HeartIcon />}
+                            label="Avg / Max HR"
+                            value={`${round(data.avg_hr)} / ${round(data.max_hr)}`}
+                        />
+                        <StatCard
+                            icon={<MountainIcon />}
+                            label="Elevation gain"
+                            value={formatElevation(data.elevation_gain_m, unit)}
+                        />
                     </div>
-                )}
 
-                <div
-                    className={`workout-chart-row${elevationData.length >= 2 && hrData.length > 0 ? ' workout-chart-row--paired' : ''}`}
-                >
-                    {elevationData.length >= 2 && (
+                    {data.route.length > 0 && (
                         <div className="section">
-                            <h2>Elevation</h2>
-                            <div className="card">
-                                <ResponsiveContainer width="100%" height={360}>
-                                    <LineChart data={elevationData}>
-                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                                        <XAxis
-                                            dataKey="t"
-                                            type="number"
-                                            domain={['dataMin', 'dataMax']}
-                                            tick={{ fontSize: 11 }}
-                                            tickFormatter={(t) => formatLocalTime(Number(t))}
-                                        />
-                                        <YAxis
-                                            domain={['auto', 'auto']}
-                                            width={52}
-                                            tick={{ fontSize: 11 }}
-                                            tickFormatter={(v) => `${v} ${elevUnit}`}
-                                        />
-                                        <Tooltip
-                                            {...tooltipProps}
-                                            labelFormatter={(t) => formatLocalTime(Number(t), true)}
-                                            formatter={(v) => [`${round(Number(v))} ${elevUnit}`, 'Elevation']}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="elev"
-                                            stroke="#16a34a"
-                                            strokeWidth={2}
-                                            dot={false}
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <h2>{data.source_name === 'Strava' ? 'Virtual Zwift route' : 'Route'}</h2>
+                            <Suspense
+                                fallback={
+                                    <div className="map loading-region">
+                                        <LoadingSpinner label="Loading map" />
+                                    </div>
+                                }
+                            >
+                                <RouteMap route={data.route} />
+                            </Suspense>
                         </div>
                     )}
-                    {hrData.length > 0 && (
-                        <div className="section">
-                            <h2>Heart rate</h2>
-                            <div className="card">
-                                <ResponsiveContainer width="100%" height={360}>
-                                    <LineChart data={hrData}>
-                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                                        <XAxis
-                                            dataKey="t"
-                                            type="number"
-                                            domain={['dataMin', 'dataMax']}
-                                            tick={{ fontSize: 11 }}
-                                            tickFormatter={(t) => formatLocalTime(Number(t))}
-                                        />
-                                        <YAxis domain={['auto', 'auto']} tick={{ fontSize: 11 }} />
-                                        <Tooltip
-                                            {...tooltipProps}
-                                            labelFormatter={(t) => formatLocalTime(Number(t), true)}
-                                            formatter={(v) => [`${v} bpm`, 'HR']}
-                                        />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="bpm"
-                                            stroke="#e5484d"
-                                            strokeWidth={2}
-                                            dot={false}
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
-                        </div>
-                    )}
-                </div>
 
-                <div className="section">
-                    <h2>Splits</h2>
-                    {splits.length === 0 ? (
-                        <p className="muted">No split data for this workout.</p>
-                    ) : (
-                        <div className="two-col">
-                            <div className="card splits-table-card" style={{ padding: 0 }}>
-                                <table>
-                                    <thead>
-                                        <tr>
-                                            <th>{unit === 'mi' ? 'Mile' : 'Km'}</th>
-                                            <th>Pace</th>
-                                            <th>Time</th>
-                                            <th>Avg HR</th>
-                                            <th>Elev</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {splits.map((s) => (
-                                            <tr key={s.split_index}>
-                                                <td>
-                                                    {s.split_index}
-                                                    {s.distance_m < (unit === 'mi' ? 1609 : 999) && (
-                                                        <span className="muted">
-                                                            {' '}
-                                                            ({formatDistance(s.distance_m, unit)})
-                                                        </span>
-                                                    )}
-                                                </td>
-                                                <td>{formatPace(s.pace_sec_per_unit, unit)}</td>
-                                                <td>{formatHms(s.duration_sec)}</td>
-                                                <td>{round(s.avg_hr)}</td>
-                                                <td>{formatElevation(s.elevation_gain_m, unit)}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div className="card">
-                                <p className="muted" style={{ margin: '0 0 8px', fontSize: '0.8rem' }}>
-                                    {hasSplitGain ? 'Pace and elevation gain' : 'Pace'} per{' '}
-                                    {unit === 'mi' ? 'mile' : 'km'}: {formatPace(paceAvg, unit)} average.
-                                </p>
-                                <ResponsiveContainer width="100%" height={260}>
-                                    <ComposedChart data={paceData}>
-                                        <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                                        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                                        <YAxis
-                                            yAxisId="pace"
-                                            domain={paceDomain}
-                                            allowDecimals={false}
-                                            width={44}
-                                            tick={{ fontSize: 11 }}
-                                            tickFormatter={(v) =>
-                                                `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`
-                                            }
-                                        />
-                                        {hasSplitGain && (
+                    <div
+                        className={`workout-chart-row${elevationData.length >= 2 && hrData.length > 0 ? ' workout-chart-row--paired' : ''}`}
+                    >
+                        {elevationData.length >= 2 && (
+                            <div className="section">
+                                <h2>Elevation</h2>
+                                <div className="card">
+                                    <ResponsiveContainer width="100%" height={360}>
+                                        <LineChart data={elevationData}>
+                                            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                            <XAxis
+                                                dataKey="t"
+                                                type="number"
+                                                domain={['dataMin', 'dataMax']}
+                                                tick={{ fontSize: 11 }}
+                                                tickFormatter={(t) => formatLocalTime(Number(t))}
+                                            />
                                             <YAxis
-                                                yAxisId="elev"
-                                                orientation="right"
-                                                domain={[0, 'auto']}
-                                                allowDecimals={false}
-                                                width={52}
+                                                domain={['auto', 'auto']}
+                                                width={48}
+                                                tickSize={0}
                                                 tick={{ fontSize: 11 }}
                                                 tickFormatter={(v) => `${v} ${elevUnit}`}
                                             />
-                                        )}
-                                        <Tooltip
-                                            {...tooltipProps}
-                                            formatter={(value, name) =>
-                                                name === 'elev'
-                                                    ? [`${round(Number(value))} ${elevUnit}`, 'Elevation gain']
-                                                    : [formatPace(Number(value), unit), 'Pace']
-                                            }
-                                            labelFormatter={(l) => `${unit === 'mi' ? 'Mile' : 'Km'} ${l}`}
-                                        />
-                                        {hasSplitGain && (
-                                            <Bar
-                                                yAxisId="elev"
-                                                dataKey="elev"
-                                                fill="#16a34a"
-                                                fillOpacity={0.35}
-                                                isAnimationActive={false}
+                                            <Tooltip
+                                                {...tooltipProps}
+                                                labelFormatter={(t) => formatLocalTime(Number(t), true)}
+                                                formatter={(v) => [`${round(Number(v))} ${elevUnit}`, 'Elevation']}
                                             />
-                                        )}
-                                        <ReferenceLine
-                                            yAxisId="pace"
-                                            y={paceAvg}
-                                            stroke="var(--text-dim)"
-                                            strokeDasharray="4 4"
-                                        />
-                                        <Line
-                                            yAxisId="pace"
-                                            type="monotone"
-                                            dataKey="pace"
-                                            stroke="#4f46e5"
-                                            strokeWidth={2}
-                                            dot={{ r: 3, fill: '#4f46e5' }}
-                                            activeDot={{ r: 5 }}
-                                        />
-                                    </ComposedChart>
-                                </ResponsiveContainer>
+                                            <Line
+                                                type="monotone"
+                                                dataKey="elev"
+                                                stroke="#16a34a"
+                                                strokeWidth={2}
+                                                dot={false}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
                             </div>
-                        </div>
-                    )}
-                </div>
+                        )}
+                        {hrData.length > 0 && (
+                            <div className="section">
+                                <h2>Heart rate</h2>
+                                <div className="card">
+                                    <ResponsiveContainer width="100%" height={360}>
+                                        <LineChart data={hrData}>
+                                            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                            <XAxis
+                                                dataKey="t"
+                                                type="number"
+                                                domain={['dataMin', 'dataMax']}
+                                                tick={{ fontSize: 11 }}
+                                                tickFormatter={(t) => formatLocalTime(Number(t))}
+                                            />
+                                            <YAxis
+                                                domain={['auto', 'auto']}
+                                                width={48}
+                                                tickSize={0}
+                                                tick={{ fontSize: 11 }}
+                                            />
+                                            <Tooltip
+                                                {...tooltipProps}
+                                                labelFormatter={(t) => formatLocalTime(Number(t), true)}
+                                                formatter={(v) => [`${v} bpm`, 'HR']}
+                                            />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="bpm"
+                                                stroke="#e5484d"
+                                                strokeWidth={2}
+                                                dot={false}
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
+                    <div className="section">
+                        <h2>Splits</h2>
+                        {splits.length === 0 ? (
+                            <p className="muted">No split data for this workout.</p>
+                        ) : (
+                            <div className="two-col">
+                                <div className="card splits-table-card" style={{ padding: 0 }}>
+                                    <table>
+                                        <thead>
+                                            <tr>
+                                                <th>{unit === 'mi' ? 'Mile' : 'Km'}</th>
+                                                <th>Pace</th>
+                                                <th>Time</th>
+                                                <th>Avg HR</th>
+                                                <th>Elev</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {splits.map((s) => (
+                                                <tr key={s.split_index}>
+                                                    <td data-label={unit === 'mi' ? 'Mile' : 'Km'}>
+                                                        {s.split_index}
+                                                        {s.distance_m < (unit === 'mi' ? 1609 : 999) && (
+                                                            <span className="muted">
+                                                                {' '}
+                                                                ({formatDistance(s.distance_m, unit)})
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                    <td data-label="Pace">{formatPace(s.pace_sec_per_unit, unit)}</td>
+                                                    <td data-label="Time">{formatHms(s.duration_sec)}</td>
+                                                    <td data-label="Avg HR">{round(s.avg_hr)}</td>
+                                                    <td data-label="Elevation">
+                                                        {formatElevation(s.elevation_gain_m, unit)}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="card">
+                                    <p className="muted" style={{ margin: '0 0 8px', fontSize: '0.8rem' }}>
+                                        {hasSplitGain ? 'Pace and elevation gain' : 'Pace'} per{' '}
+                                        {unit === 'mi' ? 'mile' : 'km'}: {formatPace(paceAvg, unit)} average.
+                                    </p>
+                                    <ResponsiveContainer width="100%" height={260}>
+                                        <ComposedChart data={paceData}>
+                                            <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                                            <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                                            <YAxis
+                                                yAxisId="pace"
+                                                domain={paceDomain}
+                                                allowDecimals={false}
+                                                width={44}
+                                                tick={{ fontSize: 11 }}
+                                                tickFormatter={(v) =>
+                                                    `${Math.floor(v / 60)}:${String(v % 60).padStart(2, '0')}`
+                                                }
+                                            />
+                                            {hasSplitGain && (
+                                                <YAxis
+                                                    yAxisId="elev"
+                                                    orientation="right"
+                                                    domain={[0, 'auto']}
+                                                    allowDecimals={false}
+                                                    width={52}
+                                                    tick={{ fontSize: 11 }}
+                                                    tickFormatter={(v) => `${v} ${elevUnit}`}
+                                                />
+                                            )}
+                                            <Tooltip
+                                                {...tooltipProps}
+                                                formatter={(value, name) =>
+                                                    name === 'elev'
+                                                        ? [`${round(Number(value))} ${elevUnit}`, 'Elevation gain']
+                                                        : [formatPace(Number(value), unit), 'Pace']
+                                                }
+                                                labelFormatter={(l) => `${unit === 'mi' ? 'Mile' : 'Km'} ${l}`}
+                                            />
+                                            {hasSplitGain && (
+                                                <Bar
+                                                    yAxisId="elev"
+                                                    dataKey="elev"
+                                                    fill="#16a34a"
+                                                    fillOpacity={0.35}
+                                                    isAnimationActive={false}
+                                                />
+                                            )}
+                                            <ReferenceLine
+                                                yAxisId="pace"
+                                                y={paceAvg}
+                                                stroke="var(--text-dim)"
+                                                strokeDasharray="4 4"
+                                            />
+                                            <Line
+                                                yAxisId="pace"
+                                                type="monotone"
+                                                dataKey="pace"
+                                                stroke="#4f46e5"
+                                                strokeWidth={2}
+                                                dot={{ r: 3, fill: '#4f46e5' }}
+                                                activeDot={{ r: 5 }}
+                                            />
+                                        </ComposedChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </ResultsTransition>
             </div>
         </div>
     );

@@ -356,7 +356,7 @@ export function PointExclusions({
                                             <ChevronLast size={16} aria-hidden="true" />
                                         </button>
                                     </div>
-                                    <span>
+                                    <span className="point-editor-page-count">
                                         Page {currentPage + 1} of {pageCount}
                                     </span>
                                 </div>

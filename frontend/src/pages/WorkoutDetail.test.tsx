@@ -198,7 +198,7 @@ it('shows elevation gain in feet and switches to meters with the km toggle', asy
     await act(async () => fireEvent.click(screen.getByRole('button', { name: 'km' })));
     expect(screen.getByRole('button', { name: 'km' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.getByRole('button', { name: 'mi' })).toHaveAttribute('aria-pressed', 'false');
-    expect(screen.getByText('Elevation gain').closest('.card')).toHaveTextContent('100 m');
+    await waitFor(() => expect(screen.getByText('Elevation gain').closest('.card')).toHaveTextContent('100 m'));
     expect(screen.getByText('30 m')).toBeInTheDocument();
 });
 

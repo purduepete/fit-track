@@ -10,6 +10,7 @@ import { useDelayedLoading } from '../hooks/useDelayedLoading';
 import { WeightField } from '../components/WeightField';
 import { SORT_LABELS, VIEW_COLUMNS, VIEWS, sortWorkouts, useWorkoutTable, type WorkoutSort } from '../lib/workoutSort';
 import { WorkoutsTable } from '../components/WorkoutsTable';
+import { ResultsTransition } from '../components/ResultsTransition';
 import { groupWorkoutDays, totalWorkouts } from '../lib/workoutTotals';
 import { useFirstLoad } from '../lib/firstLoad';
 import { usePageRefresh } from '../lib/refresh';
@@ -56,7 +57,6 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
     // Order the server returned the loaded rows in; it decides which day may continue on the next page.
     const [loadedSortKey, setLoadedSortKey] = useState(sort.key);
     const byDate = sort.key === 'date';
-    const [search, setSearch] = useState('');
     const [types, setTypes] = useState<string[]>([]);
     const [typesReady, setTypesReady] = useState(false);
     const [items, setItems] = useState<WorkoutSummary[]>([]);
@@ -86,11 +86,6 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
         sort: sortRef.current.key,
         order: sortRef.current.order,
     });
-
-    // A deep-linked date must not be hidden by a leftover client-side search term.
-    useEffect(() => {
-        if (dateParam) setSearch('');
-    }, [dateParam]);
 
     useEffect(() => {
         if (!active) return;
@@ -165,15 +160,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
         if (items.length < total) setSortRequest((value) => value + 1);
     }
 
-    // Client-side text search over the loaded rows (matches type or date).
-    const filtered = useMemo(() => {
-        const q = search.trim().toLowerCase();
-        const rows = sortWorkouts(items, sort);
-        if (!q) return rows;
-        return rows.filter(
-            (w) => w.workout_type.toLowerCase().includes(q) || formatLocalDate(w.local_date).includes(q)
-        );
-    }, [items, search, sort]);
+    const filtered = useMemo(() => sortWorkouts(items, sort), [items, sort]);
 
     const summary = useMemo(() => totalWorkouts(filtered), [filtered]);
 
@@ -186,7 +173,7 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
         const days = groupWorkoutDays(filtered, partialDate);
         return complete || loadedSortKey === 'date' ? days : days.map((day) => ({ ...day, subtotals: [] }));
     }, [byDate, filtered, partialDate, complete, loadedSortKey]);
-    const hasMore = items.length < total && !search;
+    const hasMore = items.length < total;
     // A sort column the current view hides is named so the row order isn't a mystery.
     const hiddenSort =
         sort.key !== 'date' && sort.key !== 'duration' && !VIEW_COLUMNS[view].some((key) => key === sort.key);
@@ -203,7 +190,12 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
         setSearchParams(next);
     }
 
-    if (error && !loaded) return <p className="error">{error}</p>;
+    if (error && !loaded)
+        return (
+            <p className="error" role="alert">
+                {error}
+            </p>
+        );
     if (!loaded) {
         return (
             <>
@@ -219,10 +211,6 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
         <>
             <div className="page-head">
                 <h1 className="page-title">Workouts</h1>
-                <div className="page-head-controls">
-                    <WeightField />
-                    <UnitSelector unit={unit} onChange={setUnit} saveError={saveError} />
-                </div>
             </div>
             <div className="data-enter">
                 <div className="toolbar">
@@ -235,13 +223,10 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                         disabled={!!dateParam}
                         title={dateParam ? 'Showing a single day. Clear the day filter to use ranges.' : undefined}
                     />
-                    <input
-                        type="search"
-                        placeholder="Search loaded…"
-                        value={search}
-                        onChange={(e) => setSearch(e.target.value)}
-                        aria-label="Search workouts"
-                    />
+                    <div className="page-head-controls">
+                        <WeightField />
+                        <UnitSelector unit={unit} onChange={setUnit} saveError={saveError} />
+                    </div>
                 </div>
 
                 <div className="view-bar">
@@ -283,7 +268,11 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                     </div>
                 )}
 
-                {error && <p className="error">{error}</p>}
+                {error && (
+                    <p className="error" role="alert">
+                        {items.length > 0 ? `Refresh failed; showing previously loaded workouts. ${error}` : error}
+                    </p>
+                )}
 
                 {filtered.some((workout) => workout.point_exclusion_warning) && (
                     <p className="error" role="alert">
@@ -291,53 +280,58 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                     </p>
                 )}
 
-                {showListRefresh ? (
-                    <div className="loading-region workouts-loading">
-                        <LoadingSpinner label="Loading workouts" show />
-                    </div>
-                ) : (
-                    <div className="data-enter">
-                        <div className="card workouts-card" style={{ padding: 0 }} aria-busy={loading}>
-                            <WorkoutsTable
-                                rows={filtered}
-                                groups={byDate ? groups : null}
-                                summary={summary}
-                                unit={unit}
-                                view={view}
-                                sort={sort}
-                                onSort={changeSort}
-                                emptyMessage={
-                                    loading
-                                        ? null
-                                        : items.length === 0
-                                          ? 'No workouts in this range. Try a wider date range or ingest an export.'
-                                          : 'No loaded workouts match your search.'
-                                }
-                                onOpen={(uuid) => nav(`/workouts/${uuid}`)}
-                            />
+                <ResultsTransition transitionKey={JSON.stringify([view, type, dateFrom, dateTo, sort, unit])}>
+                    {showListRefresh ? (
+                        <div className="loading-region workouts-loading">
+                            <LoadingSpinner label="Loading workouts" show />
                         </div>
+                    ) : (
+                        <div className="data-enter">
+                            <div className="card workouts-card" style={{ padding: 0 }} aria-busy={loading}>
+                                <WorkoutsTable
+                                    rows={filtered}
+                                    groups={byDate ? groups : null}
+                                    summary={summary}
+                                    unit={unit}
+                                    view={view}
+                                    sort={sort}
+                                    onSort={changeSort}
+                                    emptyMessage={
+                                        error || loading
+                                            ? null
+                                            : items.length === 0
+                                              ? 'No workouts in this range. Try a wider date range or ingest an export.'
+                                              : null
+                                    }
+                                    onOpen={(uuid) => nav(`/workouts/${uuid}`)}
+                                />
+                            </div>
 
-                        <div className="workouts-footer">
-                            <span className="muted">
-                                Showing {filtered.length} of {total}
-                            </span>
-                            {hasMore && (
-                                <button
-                                    className="btn load-more-button"
-                                    onClick={loadMore}
-                                    disabled={loading}
-                                    aria-label={showMoreSpinner ? 'Loading workouts' : undefined}
-                                    aria-busy={pending === 'more'}
-                                >
-                                    <span className={showMoreSpinner ? 'load-more-label--hidden' : undefined}>
-                                        Load more
+                            {(!error || items.length > 0) && (
+                                <div className="workouts-footer">
+                                    <span className="muted">
+                                        Showing {filtered.length} of {total}
+                                        {error ? ' (last successful load)' : ''}
                                     </span>
-                                    {showMoreSpinner && <LoadingSpinner label="Loading workouts" small show />}
-                                </button>
+                                    {hasMore && (
+                                        <button
+                                            className="btn load-more-button"
+                                            onClick={loadMore}
+                                            disabled={loading}
+                                            aria-label={showMoreSpinner ? 'Loading workouts' : undefined}
+                                            aria-busy={pending === 'more'}
+                                        >
+                                            <span className={showMoreSpinner ? 'load-more-label--hidden' : undefined}>
+                                                Load more
+                                            </span>
+                                            {showMoreSpinner && <LoadingSpinner label="Loading workouts" small show />}
+                                        </button>
+                                    )}
+                                </div>
                             )}
                         </div>
-                    </div>
-                )}
+                    )}
+                </ResultsTransition>
             </div>
         </>
     );

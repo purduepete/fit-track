@@ -136,7 +136,6 @@ export function FilterSelect<T extends string | number>({
                 ref={triggerRef}
                 type="button"
                 role="combobox"
-                tabIndex={title ? 0 : -1}
                 className="filter-select-trigger"
                 aria-label={ariaLabel}
                 aria-haspopup="listbox"

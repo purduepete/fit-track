@@ -137,7 +137,7 @@ export function round(n: number | null, digits = 0): string {
 /** Whole-number step count with thousands separators (e.g. 12500 -> "12,500"). */
 export function formatSteps(n: number | null): string {
     if (n == null || !isFinite(n)) return '—';
-    return Math.round(n).toLocaleString();
+    return Math.round(n).toLocaleString('en-US');
 }
 
 /** Decimal hours -> "Hh Mm" (e.g. 6.311 -> "6h 19m", 7 -> "7h", 0.5 -> "30m"). */

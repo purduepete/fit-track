@@ -11,9 +11,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from threading import Event, Thread
 from typing import Literal
+from urllib.parse import quote
 
 from fastapi import Depends, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -93,6 +95,13 @@ def health() -> dict:
 @app.get("/api/auth-mode", tags=["meta"])
 def auth_mode() -> dict:
     return {"gateway": settings.gateway_read_auth}
+
+
+@app.get("/api/access-login", include_in_schema=False)
+def access_login(route: str = "") -> RedirectResponse:
+    """Return to the app after Access authenticates this network-only navigation."""
+    return RedirectResponse(f"/#{quote(route, safe='/?:=&%')}", status_code=303)
+
 
 class UnitPreference(BaseModel):
     unit: Literal["mi", "km"]

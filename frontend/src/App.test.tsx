@@ -45,6 +45,26 @@ describe('App sign-in gates', () => {
         expect(await screen.findByText(/Sign in with Cloudflare/)).toBeTruthy();
     });
 
+    it('signs in within the same tab and keeps the current route', async () => {
+        window.location.hash = '#/workouts';
+        vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Load failed')));
+        render(<App />);
+        const signIn = await screen.findByRole('link', { name: 'Sign in' });
+        expect(signIn).toHaveAttribute('href', '/api/access-login?route=%2Fworkouts');
+        expect(signIn).not.toHaveAttribute('target', '_blank');
+    });
+
+    it('opens sign-in separately when embedded', async () => {
+        Object.defineProperty(window, 'top', { configurable: true, get: () => ({}) });
+        try {
+            vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Load failed')));
+            render(<App />);
+            expect(await screen.findByRole('link', { name: 'Sign in' })).toHaveAttribute('target', '_blank');
+        } finally {
+            Object.defineProperty(window, 'top', { configurable: true, get: () => window });
+        }
+    });
+
     it('loads the dashboard after the user returns signed in', async () => {
         vi.spyOn(api, 'dashboard').mockReturnValue(new Promise(() => {}));
         const fetch = vi

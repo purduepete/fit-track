@@ -4,6 +4,9 @@ import { BrandMark } from './Icons';
 
 /** Shown when Cloudflare Access has no session for this browser or frame. */
 export function AccessGate() {
+    const embedded = window.top !== window;
+    const signInUrl = `/api/access-login?route=${encodeURIComponent(location.hash.slice(1))}`;
+
     return (
         <div className="gate">
             <div className="brand" style={{ justifyContent: 'center', fontSize: '1.5rem' }}>
@@ -11,9 +14,16 @@ export function AccessGate() {
                 Fit Track
             </div>
             <p className="muted">
-                Sign in with Cloudflare to view your workouts. Fit Track loads here after you return.
+                {embedded
+                    ? 'Sign in with Cloudflare to view your workouts. Fit Track loads here after you return.'
+                    : 'Sign in with Cloudflare to view your workouts.'}
             </p>
-            <a className="btn" href={location.href} target="_blank" rel="noopener noreferrer">
+            <a
+                className="btn"
+                href={signInUrl}
+                target={embedded ? '_blank' : undefined}
+                rel={embedded ? 'noopener noreferrer' : undefined}
+            >
                 Sign in
             </a>
         </div>

@@ -13,6 +13,10 @@ sign-in through Cloudflare Access. The Google Drive uploader runs on the same ho
 http://127.0.0.1:8791. It runs only while JimBrown is signed in, because `G:` is a
 per-user Google Drive mount.
 
+When an Access session expires, the sign-in link uses the protected
+`/api/access-login` route to bypass the cached app shell and return to the
+current app route. It stays in the same tab, except when Fit Track is embedded.
+
 The optional Strava sync runs in the existing app process, including after a
 startup with nobody signed in. It needs no extra task or Cloudflare route.
 Keep its mutable OAuth credentials at

@@ -4,6 +4,9 @@ import App from './App';
 import './theme.css';
 import './open-layout.css';
 import './pwa';
+import { restoreAccessRoute } from './lib/accessLogin';
+
+restoreAccessRoute();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

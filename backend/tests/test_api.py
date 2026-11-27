@@ -33,11 +33,25 @@ def test_health_endpoint_is_open(client):
     assert client.get("/api/health").json() == {"status": "ok"}
 
 
-def test_access_login_serves_an_uncached_recovery_page(client):
+def test_access_login_serves_the_current_uncached_app_shell(client, monkeypatch, tmp_path):
+    from app.main import settings
+
+    (tmp_path / "index.html").write_text("<html>Current app shell</html>", encoding="utf-8")
+    monkeypatch.setattr(settings, "static_dir", str(tmp_path))
     response = client.get("/api/access-login", params={"route": "/workouts/item?unit=mi"}, follow_redirects=False)
     assert response.status_code == 200
     assert response.headers["cache-control"] == "no-store"
     assert "text/html" in response.headers["content-type"]
+    assert response.text == "<html>Current app shell</html>"
+
+
+def test_access_login_reports_a_missing_app_shell(client, monkeypatch, tmp_path):
+    from app.main import settings
+
+    monkeypatch.setattr(settings, "static_dir", str(tmp_path))
+    response = client.get("/api/access-login")
+    assert response.status_code == 503
+    assert response.json() == {"detail": "Fit Track app shell is unavailable"}
 
 
 def test_unit_preference_cookie(client, monkeypatch):

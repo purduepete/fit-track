@@ -14,10 +14,9 @@ http://127.0.0.1:8791. It runs only while JimBrown is signed in, because `G:` is
 per-user Google Drive mount.
 
 When an Access session expires, the sign-in link uses the protected
-`/api/access-login` route to bypass the cached app shell. After authentication,
-it unregisters the old app worker and returns to the current app route. The
-app registers a fresh worker on load. Sign-in stays in the same tab, except
-when Fit Track is embedded.
+`/api/access-login` route to load the current app shell without the service
+worker's navigation fallback. The app restores the previous route after
+authentication. Sign-in stays in the same tab, except when Fit Track is embedded.
 
 The optional Strava sync runs in the existing app process, including after a
 startup with nobody signed in. It needs no extra task or Cloudflare route.

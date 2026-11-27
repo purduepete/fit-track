@@ -17,6 +17,10 @@ When an Access session expires, the sign-in link uses the protected
 `/api/access-login` route to load the current app shell without the service
 worker's navigation fallback. The app restores the previous route after
 authentication. Sign-in stays in the same tab, except when Fit Track is embedded.
+Cloudflare's `/cdn-cgi/` routes, including `/cdn-cgi/access/authorized`, are
+excluded from the service worker's navigation fallback so Safari lets the
+network complete authentication. A browser running an older worker may need
+its Fit Track website data cleared once after this fix is deployed.
 
 The optional Strava sync runs in the existing app process, including after a
 startup with nobody signed in. It needs no extra task or Cloudflare route.

@@ -37,9 +37,9 @@ export default defineConfig({
                 skipWaiting: true,
                 clientsClaim: true,
                 cleanupOutdatedCaches: true,
-                // The FastAPI backend is served under /api on the same origin; never let
-                // the SW navigation fallback serve the cached app shell for API requests.
-                navigateFallbackDenylist: [/^\/api/, /^\/oauth\//],
+                // Cloudflare's sign-in callback must reach the network without respondWith.
+                // Keep API and public OAuth pages out of the app-shell fallback too.
+                navigateFallbackDenylist: [/^\/api/, /^\/oauth\//, /^\/cdn-cgi\//],
                 runtimeCaching: [
                     {
                         urlPattern: ({ url }) => url.pathname.startsWith('/api'),

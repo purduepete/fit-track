@@ -467,6 +467,11 @@ html body [aria-label='Workouts view'] .view-bar {
     margin-bottom: 12px;
 }
 
+html body [aria-label='Workouts view'] .phone-unit-selector,
+html body [aria-label='Workouts view'] .phone-unit-error {
+    display: none;
+}
+
 html body [aria-label='Workouts view'] .results-transition .data-enter {
     animation: none;
 }
@@ -869,6 +874,35 @@ html body .data-enter:has(.workout-title-row) .recharts-tooltip-wrapper[style*='
         row-gap: 12px;
     }
 
+    html body [aria-label='Workouts view'] .toolbar .page-head-controls {
+        display: none;
+    }
+
+    html body [aria-label='Workouts view'] .phone-unit-selector {
+        display: block;
+        margin-left: auto;
+    }
+
+    html body [aria-label='Workouts view'] .phone-unit-error {
+        display: block;
+        flex-basis: 100%;
+        margin: 0;
+    }
+
+    html body [aria-label='Workouts view'] .view-bar .workout-view-selector {
+        flex: 1 1 0;
+        max-width: 210px;
+        min-width: 0;
+    }
+
+    html body [aria-label='Workouts view'] .view-bar .workout-view-selector button {
+        width: calc(100% / 3);
+    }
+
+    html body [aria-label='Workouts view'] .view-bar .hidden-sort {
+        flex-basis: 100%;
+    }
+
     html body [aria-label='Workouts view'] .page-head::before {
         margin-bottom: -5px;
     }
@@ -949,6 +983,7 @@ html body [aria-label='Workouts view'] .toolbar .filter-select-trigger,
 html body [aria-label='Workouts view'] .toolbar input,
 html body [aria-label='Workouts view'] .toolbar .workout-unit-selector,
 html body [aria-label='Workouts view'] .toolbar .weight-field-input,
+html body [aria-label='Workouts view'] .view-bar .workout-unit-selector,
 html body [aria-label='Workouts view'] .workout-view-selector {
     height: 40px;
 }
@@ -1328,6 +1363,7 @@ html body .nav a {
     html body [aria-label='Workouts view'] .toolbar input,
     html body [aria-label='Workouts view'] .toolbar .workout-unit-selector,
     html body [aria-label='Workouts view'] .toolbar .weight-field-input,
+    html body [aria-label='Workouts view'] .view-bar .workout-unit-selector,
     html body [aria-label='Workouts view'] .workout-view-selector {
         height: 44px;
     }

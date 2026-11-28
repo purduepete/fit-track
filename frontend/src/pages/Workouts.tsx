@@ -242,6 +242,14 @@ export function Workouts({ onAuthError, active = true }: { onAuthError: () => vo
                             </button>
                         ))}
                     </div>
+                    <div className="phone-unit-selector">
+                        <UnitSelector unit={unit} onChange={setUnit} />
+                    </div>
+                    {saveError && (
+                        <p className="error phone-unit-error" role="alert">
+                            {saveError}
+                        </p>
+                    )}
                     {hiddenSort && (
                         <span className="hidden-sort">
                             Sorted by <strong>{SORT_LABELS[sort.key]}</strong>{' '}

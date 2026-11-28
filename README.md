@@ -25,7 +25,9 @@ Apple Watch ─▶ Apple Health ─▶ Health Auto Export (iOS)
 - **Mileage splits** — per-mile / per-km pace + avg HR, computed from the GPS
   route (with a distance-sample fallback for indoor workouts). The mi/km selector
   stays in the Workouts and workout detail headers on phone, tablet and desktop,
-  converting distance, pace and elevation, including the Workouts totals.
+  converting distance, pace and elevation, including the Workouts totals. On
+  phones, the Workouts selector sits to the right of the column views and the
+  weight field is hidden.
   The shared unit choice survives browser sessions on the same site, with a
   server-set cookie fallback when Safari clears local storage.
 - **Route map** — the GPS track drawn on OpenStreetMap (no API key).

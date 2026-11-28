@@ -273,7 +273,7 @@ describe('Workouts type dropdown', () => {
             const fetch = setup([workout({ elevation_gain_m: 100 })]);
             renderAt('/workouts');
             await findFooter();
-            const units = screen.getByRole('group', { name: 'Distance units' });
+            const [units, phoneUnits] = screen.getAllByRole('group', { name: 'Distance units' });
             expect(units.closest('.toolbar')).toBeInTheDocument();
             expect(screen.getAllByText('1.00 mi')).toHaveLength(2);
             expect(screen.getAllByText('10:00/mi')).toHaveLength(2);
@@ -284,6 +284,7 @@ describe('Workouts type dropdown', () => {
             expect(screen.getAllByText('6:13/km')).toHaveLength(2);
             expect(screen.getAllByText('100 m')).toHaveLength(2);
             expect(within(units).getByRole('button', { name: 'km' })).toHaveAttribute('aria-pressed', 'true');
+            expect(within(phoneUnits).getByRole('button', { name: 'km' })).toHaveAttribute('aria-pressed', 'true');
             expect(fetch).toHaveBeenCalledTimes(requests);
             await act(async () => fireEvent.click(within(units).getByRole('button', { name: 'mi' })));
             expect(await screen.findAllByText('1.00 mi')).toHaveLength(2);
